@@ -1,0 +1,443 @@
+package com.cinpe.deponder;
+
+
+import android.graphics.Matrix;
+import android.graphics.PointF;
+import android.graphics.Rect;
+import android.text.TextUtils;
+import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.Transformation;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import com.cinpe.deponder.control.DeponderControl;
+import com.cinpe.deponder.model.MyRootOption;
+import com.cinpe.deponder.option.BaseOption;
+import com.cinpe.deponder.option.PlanetOption;
+import com.cinpe.deponder.option.RootOption;
+import com.cinpe.deponder.option.RubberOption;
+
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import io.reactivex.rxjava3.android.MainThreadDisposable;
+import io.reactivex.rxjava3.core.BackpressureStrategy;
+import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.FlowableEmitter;
+import io.reactivex.rxjava3.schedulers.Schedulers;
+import io.reactivex.rxjava3.schedulers.Timed;
+
+/**
+ * @Description: T 唯一标识接口.
+ * @Author: Cinpe
+ * @E-Mail: cinpeCan@outlook.com
+ * @CreateDate: 2021/12/22
+ * @Version: 0.01
+ */
+public abstract class DeponderProxy<PO extends PlanetOption, RO extends RubberOption> implements DeponderControl<PO,RO> {
+
+    public static final String TAG = "DeponderProxy";
+
+    private final RootOption rootOption;
+
+    private final Map<String, PO> poMap;
+    private final Map<String, RO> roMap;
+
+    Flowable<Timed<Transformation>> flowable;
+
+    /**
+     * 相互作用力的缓存
+     */
+    private Map<String, Newton> newtonMap = new HashMap<>();
+
+    BindAdapter adapter;
+
+    float mScale = 1f;
+    float mX = 0f;
+    float mY = 1f;
+
+
+//    @NonNull
+//    private final DiffUtil.ItemCallback<T> mDiffCallback;
+
+
+    public DeponderProxy(@NonNull ViewGroup rootView) {
+
+        this(MyRootOption.builder()
+                .initScale(DeponderHelper.DEFAULT_INIT_SCALE)
+                .maxScale(DeponderHelper.DEFAULT_MAX_SCALE)
+                .minScale(DeponderHelper.DEFAULT_MIN_SCALE)
+                .mRootDensity(DeponderHelper.DEFAULT_ROOT_DENSITY)
+                .id(UUID.randomUUID().toString())
+                .itemView(rootView)
+                .build());
+
+
+    }
+
+    public DeponderProxy(@NonNull RootOption rootOption) {
+
+        this.rootOption = rootOption;
+
+        this.poMap = new HashMap<>();
+        this.roMap = new HashMap<>();
+
+        init();
+
+
+    }
+
+
+    private void init() {
+        if (this.flowable == null) {
+            DeponderHelper.bindDelegateRootTouch(this.rootOption, this.poMap.values());
+            bindRootMotion(this.rootOption);
+            this.flowable.subscribe(new DefSubscriber());
+        }
+    }
+
+    @Override
+    public void submit(@NonNull Collection<View> pList) {
+        submit(pList, null);
+    }
+    @Override
+    public void submit(@NonNull Collection<View> pList, @Nullable Collection<View> rList) {
+        submit(pList, rList, 1f);
+    }
+    @Override
+    public void submit(@NonNull Collection<View> pList, @Nullable Collection<View> rList, float scale) {
+        this.mScale = scale;
+        //todo 比对差异.
+
+        //移除原来所有动画.
+        cancel();
+
+        submitPlanet(pList);
+        if (rList != null) {
+            submitRubber(rList);
+        }
+
+        start();
+    }
+
+    /**
+     * 提交P
+     */
+    private void submitPlanet(@NonNull Collection<View> pList) {
+
+        //todo 比对差异.
+
+        //更新map.
+        poMap.putAll(pList.stream().map(this::functionP).collect(Collectors.<PO, String, PO>toMap(BaseOption::id, p -> p)));
+
+    }
+
+    /**
+     * 提交R
+     */
+    private void submitRubber(Collection<View> rList) {
+        roMap.putAll(rList.stream().map(this::functionR).collect(Collectors.<RO, String, RO>toMap(BaseOption::id, ro -> ro)));
+        roMap.values().forEach(ro -> rootOption.itemView().addView(ro.itemView()));
+    }
+
+    protected abstract PO functionP(View p);
+
+    protected abstract RO functionR(View r);
+
+    /**
+     * startAll
+     */
+    private void start() {
+
+        rootOption.animator().start();
+        poMap.values().forEach(po -> {
+            po.itemView().setAnimation(po.animator());
+            DeponderHelper.bindPlanet(po);
+            po.itemView().post(() -> {
+                mX = po.itemView().getWidth() >> 1;
+                mY = po.itemView().getHeight() >> 1;
+                po.matrix().postScale(this.mScale, this.mScale, mX, mY);
+            });
+        });
+        roMap.values().forEach(ro -> ro.itemView().setAnimation(ro.animator()));
+        this.rootOption.itemView().setAnimation(this.rootOption.animator());
+
+    }
+
+
+    /**
+     * pauseAll
+     */
+    private void pause() {
+        poMap.values().parallelStream().forEach(po -> po.animator().cancel());
+        roMap.values().parallelStream().forEach(ro -> ro.animator().cancel());
+    }
+
+    /**
+     * cancelAll
+     */
+    public void cancel() {
+        pause();
+        poMap.values().parallelStream().forEach(po -> po.itemView().setAnimation(null));
+        roMap.values().parallelStream().forEach(ro -> ro.itemView().setAnimation(null));
+        poMap.clear();
+        roMap.clear();
+    }
+
+
+    static class Newton {
+
+        public Newton(PlanetOption sPlanet, PlanetOption ePlanet) {
+            this.sPlanet = sPlanet;
+            this.ePlanet = ePlanet;
+            this.vector = new Matrix();
+            evaluate();
+        }
+
+        /**
+         * 评估.
+         */
+        private void evaluate() {
+
+            final Matrix sMatrix = this.sPlanet.matrix();
+            final Matrix eMatrix = this.ePlanet.matrix();
+
+            final Matrix invert = new Matrix();
+            sMatrix.invert(invert);
+
+            this.vector.setConcat(invert, eMatrix);
+
+            //如果不处于斥力感应范围,则reset.
+            float[] values = new float[9];
+            this.vector.getValues(values);
+
+            float radius = DeponderHelper.pythagorean(values[Matrix.MTRANS_X], values[Matrix.MTRANS_Y]);
+//            this.vector.mapRadius(radius);
+
+            Log.d(TAG, "评估() called[半径]=" + radius + ",[矩阵]=" + this.vector);
+
+            if (Math.abs(radius) > sPlanet.mInternalPressure()) {
+                //超出感应范围->重置.
+                this.vector.reset();
+            } else {
+                //感应范围内, 距离->力
+                float x = DeponderHelper.dDistance(values[Matrix.MTRANS_X], sPlanet.mInternalPressure());
+                float y = DeponderHelper.dDistance(values[Matrix.MTRANS_Y], sPlanet.mInternalPressure());
+
+                this.vector.setTranslate(x, y);
+            }
+
+        }
+
+        /**
+         * sPlanet
+         */
+        final PlanetOption sPlanet;
+
+        /**
+         * ePlanet
+         */
+        final PlanetOption ePlanet;
+
+        /**
+         * e -> s 的矢量.
+         * 力.
+         */
+        final Matrix vector;
+
+    }
+
+
+    class Listener extends MainThreadDisposable implements NAnimator.ApplyTransformationListener {
+
+        NAnimator nAnimator;
+        //        Observer<Float> observer;
+        FlowableEmitter<Transformation> emitter;
+
+        public Listener(NAnimator nAnimator, FlowableEmitter<Transformation> emitter) {
+            this.nAnimator = nAnimator;
+            this.emitter = emitter;
+        }
+
+        @Override
+        public void onApplyTransformation(Transformation t) {
+            emitter.onNext(t);
+        }
+
+        @Override
+        protected void onDispose() {
+            nAnimator.setApplyTransformationListener(null);
+        }
+    }
+
+    /**
+     * 绑定rootOption的动画.
+     */
+    private void bindRootMotion(@NonNull RootOption option) {
+
+        this.flowable = Flowable.<Transformation>create(emitter -> option.animator().setApplyTransformationListener(new Listener(option.animator(), emitter)), BackpressureStrategy.DROP)
+                .subscribeOn(Schedulers.io())
+                .timeInterval()
+                .doOnNext(transformationTimed -> {
+
+                    final long interval = Math.min(transformationTimed.time(), 16L);
+
+                    //todo 先完成上一帧的绘制.
+                    Log.i(TAG, "先完成上一帧的绘制() called with: interval = [" + interval + "]");
+
+                    poMap.values().forEach(po -> {
+
+                        //摩擦损耗.
+                        po.speed().offset(-po.speed().x * rootOption.mRootDensity() * interval, -po.speed().y * rootOption.mRootDensity() * interval);
+
+                        //进行位移.
+                        PointF p = DeponderHelper.calculate(po.speed(), po.acceleration(), interval);
+                        Log.i(TAG, "po[速度]=" + po.speed() + ",[加速度]=" + po.acceleration() + ",[间隔时间]=" + interval + ",[位移]=" + p);
+                        po.matrix().postTranslate(p.x, p.y);
+                        //记录位移末速度.
+                        po.speed().offset(po.acceleration().x * interval, po.acceleration().y * interval);
+
+                    });
+
+                })
+                //计算加速度.
+                .doOnNext(transformationTimed -> {
+
+                    //root的参数.
+                    Rect rootRect = new Rect();
+                    rootOption.itemView().getHitRect(rootRect);
+                    rootOption.rectF().set(rootRect);
+                    rootOption.matrix().mapRect(rootOption.rectF());
+                    rootOption.rectF().offsetTo(-mX, -mY);
+
+                    Log.i(TAG, "完成当前帧的计算() rootRect = [" + rootRect + "]");
+
+                    poMap.values().forEach(po -> {
+                        //todo 完成当前帧的计算.
+
+                        if (po.itemView().isPressed()) {
+                            po.speed().set(0, 0);
+                            po.acceleration().set(0, 0);
+                        } else {
+
+                            //先获取到root的[四个边距]的[有效]矢量和.
+                            //正方向取力的方向.
+                            PointF wallDistance = new PointF();
+
+                            //planet之间[有效]距离的矢量和.
+                            PointF planetDistance = new PointF();
+
+                            //rubber之间[有效]距离的矢量和.
+
+                            //总的加速度.
+                            PointF acceleration = new PointF();
+
+
+                            //先获取当前的矩形.
+                            Rect rect = new Rect();
+                            po.itemView().getHitRect(rect);
+                            po.rectF().set(rect);
+//                                po.matrix().mapRect(po.rectF());
+
+                            Matrix temp = new Matrix();
+                            float[] floats = new float[9];
+                            po.matrix().getValues(floats);
+                            po.rectF().offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
+                            temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], po.rectF().left, po.rectF().top);
+                            temp.mapRect(po.rectF());
+
+                            PointF centerPoint = new PointF(po.rectF().centerX(), po.rectF().centerY());
+
+                            //分析四边.
+                            float l = centerPoint.x - rootOption.rectF().left;
+                            float t = centerPoint.y - rootOption.rectF().top;
+                            float r = rootOption.rectF().right - centerPoint.x;
+                            float b = rootOption.rectF().bottom - centerPoint.y;
+
+                            //四边产生的力.
+                            l = l < rootOption.mInternalPressure() ? rootOption.mInternalPressure() - l : 0;
+                            t = t < rootOption.mInternalPressure() ? rootOption.mInternalPressure() - t : 0;
+                            r = r < rootOption.mInternalPressure() ? rootOption.mInternalPressure() - r : 0;
+                            b = b < rootOption.mInternalPressure() ? rootOption.mInternalPressure() - b : 0;
+
+                            wallDistance.x = l - r;//向右
+                            wallDistance.y = t - b;//向下
+
+                            //step#1
+                            acceleration.set(DeponderHelper.calculate(wallDistance, rootOption.elasticityCoefficient(), po.quality()));
+
+                            Log.d(TAG, "步骤一() 加速度 = [" + acceleration + "]" + ",边界距离向量:" + wallDistance + ",大矩形:" + rootOption.rectF() + ",小矩形:" + po.rectF() + ",感应范围:" + rootOption.mInternalPressure());
+
+
+                            //step#2
+                            //获取到其它planet的矢量和.
+                            Matrix planetMatrix = new Matrix();
+
+                            poMap.values().stream().filter(otherPo -> !TextUtils.equals(po.id(), otherPo.id()))
+                                    .forEach(otherPo -> {
+
+                                        final String mId = po.id() + otherPo.id();
+                                        final String invertId = otherPo.id() + po.id();
+                                        Newton obj = newtonMap.get(invertId);
+
+                                        Matrix matrix = new Matrix();
+                                        if (obj == null) {
+                                            obj = new Newton(po, otherPo);
+                                            newtonMap.put(mId, obj);
+
+                                            matrix.set(obj.vector);
+
+                                        } else {
+
+                                            obj.vector.invert(matrix);
+
+                                        }
+
+                                        planetMatrix.postConcat(matrix);
+
+                                    });
+
+
+                            if (!planetMatrix.isIdentity())
+                                Log.d(TAG, "矩阵积() [matrix] = [" + planetMatrix + "]");
+
+                            float[] values = new float[9];
+                            planetMatrix.getValues(values);
+
+                            planetDistance.set(-values[Matrix.MTRANS_X], -values[Matrix.MTRANS_Y]);
+
+                            //planet当前加速度.
+                            PointF planetAcceleration = DeponderHelper.calculate(planetDistance, po.elasticityCoefficient(), po.quality());
+
+
+                            Log.d(TAG, "步骤二() 加速度 = [" + planetAcceleration + "]" + ",步骤一:" + po.quality() + ",边界距离向量:" + wallDistance);
+
+
+                            //记录planet之间产生的加速度.
+                            acceleration.offset(planetAcceleration.x, planetAcceleration.y);
+
+
+                            //step#3
+                            //todo 开始计算rubber的合力.
+
+
+                            //step#4
+                            //记录. 加速度.
+                            po.acceleration().set(acceleration);
+                        }
+
+
+                    });
+                })
+                .doOnError(throwable -> Log.d(TAG, "doOnError() called with: throwable = [" + throwable + "]"))
+                .doOnComplete(() -> Log.d(TAG, "doOnComplete() 自动完成了"));
+
+    }
+
+}

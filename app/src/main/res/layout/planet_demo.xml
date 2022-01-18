@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?><!--作品属性的编辑,[剧情]类型的-->
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <data>
+
+        <variable
+            name="control"
+            type="com.cinpe.demo_deponder.DemoActivityControl" />
+
+        <!--        <variable-->
+        <!--            name="src"-->
+        <!--            type="android.net.Uri" />-->
+        <!--        -->
+        <!--        <variable-->
+        <!--            name="str"-->
+        <!--            type="String" />-->
+
+        <import type="android.view.View" />
+
+        <import type="androidx.lifecycle.MutableLiveData" />
+
+        <import type="androidx.lifecycle.LiveData" />
+
+        <import type="android.text.TextUtils" />
+
+    </data>
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@color/white">
+
+        <ImageView
+            android:id="@+id/img"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="@string/dummy_button"
+            android:src="@mipmap/ic_launcher_round"
+            app:layout_constraintBottom_toTopOf="@id/txt"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:layout_constraintVertical_chainStyle="spread" />
+
+        <TextView
+            android:id="@+id/txt"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/app_name"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/img" />
+
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+
+</layout>
