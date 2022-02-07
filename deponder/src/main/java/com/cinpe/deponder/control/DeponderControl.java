@@ -18,8 +18,8 @@ public interface DeponderControl<PO, RO> {
 
     void submit(@NonNull Collection<View> pList);
 
-    void submit(@NonNull Collection<View> pList, @Nullable Collection<View> rList);
+    void submit(@NonNull Collection<View> pList, @Nullable Collection<RO> rList);
 
-    void submit(@NonNull Collection<View> pList, @Nullable Collection<View> rList, float scale);
+    void submit(@NonNull Collection<View> pList, @Nullable Collection<RO> rList, float scale);
 
 }

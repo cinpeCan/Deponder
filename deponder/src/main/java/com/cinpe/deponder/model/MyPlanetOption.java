@@ -4,6 +4,7 @@ import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.text.TextUtils;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -83,7 +84,7 @@ public abstract class MyPlanetOption extends PlanetOption {
 
 
     public static Builder builder() {
-        return new AutoValue_MyPlanetOption.Builder().id(UUID.randomUUID().toString()).quality(DeponderHelper.DEFAULT_QUALITY_PROPERTY).mInternalPressure(DeponderHelper.DEFAULT_PLANET_INTERNAL_PRESSURE).speed(new PointF()).acceleration(new PointF()).frontalArea(DeponderHelper.DEFAULT_INIT_SCALE).elasticityCoefficient(DeponderHelper.DEFAULT_ELASTICITY_COEFFICIENT);
+        return new AutoValue_MyPlanetOption.Builder().quality(DeponderHelper.DEFAULT_QUALITY_PROPERTY).mInternalPressure(DeponderHelper.DEFAULT_PLANET_INTERNAL_PRESSURE).speed(new PointF()).acceleration(new PointF()).frontalArea(DeponderHelper.DEFAULT_INIT_SCALE).elasticityCoefficient(DeponderHelper.DEFAULT_ELASTICITY_COEFFICIENT);
     }
 
     @AutoValue.Builder

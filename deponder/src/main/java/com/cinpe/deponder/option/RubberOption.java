@@ -29,4 +29,9 @@ public abstract class RubberOption extends BaseOption {
      */
     public abstract float elasticityCoefficient();
 
+    /**
+     * 自然长度(px).
+     */
+    public abstract int naturalLength();
+
 }

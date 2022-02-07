@@ -6,6 +6,7 @@ import androidx.databinding.DataBindingUtil;
 
 import android.os.Bundle;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 
 import com.cinpe.demo_deponder.databinding.ActivityDemoBinding;
@@ -42,22 +43,23 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
                 return MyPlanetOption
                         .builder()
                         .itemView(p)
+                        .id(String.valueOf(p.hashCode()))
                         .build();
             }
 
-            @Override
-            public RubberOption functionR(View r) {
-                return null;
+//            @Override
+//            public RubberOption functionR(View r) {
+////                return null;
 //                return MyRubberOption
 //                        .builder()
 //                        .id()
 //                        .eId()
 //                        .itemView(r)
 //                        .build();
-            }
+//            }
         };
 
-        incubateDate();
+        incubateDate2();
 
         Log.i(TAG, "[submit]childCount:" + mBinding.layoutRoot);
     }
@@ -74,11 +76,36 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
 
         List<View> list = new ArrayList<>();
         list.add(mBinding.item0);
-        list.add(mBinding.item1);
-        list.add(mBinding.item2);
+//        list.add(mBinding.item1);
+//        list.add(mBinding.item2);
 
         //提交view集合.
         deponderProxy.submit(list);
+    }
 
+
+    /**
+     * 随便生成些数据2.
+     */
+    private void incubateDate2() {
+
+        List<View> list = new ArrayList<>();
+        list.add(mBinding.item0);
+        list.add(mBinding.item1);
+        list.add(mBinding.item2);
+
+        List<RubberOption> rubberOptions = new ArrayList<>();
+
+        MyRubberOption rubberOption = MyRubberOption.builder()
+                .id(String.valueOf(mBinding.item0.hashCode()))
+                .eId(String.valueOf(mBinding.item1.hashCode()))
+                .naturalLength(300)
+                .itemView(DataBindingUtil.inflate(LayoutInflater.from(this), R.layout.rubber_demo, mBinding.layoutRoot, false).getRoot())
+                .build();
+
+        rubberOptions.add(rubberOption);
+
+        //提交view集合.
+        deponderProxy.submit(list, rubberOptions, .3f);
     }
 }

@@ -17,11 +17,11 @@ import io.reactivex.rxjava3.subscribers.DisposableSubscriber;
  * @CreateDate: 2022/1/18
  * @Version: 0.01
  */
-public class DefSubscriber implements FlowableSubscriber<Timed<Transformation>> {
+public class DefSubscriber<T> extends DisposableSubscriber<T> {
     private static final String TAG = "DefSubscriber";
 
     @Override
-    public void onNext(Timed<Transformation> transformationTimed) {
+    public void onNext(T transformationTimed) {
     }
 
     @Override
@@ -34,8 +34,5 @@ public class DefSubscriber implements FlowableSubscriber<Timed<Transformation>> 
         Log.d(TAG, "onComplete() called");
     }
 
-    @Override
-    public void onSubscribe(@NonNull Subscription s) {
-        s.request(Long.MAX_VALUE);
-    }
+
 }

@@ -1,13 +1,11 @@
 package com.cinpe.deponder;
 
-import android.animation.RectEvaluator;
 import android.content.Context;
 import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.graphics.drawable.Drawable;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.GestureDetector;
@@ -21,14 +19,10 @@ import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Px;
 
-import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RootOption;
-import com.orhanobut.logger.Logger;
 
-import java.lang.ref.WeakReference;
 import java.util.Collection;
-import java.util.Optional;
 
 /**
  * @Description: 描述
@@ -59,7 +53,7 @@ public class DeponderHelper {
     /**
      * 空间中以太密度.
      */
-    public final static float DEFAULT_ROOT_DENSITY = 0.00028f;
+    public final static float DEFAULT_ROOT_DENSITY = 0.0006f;
 
     /**
      * 默认planet质量
@@ -117,13 +111,30 @@ public class DeponderHelper {
     }
 
     /**
+     * 获取矩阵差.
+     */
+    public static Matrix matrixDiff(Matrix sMatrix, Matrix eMatrix) {
+        final Matrix invert = new Matrix();
+        sMatrix.invert(invert);
+        Matrix matrix = new Matrix();
+        boolean concat = matrix.setConcat(invert, eMatrix);
+        if (concat) {
+            return matrix;
+        } else {
+            throw new IllegalStateException("IllegalState Matrix: [sMatrix] = " + sMatrix + " [eMatrix] = " + eMatrix);
+        }
+
+    }
+
+    /**
      * 距离->形变距离.
-     * 力方向为正
+     * 斥力方向为正
      *
      * @param distance 实际距离.
      */
     public static float dDistance(float distance, @FloatRange(from = 0) float internalPressure) {
         if (distance == 0) {
+            //距离为0, 没有力的方向. 合力为0.
             return 0;
         } else if (distance > 0) {
             return internalPressure - distance;
@@ -133,13 +144,25 @@ public class DeponderHelper {
     }
 
     /**
+     * 形变量->计算力
+     *
+     * @param difDistance 形变距离.
+     */
+    public static PointF calculate(@NonNull PointF difDistance, float elasticity_coefficient) {
+        return new PointF(difDistance.x * elasticity_coefficient, difDistance.y * elasticity_coefficient);
+    }
+
+    /**
      * 距离计算加速度.
      *
-     * @param distance 形变距离.
+     * @param difDistance 形变距离.
      */
-    public static PointF calculate(PointF distance, float elasticity_coefficient, float m) {
-        return new PointF(distance.x * elasticity_coefficient / m, distance.y * elasticity_coefficient / m);
+    public static PointF calculate(@NonNull PointF difDistance, float elasticity_coefficient, float m) {
+        final PointF newton = calculate(difDistance, elasticity_coefficient);
+        return new PointF(newton.x / m, newton.y / m);
     }
+
+
 
     /**
      * 计算位移(矢量),

@@ -59,7 +59,12 @@ public abstract class PlanetOption extends BaseOption implements QualityProperty
         final Rect rect = new Rect();
         itemView().getHitRect(rect);
         final RectF rectF = new RectF(rect);
-        matrix().mapRect(rectF);
+        float[] floats = new float[9];
+        matrix().getValues(floats);
+        rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
+        final Matrix matrix = new Matrix();
+        matrix.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.centerX(), rectF.centerY());
+        matrix.mapRect(rectF);
         return rectF;
     }
 

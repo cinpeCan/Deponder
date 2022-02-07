@@ -3,6 +3,7 @@ package com.cinpe.deponder.model;
 import android.graphics.Matrix;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.text.TextUtils;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -57,17 +58,21 @@ public abstract class MyRubberOption extends RubberOption {
     @Override
     public abstract float elasticityCoefficient();
 
-    public static MyRubberOption create(View itemView, String id, String eId, float elasticityCoefficient) {
+    @Override
+    public abstract int naturalLength();
+
+    public static MyRubberOption create(View itemView, String id, String eId, float elasticityCoefficient, int naturalLength) {
         return builder()
                 .itemView(itemView)
                 .id(id)
                 .eId(eId)
                 .elasticityCoefficient(elasticityCoefficient)
+                .naturalLength(naturalLength)
                 .build();
     }
 
     public static Builder builder() {
-        return new AutoValue_MyRubberOption.Builder().elasticityCoefficient(DeponderHelper.DEFAULT_RUBBER_ELASTICITY_COEFFICIENT);
+        return new AutoValue_MyRubberOption.Builder().elasticityCoefficient(DeponderHelper.DEFAULT_RUBBER_ELASTICITY_COEFFICIENT).naturalLength(DeponderHelper.DEFAULT_RUBBER_NATURAL_LENGTH);
     }
 
     @AutoValue.Builder
@@ -86,13 +91,21 @@ public abstract class MyRubberOption extends RubberOption {
 
         public abstract Builder elasticityCoefficient(float elasticityCoefficient);
 
+        public abstract Builder naturalLength(int naturalLength);
+
         abstract MyRubberOption autoBuild();
+
+        abstract String id();
+
+        abstract String eId();
 
         abstract View itemView();
 
         abstract Matrix matrix();
 
         public final MyRubberOption build() {
+            if (TextUtils.equals(id(), eId()))
+                throw new IllegalStateException("Start and end points cannot be the same");
             final Rect rect = new Rect();
             itemView().getHitRect(rect);
             final RectF rectF = new RectF(rect);
