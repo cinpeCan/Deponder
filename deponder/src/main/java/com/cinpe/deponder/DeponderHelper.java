@@ -18,11 +18,22 @@ import androidx.annotation.Dimension;
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Px;
+import androidx.core.util.Pair;
 
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RootOption;
 
+import org.reactivestreams.Publisher;
+
 import java.util.Collection;
+
+import io.reactivex.rxjava3.core.Flowable;
+import io.reactivex.rxjava3.core.FlowableTransformer;
+import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.ObservableSource;
+import io.reactivex.rxjava3.core.ObservableTransformer;
+import io.reactivex.rxjava3.functions.BiFunction;
+import io.reactivex.rxjava3.functions.Function;
 
 /**
  * @Description: 描述
@@ -104,6 +115,44 @@ public class DeponderHelper {
     }
 
     /**
+     * hitRect
+     */
+    public static @NonNull
+    Rect hitRect(@NonNull View v) {
+        Rect rect = new Rect();
+        v.getHitRect(rect);
+        return rect;
+    }
+
+    /**
+     * hitRectF
+     */
+    public static @NonNull
+    RectF hitRectF(@NonNull View v) {
+        Rect rect = new Rect();
+        v.getHitRect(rect);
+        return new RectF(rect);
+    }
+
+    /**
+     * getValues
+     */
+    public static @NonNull
+    float[] values(@NonNull Matrix matrix) {
+        float[] floats = new float[9];
+        matrix.getValues(floats);
+        return floats;
+    }
+
+    /**
+     * centerPointF
+     */
+    public static @NonNull
+    PointF centerPointF(PointF s, PointF e) {
+        return new PointF((s.x + e.x) / 2, (s.y + e.y) / 2);
+    }
+
+    /**
      * 矩形长宽获取斜边长.
      */
     public static float pythagorean(float dx, float dy) {
@@ -163,7 +212,6 @@ public class DeponderHelper {
     }
 
 
-
     /**
      * 计算位移(矢量),
      *
@@ -177,7 +225,7 @@ public class DeponderHelper {
         return new PointF(x, y);
     }
 
-    public static void bindDelegateRootTouch(RootOption rootOption, Collection<? extends PlanetOption> clt) {
+    public static void bindDelegateRootTouch(@NonNull RootOption rootOption, @NonNull Collection<? extends PlanetOption> clt) {
         rootOption.itemView().post(() -> rootOption.itemView().setTouchDelegate(new DeponderDelegate(clt)));
 //        todo 暂不考虑root的触控
 //        todo rootOption.itemView().setOnTouchListener(new RootTouchHelper(rootOption.matrix()));
@@ -205,6 +253,8 @@ public class DeponderHelper {
         @Override
         public boolean onTouch(View v, MotionEvent event) {
 
+            Log.i(TAG, "进入PlanetOption.onTouch()" + event.getAction());
+
             if (!v.isEnabled()) {
                 return false;
             }
@@ -229,6 +279,7 @@ public class DeponderHelper {
                 Log.i(TAG, "不包含, 不消费" + rectF + "," + this.option.matrix() + "," + point);
                 return false;
             }
+            Log.i(TAG, "包含, 进行消费" + rectF + "," + this.option.matrix() + "," + point);
 
             boolean retVal = mScaleGestureDetector.onTouchEvent(event);
             retVal = mGestureDetector.onTouchEvent(event) || retVal;
@@ -275,6 +326,7 @@ public class DeponderHelper {
 
         @Override
         public boolean onDown(MotionEvent e) {
+
             return true;
         }
 
@@ -352,4 +404,89 @@ public class DeponderHelper {
         }
     }
 
+    public static <O> CombinationsPair<O, Pair<O, O>> combinationsPair() {
+        return new CombinationsPair<O, Pair<O, O>>() {
+            @NonNull
+            @Override
+            protected BiFunction<O, O, Pair<O, O>> biFunction() {
+                return Pair::create;
+            }
+        };
+    }
+
+    public static <O, P> FlowableCombinationsPair<O, P> flowableCombinationsPair(@NonNull BiFunction<O, O, P> biFunction) {
+        return new FlowableCombinationsPair<O, P>() {
+            @NonNull
+            @Override
+            protected BiFunction<O, O, P> biFunction() {
+                return biFunction;
+            }
+        };
+    }
+
+    public static <O, P> FlowableTransformer<O, P> flowableCombinations(FlowableTransformer<O, O> UpstreamTransformer, FlowableTransformer<O, P> transformer) {
+        return upstream -> upstream.compose(UpstreamTransformer).compose(transformer);
+    }
+
+    public static <O, P> CombinationsPair<O, P> combinationsPair(@NonNull BiFunction<O, O, P> biFunction) {
+        return new CombinationsPair<O, P>() {
+            @NonNull
+            @Override
+            protected BiFunction<O, O, P> biFunction() {
+                return biFunction;
+            }
+        };
+    }
+
+
+    private static abstract class CombinationsPair<O, P> implements ObservableTransformer<O, P> {
+
+        private int i = 0;
+
+        @Override
+        public @NonNull
+        final ObservableSource<P> apply(@NonNull Observable<O> upstream) {
+            return upstream
+                    //todo 绘制po.
+                    .doOnNext(o -> System.out.println("upstream.doOnNext:[评估四边压力]" + o))
+                    .doAfterNext(o -> System.out.println("upstream.doAfterNext:[绘制po]" + o))
+//                    .doFinally(() -> System.out.println("upstream.doFinally"))
+                    .flatMap(o -> upstream.skip(++i)
+//                            .doOnNext(e -> System.out.println("doOnNext o:" + o + ",e:" + e))
+//                            .doAfterNext(e -> System.out.println("doAfterNext o:" + o + ",e:" + e))
+                            //用来处理o.
+//                            .doFinally(() -> System.out.println("doFinally:" + o))
+                            , biFunction());
+        }
+
+        abstract protected @NonNull
+        BiFunction<O, O, P> biFunction();
+
+    }
+
+
+    private static abstract class FlowableCombinationsPair<O, P> implements FlowableTransformer<O, P> {
+
+        private int i = 0;
+
+        @Override
+        public @NonNull
+        final Publisher<P> apply(@NonNull Flowable<O> upstream) {
+            return upstream
+                    //todo 绘制po.
+                    .doOnNext(o -> Log.i(TAG, "看看i:" + i))
+                    .doAfterNext(o -> Log.i(TAG, "看看after-i:" + i))
+//                    .doFinally(() -> System.out.println("upstream.doFinally"))
+                    .flatMap(o -> upstream.skip(++i)
+//                            .doOnNext(e -> System.out.println("doOnNext o:" + o + ",e:" + e))
+//                            .doAfterNext(e -> System.out.println("doAfterNext o:" + o + ",e:" + e))
+                            //用来处理o.
+//                            .doFinally(() -> System.out.println("doFinally:" + o))
+                            , biFunction());
+        }
+
+        abstract protected @NonNull
+        BiFunction<O, O, P> biFunction();
+
+    }
 }

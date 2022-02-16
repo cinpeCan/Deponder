@@ -1,15 +1,16 @@
 package com.cinpe.demo_deponder;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.databinding.DataBindingUtil;
-
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.databinding.DataBindingUtil;
+
 import com.cinpe.demo_deponder.databinding.ActivityDemoBinding;
+import com.cinpe.deponder.Deponder;
 import com.cinpe.deponder.DeponderProxy;
 import com.cinpe.deponder.model.MyPlanetOption;
 import com.cinpe.deponder.model.MyRubberOption;
@@ -23,23 +24,27 @@ import java.util.List;
 /**
  * An example activity that shows how to use DeponderProxy.
  */
-public class DemoActivity extends AppCompatActivity implements DemoActivityControl {
+public class DemoActivity2 extends AppCompatActivity implements DemoActivityControl {
 
-    private static final String TAG = "DemoActivity";
+    private static final String TAG = "DemoActivity2";
 
     private ActivityDemoBinding mBinding;
 
-    DeponderProxy<MyPlanetOption, MyRubberOption> deponderProxy;
+    Deponder<PlanetOption, RubberOption> deponderProxy;
+
+    List<View> list = new ArrayList<>();
+    List<RubberOption> rubberOptions = new ArrayList<>();
 
 
     @Override
     protected void onPostCreate(@Nullable Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
         mBinding = DataBindingUtil.setContentView(this, R.layout.activity_demo);
+        mBinding.setControl(this);
 
-        deponderProxy = new DeponderProxy<MyPlanetOption, MyRubberOption>(mBinding.layoutRoot) {
+        deponderProxy = new Deponder<PlanetOption, RubberOption>(this, mBinding.layoutRoot) {
             @Override
-            public MyPlanetOption functionP(View p) {
+            public PlanetOption functionP(View p) {
                 return MyPlanetOption
                         .builder()
                         .itemView(p)
@@ -71,6 +76,8 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
 
     @Override
     public void onClickAddPO(View view) {
+        list.add(mBinding.item2);
+        deponderProxy.submit(list, rubberOptions, 1f);
 
     }
 
@@ -84,13 +91,12 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
      */
     private void incubateDate() {
 
-        List<View> list = new ArrayList<>();
         list.add(mBinding.item0);
 //        list.add(mBinding.item1);
 //        list.add(mBinding.item2);
 
         //提交view集合.
-        deponderProxy.submit(list);
+        deponderProxy.submit(list, rubberOptions, 1f);
     }
 
 
@@ -99,24 +105,22 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
      */
     private void incubateDate2() {
 
-        List<View> list = new ArrayList<>();
+
         list.add(mBinding.item0);
-//        list.add(mBinding.item1);
+        list.add(mBinding.item1);
 //        list.add(mBinding.item2);
 
-        List<MyRubberOption> rubberOptions = new ArrayList<>();
 
-//        MyRubberOption rubberOption = MyRubberOption.builder()
-//                .id(String.valueOf(mBinding.item0.hashCode()))
-//                .eId(String.valueOf(mBinding.item1.hashCode()))
-//                .naturalLength(300)
-//                .itemView(DataBindingUtil.inflate(LayoutInflater.from(this), R.layout.rubber_demo, mBinding.layoutRoot, false).getRoot())
-//                .build();
+        MyRubberOption rubberOption = MyRubberOption.builder()
+                .id(String.valueOf(mBinding.item0.hashCode()))
+                .eId(String.valueOf(mBinding.item1.hashCode()))
+                .naturalLength(300)
+                .itemView(DataBindingUtil.inflate(LayoutInflater.from(mBinding.layoutRoot.getContext()), R.layout.rubber_demo, mBinding.layoutRoot, false).getRoot())
+                .build();
 
-//        rubberOptions.add(rubberOption);
+        rubberOptions.add(rubberOption);
 
         //提交view集合.
-//        mBinding.item0.post(()->deponderProxy.submit(list, null, 1f));
-        deponderProxy.submit(list, null, 1f);
+        deponderProxy.submit(list, rubberOptions, 1f);
     }
 }

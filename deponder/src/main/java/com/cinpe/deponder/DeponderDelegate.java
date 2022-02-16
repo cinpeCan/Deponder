@@ -52,6 +52,7 @@ public class DeponderDelegate extends TouchDelegate {
 
         int action = event.getAction();
         final PlanetOption mOption = option;
+        Log.i(TAG, "进入PlanetOption的touch");
 
         if (mOption != null) {
             boolean b = sendToDelegate(mOption, event);
@@ -60,6 +61,7 @@ public class DeponderDelegate extends TouchDelegate {
                     mOption.itemView().setPressed(false);
                 } else {
                     mOption.itemView().setPressed(true);
+                    mOption.speed().set(0, 0);
                 }
                 return true;
             } else {
@@ -98,6 +100,7 @@ public class DeponderDelegate extends TouchDelegate {
                     intersect = sendToDelegate(option, event);
 
                     option.itemView().setPressed(true);
+                    option.speed().set(0, 0);
                 }
 
 
@@ -109,6 +112,7 @@ public class DeponderDelegate extends TouchDelegate {
     }
 
     private boolean sendToDelegate(final PlanetOption mOption, @NonNull MotionEvent event) {
+        Log.i(TAG, "发射事件到planet上");
         return mOption.itemView().dispatchTouchEvent(event);
     }
 }

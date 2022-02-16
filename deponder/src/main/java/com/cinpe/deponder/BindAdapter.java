@@ -7,6 +7,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.databinding.ViewDataBinding;
+import androidx.lifecycle.MutableLiveData;
 
 import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
@@ -28,58 +29,40 @@ import java.util.stream.Collectors;
  */
 public abstract class BindAdapter<P, R, PO extends PlanetOption, RO extends RubberOption> {
 
-    private final String TAG;
+    private final String TAG = this.getClass().getSimpleName();
 
-    private final Map<String, PO> poMap;
-    private final Map<String, RO> roMap;
-
-    RootOption rootOption;
+    final MutableLiveData<Collection<PO>> poClt;
+    final MutableLiveData<Collection<RO>> roClt;
 
 //    @NonNull
 //    private final DiffUtil.ItemCallback<T> mDiffCallback;
 
-    public BindAdapter(@NonNull RootOption rootOption) {
-        this.TAG = this.getClass().getSimpleName();
-        this.rootOption = rootOption;
-        this.poMap = new HashMap<>();
-        this.roMap = new HashMap<>();
+    public BindAdapter(@NonNull MutableLiveData<Collection<PO>> poClt, @NonNull MutableLiveData<Collection<RO>> roClt) {
+
+        this.poClt = poClt;
+        this.roClt = roClt;
         //        mDiffCallback = callback;
 
     }
 
-//    public Map<String, PO> getPoMap() {
-//        return this.poMap;
-//    }
-//
-//    public Map<String, RO> getRoMap() {
-//        return this.roMap;
-//    }
-
-    /**
-     * 提交viewList.
-     */
-    public void submit(Collection<P> pClt, Collection<R> rClt) {
-
-    }
 
     /**
      * 提交P
      */
-    private void submitPlanet(@NonNull List<P> pList) {
+    public void submitP(@NonNull Collection<P> pList) {
 
     }
 
     /**
      * 提交R
      */
-    private Map<String, RO> submitRubber(List<R> rList) {
-        Map<String, RO> roMap = new HashMap<>();
-        roMap.putAll(rList.stream().map(ro -> functionR(ro, rootOption.itemView())).collect(Collectors.<RO, String, RO>toMap(BaseOption::id, ro -> ro)));
-        roMap.values().forEach(ro -> rootOption.itemView().addView(ro.itemView()));
-        return roMap;
+    public void submitR(@NonNull Collection<R> rList) {
+
     }
 
-    public abstract PO functionP(P p, ViewGroup parent);
+    public abstract @NonNull
+    PO functionP(@NonNull P p, @NonNull View parent);
 
-    public abstract RO functionR(R p, ViewGroup parent);
+    public abstract @NonNull
+    RO functionR(@NonNull R p, @NonNull View parent);
 }

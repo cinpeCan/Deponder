@@ -103,6 +103,8 @@ public abstract class MyPlanetOption extends PlanetOption {
 
         abstract View itemView();
 
+        abstract Matrix matrix();
+
         abstract MyPlanetOption autoBuild();
 
         abstract Builder speed(PointF speed);
@@ -114,9 +116,8 @@ public abstract class MyPlanetOption extends PlanetOption {
         abstract Builder acceleration(PointF acceleration);
 
         public final MyPlanetOption build() {
-            final Matrix matrix = itemView().getMatrix();
-            return matrix(matrix)
-                    .animator(new NAnimator(matrix))
+            return matrix(itemView().getMatrix())
+                    .animator(new NAnimator(matrix()))
                     .speed(new PointF())
                     .acceleration(new PointF())
                     .autoBuild();

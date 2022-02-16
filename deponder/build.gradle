@@ -105,8 +105,8 @@ dependencies {
 //    // optional - ProcessLifecycleOwner provides a lifecycle for the whole application process
 //    implementation "androidx.lifecycle:lifecycle-process:$lifecycleVersion"
 
-//    // optional - ReactiveStreams support for LiveData
-//    implementation "androidx.lifecycle:lifecycle-reactivestreams:$lifecycleVersion"
+    // optional - ReactiveStreams support for LiveData
+    implementation "androidx.lifecycle:lifecycle-reactivestreams:$lifecycleVersion"
 
     // optional - Test helpers for LiveData
     testImplementation "androidx.arch.core:core-testing:$archVersion"

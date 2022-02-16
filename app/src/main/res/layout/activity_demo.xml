@@ -27,9 +27,9 @@
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/layout_root"
             android:layout_width="300dp"
-            android:layout_height="300dp"
+            android:layout_height="500dp"
+            android:layout_marginTop="50dp"
             android:background="@color/white"
-            app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">
@@ -67,14 +67,27 @@
 
         </androidx.constraintlayout.widget.ConstraintLayout>
 
-        <!--        <androidx.recyclerview.widget.RecyclerView-->
-        <!--            android:id="@+id/recycler_layout"-->
-        <!--            android:background="@color/light_blue_A200"-->
-        <!--            tools:itemCount="20"-->
-        <!--            tools:listitem="@layout/db_item_status_content_fragment"-->
-        <!--            android:layout_width="match_parent"-->
-        <!--            android:layout_height="match_parent"/>-->
+        <!--点击添加PO-->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_add_po"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:onClick="@{control::onClickAddPO}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/btn_add_ro"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/layout_root" />
 
+        <!--点击添加RO-->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_add_ro"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:onClick="@{control::onClickAddRO}"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/btn_add_po"
+            app:layout_constraintTop_toBottomOf="@id/layout_root" />
 
 
     </androidx.constraintlayout.widget.ConstraintLayout>

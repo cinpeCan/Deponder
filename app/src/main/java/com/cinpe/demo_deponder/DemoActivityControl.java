@@ -16,4 +16,14 @@ public interface DemoActivityControl {
      */
     void onClickPlanet(View view);
 
+    /**
+     * 点击添加PO
+     */
+    void onClickAddPO(View view);
+
+    /**
+     * 点击添加RO
+     */
+    void onClickAddRO(View view);
+
 }
