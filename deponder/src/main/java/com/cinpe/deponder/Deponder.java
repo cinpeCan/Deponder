@@ -75,7 +75,7 @@ import io.reactivex.rxjava3.schedulers.Timed;
  * @CreateDate: 2021/12/22
  * @Version: 0.01
  */
-public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption> {
+public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
 
     public static final String TAG = "Deponder";
 
@@ -114,19 +114,29 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
         pre(this.rootOption);
     }
 
-    public void submit(@NonNull Collection<View> pList) {
-        submit(pList, null);
-    }
+//    private void submit(@NonNull Collection<View> pList) {
+//        submit(pList, null);
+//    }
+//
+//    private void submit(@NonNull Collection<View> pList, @Nullable Collection<RO> rList) {
+//        submit(pList, rList, 1f);
+//    }
+//
+//    private void submit(@NonNull Collection<View> pList, @Nullable Collection<RO> rList, float scale) {
+//        this.scaleLD.postValue(scale);
+//        //todo 比对差异.
+//
+//        submitPlanet(pList.stream().map(this::functionP).collect(Collectors.toList()));
+//        submitRubber(rList);
+//
+//
+//    }
 
-    public void submit(@NonNull Collection<View> pList, @Nullable Collection<RO> rList) {
-        submit(pList, rList, 1f);
-    }
-
-    public void submit(@NonNull Collection<View> pList, @Nullable Collection<RO> rList, float scale) {
+    public void submit(@NonNull Collection<PO> pList, @Nullable Collection<RO> rList, float scale) {
         this.scaleLD.postValue(scale);
         //todo 比对差异.
 
-        submitPlanet(pList.stream().map(this::functionP).collect(Collectors.toList()));
+        submitPlanet(pList);
         submitRubber(rList);
 
 
@@ -135,33 +145,31 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
     /**
      * 提交P
      */
-    private void submitPlanet(@NonNull Collection<PO> pList) {
-
-        //todo 比对差异.
-
-        //todo 移除之前所有动画绑定.
+    public void submitPlanet(@NonNull Collection<PO> pList) {
 
         poClt.setValue(pList);
 
-        //todo view添加到rootView.
     }
 
     /**
      * 提交R
      */
-    private void submitRubber(Collection<RO> rList) {
-
-        //todo 检查差异?
-
-        //todo 移除之前所有动画绑定.
+    public void submitRubber(Collection<RO> rList) {
 
         roClt.setValue(rList);
 
-        //todo view添加到rootView.
+    }
+
+    /**
+     * 提交scale
+     */
+    public void submitScale(float scale) {
+
+        scaleLD.postValue(scale);
 
     }
 
-    protected abstract PO functionP(View p);
+//    protected abstract PO functionP(View p);
 
 //    protected abstract RO functionR(View r);
 
@@ -172,7 +180,7 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
 
         Log.i(TAG, "start");
         this.rootOption.itemView().startAnimation(this.rootOption.animator());
-
+        DeponderHelper.bindDelegateRootTouch(this.rootOption);
     }
 
 
@@ -190,7 +198,7 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
     /**
      * cancelAll
      */
-    public void cancel() {
+    private void cancel() {
         pause();
         poClt.postValue(null);
         roClt.postValue(null);
@@ -209,7 +217,6 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
             this.ePlanet = ePlanet;
             this.rubber = rubberOption;
             this.vector = new Matrix();
-//            evaluate();
         }
 
         /**
@@ -345,33 +352,47 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
     private void pre(@NonNull RootOption option) {
 
 
-        //用于 用于绘制po.
-        Flowable<Collection<PO>> poCltFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt))
-                .defaultIfEmpty(Collections.emptyList())
-                .doOnSubscribe(s -> start())
-                .doOnNext(p -> Log.i(TAG, "发射po集合" + p))
-                .doOnNext(clt -> {
-                    if (!clt.isEmpty()) {
-                        Log.i(TAG, "设置touch:" + clt);
-                        DeponderHelper.bindDelegateRootTouch(this.rootOption, clt);
-//                        clt.forEach(po -> {
-//                            po.itemView().setAnimation(po.animator());
-//                            DeponderHelper.bindPlanet(po);
-//
-//                            po.matrix().postTranslate(300, 300);
-//                        });
-
-                    }
-                });
 //                .concatMapIterable(iterable -> iterable);
+
+        //scale
+        Flowable<Float> scaleFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, scaleLD)).debounce(50, TimeUnit.MILLISECONDS).doOnNext(p -> Log.i(TAG, "发射缩放" + p));
+
+        //用于 用于绘制po.
+        Flowable<Collection<PO>> poCltFlowable =
+//                Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt))
+//                .defaultIfEmpty(Collections.emptyList())
+//                .doOnSubscribe(s -> start());
+                Flowable.combineLatest(
+                        Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt))
+                                .defaultIfEmpty(Collections.emptyList())
+                                .doOnSubscribe(s -> start()),
+                        scaleFlowable,
+                        new BiFunction<Collection<PO>, Float, Collection<PO>>() {
+                            @Override
+                            public Collection<PO> apply(Collection<PO> pos, Float aFloat) throws Throwable {
+                                return Observable.fromIterable(pos)
+                                        .distinct(BaseOption::id)
+                                        .doOnNext(po -> {
+                                            float dst = aFloat;
+                                            float[] values = DeponderHelper.values(po.matrix());
+                                            RectF rectF = DeponderHelper.hitRectF(po.itemView());
+                                            PointF pointF = new PointF(rectF.centerX() + values[Matrix.MTRANS_X], rectF.centerY() + values[Matrix.MTRANS_Y]);
+                                            float s = dst / values[Matrix.MSCALE_Y];
+                                            po.matrix().postScale(s, s, pointF.x, pointF.y);
+                                        })
+                                        .toList()
+                                        .doOnError(t -> Log.i(TAG, "scale出错:" + t.getMessage()))
+                                        .blockingGet();
+                            }
+                        }
+
+                );
 
         //用于 用于绘制ro.
         Flowable<Collection<RO>> roCltFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, roClt))
                 .defaultIfEmpty(Collections.emptyList())
                 .doOnNext(p -> Log.i(TAG, "发射ro集合"));
 
-        //scale
-        Flowable<Float> scaleFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, scaleLD)).doOnNext(p -> Log.i(TAG, "发射缩放" + p));
 
         /**
          * 帧回调.
@@ -380,21 +401,23 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
                 .timeInterval()
 //                .skipWhile(t -> t.time() > 16)
 //                .map(Timed::time)
+                .throttleFirst(500, TimeUnit.MILLISECONDS)
                 .doOnNext(l -> Log.i(TAG, "间隔时间:" + l));
 
         //用于 evaluate.
         //用于 绘制ro.
-        Flowable<? extends Iterable<Newton<PO, RO>>> newtonFlowable = Flowable.combineLatest(
+        Flowable<? extends Collection<Newton<PO, RO>>> newtonFlowable = Flowable.combineLatest(
                 poCltFlowable,
                 roCltFlowable.defaultIfEmpty(Collections.emptyList()),
                 Pair::create
         ).debounce(50, TimeUnit.MILLISECONDS)
                 .doOnNext(pair -> Log.i(TAG, "发射Pair"))
-                .concatMap(pair ->
+                .map(pair ->
                         {
                             Log.i(TAG, "实际发射Pair" + pair);
 
                             final Map<String, RO> stringROMap = Observable.fromIterable(pair.second)
+                                    .distinct(ro -> ro.id() + ro.eId())
                                     .doOnNext(ro -> {
                                         int i = rootOption.itemView().indexOfChild(ro.itemView());
                                         if (i < 0) {
@@ -407,67 +430,91 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
                                     .subscribeOn(AndroidSchedulers.mainThread())
                                     .doOnNext(ro -> Log.i(TAG, "设置完ro动画"))
                                     .toMap(ro -> ro.id() + ro.eId(), ro -> ro)
+                                    .doOnSuccess(m -> Log.i(TAG, "看看个数:" + m.size()))
                                     .blockingGet();
 
                             Log.i(TAG, "完成了map" + stringROMap);
 
+                            Log.i(TAG, "开始前半段:" + pair.first.size());
+
                             return Flowable.fromIterable(pair.first)
+//                                    .distinct(BaseOption::id)
                                     .compose(Upstream -> Upstream
-                                            //设置PO动画
-                                            .doOnNext(po -> {
-                                                if(po.itemView().getAnimation() instanceof NAnimator){
+                                                    //设置PO动画
+                                                    .doOnNext(po -> {
+                                                        if (po.itemView().getAnimation() instanceof NAnimator) {
+                                                            Log.i(TAG, "不用绑定动画和触摸");
+                                                        } else {
+                                                            Log.i(TAG, "绑定动画和触摸");
+                                                            po.itemView().startAnimation(po.animator());
+                                                            DeponderHelper.bindPlanet(po);
+                                                        }
+                                                    })
+//                                            .compose(upstream -> Flowable.combineLatest(
+//                                                    upstream,
+//                                                    scaleFlowable,
+//                                                    new BiFunction<PO, Float, PO>() {
+//                                                        @Override
+//                                                        public PO apply(PO po, Float aFloat) throws Throwable {
+//                                                            float dst = aFloat;
+//                                                            float[] values = DeponderHelper.values(po.matrix());
+//                                                            RectF rectF = DeponderHelper.hitRectF(po.itemView());
+//                                                            PointF pointF = new PointF(rectF.centerX() + values[Matrix.MTRANS_X], rectF.centerY() + values[Matrix.MTRANS_Y]);
+//                                                            float s = dst / values[Matrix.MSCALE_Y];
+//                                                            po.matrix().postScale(s, s, pointF.x, pointF.y);
+//                                                            return po;
+//                                                        }
+//                                                    }
+//                                            ))
+                                                    //设置PO触摸
+                                                    .subscribeOn(AndroidSchedulers.mainThread())
+                                                    .observeOn(Schedulers.io())
+                                                    .compose(upstream -> {
+                                                        Log.i(TAG, "当前的序号是 发射过来多少个." + upstream.count().blockingGet());
+                                                        return upstream;
+                                                    })
+                                                    //转newton.
+                                                    .flatMap(new Function<PO, Publisher<PO>>() {
+                                                        final AtomicInteger index = new AtomicInteger();
 
-                                                }else {
-                                                    Log.i(TAG, "绑定动画和触摸");
-                                                    po.itemView().startAnimation(po.animator());
-                                                    DeponderHelper.bindPlanet(po);
-                                                }
-                                            })
-                                            //设置PO触摸
-                                            .subscribeOn(AndroidSchedulers.mainThread())
-                                            .observeOn(Schedulers.io())
-                                            //转newton.
-                                            .flatMap(new Function<PO, Publisher<PO>>() {
-                                                final AtomicInteger index = new AtomicInteger();
+                                                        @Override
+                                                        public Publisher<PO> apply(PO po) throws Throwable {
+                                                            Log.i(TAG, "当前的序号是:" + index.get());
+                                                            return Upstream.skip(index.incrementAndGet()).defaultIfEmpty(po);
+                                                        }
+                                                    }, new BiFunction<PO, PO, Newton<PO, RO>>() {
+                                                        @Override
+                                                        public Newton<PO, RO> apply(PO s, PO e) throws Throwable {
 
-                                                @Override
-                                                public Publisher<PO> apply(PO po) throws Throwable {
-                                                    return Upstream.skip(index.incrementAndGet()).defaultIfEmpty(po);
-                                                }
-                                            }, new BiFunction<PO, PO, Newton<PO, RO>>() {
-                                                @Override
-                                                public Newton<PO, RO> apply(PO s, PO e) throws Throwable {
+                                                            if (TextUtils.equals(s.id(), e.id())) {
+                                                                Log.i(TAG, "出现了!相同怪!");
 
-                                                    if (TextUtils.equals(s.id(), e.id())) {
-                                                        Log.i(TAG, "出现了!相同怪!");
-
-                                                        return new Newton<>(s, e, null);
-                                                    } else {
-                                                        return stringROMap
-                                                                .containsKey(s.id() + e.id()) ? new Newton<>(s, e, stringROMap.get(s.id() + e.id())) : new Newton<>(e, s, stringROMap.get(e.id() + s.id()));
-
-                                                    }
-
-                                                }
-                                            })
+                                                                return new Newton<>(s, e, null);
+                                                            } else {
+                                                                return stringROMap
+                                                                        .containsKey(s.id() + e.id()) ? new Newton<>(s, e, stringROMap.get(s.id() + e.id())) : new Newton<>(e, s, stringROMap.get(e.id() + s.id()));
+                                                            }
+                                                        }
+                                                    })
 
 
                                     )
                                     .doOnNext(n -> Log.i(TAG, "发射了牛顿" + n))
                                     .toList()
-                                    .toFlowable()
-//                                    .blockingGet()
-                                    ;
+//                                    .toFlowable()
+                                    .blockingGet();
 
                         }
 
                 )
-                .doOnNext(n -> Log.i(TAG, "发射牛顿"));
+                .doOnNext(n -> Log.i(TAG, "发射牛顿:" + n.size()));
 
 
-        timer.withLatestFrom(newtonFlowable, new BiFunction<Timed<Transformation>, Iterable<Newton<PO, RO>>, Iterable<PO>>() {
+        timer.withLatestFrom(newtonFlowable, new BiFunction<Timed<Transformation>, Collection<Newton<PO, RO>>, Iterable<PO>>() {
             @Override
-            public Iterable<PO> apply(Timed<Transformation> timed, Iterable<Newton<PO, RO>> newtons) throws Throwable {
+            public Collection<PO> apply(Timed<Transformation> timed, Collection<Newton<PO, RO>> newtons) throws Throwable {
+
+                Log.i(TAG, "开始后半段." + newtons.size());
 
                 return Flowable.fromIterable(newtons)
                         .compose(upstream -> upstream
@@ -503,11 +550,6 @@ public abstract class Deponder<PO extends PlanetOption, RO extends RubberOption>
         })
                 .subscribeOn(Schedulers.io())
                 .subscribe(new DefSubscriber<>());
-    }
-
-    public void submitCte(@NonNull Collection<PO> pList, @NonNull Collection<RO> rList, float scale) {
-
-
     }
 
 

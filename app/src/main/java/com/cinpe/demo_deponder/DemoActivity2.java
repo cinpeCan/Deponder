@@ -5,6 +5,7 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.databinding.DataBindingUtil;
@@ -16,9 +17,16 @@ import com.cinpe.deponder.model.MyPlanetOption;
 import com.cinpe.deponder.model.MyRubberOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RubberOption;
+import com.google.android.material.slider.Slider;
+import com.google.common.collect.ImmutableList;
+import com.jakewharton.rxbinding4.slidingpanelayout.RxSlidingPaneLayout;
+import com.jakewharton.rxbinding4.widget.RxSeekBar;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 
 /**
@@ -32,37 +40,28 @@ public class DemoActivity2 extends AppCompatActivity implements DemoActivityCont
 
     Deponder<PlanetOption, RubberOption> deponderProxy;
 
-    List<View> list = new ArrayList<>();
-    List<RubberOption> rubberOptions = new ArrayList<>();
+    PlanetOption item0;
+    PlanetOption item1;
+    PlanetOption item2;
+
+    RubberOption ro0to1;
 
 
     @Override
     protected void onPostCreate(@Nullable Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
         mBinding = DataBindingUtil.setContentView(this, R.layout.activity_demo);
+        mBinding.slide.addOnChangeListener((slider, value, fromUser) -> {
+            if (deponderProxy != null & fromUser) deponderProxy.submitScale(value);
+        });
         mBinding.setControl(this);
 
-        deponderProxy = new Deponder<PlanetOption, RubberOption>(this, mBinding.layoutRoot) {
-            @Override
-            public PlanetOption functionP(View p) {
-                return MyPlanetOption
-                        .builder()
-                        .itemView(p)
-                        .id(String.valueOf(p.hashCode()))
-                        .build();
-            }
+        item0 = functionP(mBinding.item0);
+        item1 = functionP(mBinding.item1);
+        item2 = functionP(mBinding.item2);
+        ro0to1 = functionR(item0, item1);
 
-//            @Override
-//            public RubberOption functionR(View r) {
-////                return null;
-//                return MyRubberOption
-//                        .builder()
-//                        .id()
-//                        .eId()
-//                        .itemView(r)
-//                        .build();
-//            }
-        };
+        deponderProxy = new Deponder<PlanetOption, RubberOption>(this, mBinding.layoutRoot);
 
         incubateDate2();
 
@@ -76,27 +75,14 @@ public class DemoActivity2 extends AppCompatActivity implements DemoActivityCont
 
     @Override
     public void onClickAddPO(View view) {
-        list.add(mBinding.item2);
-        deponderProxy.submit(list, rubberOptions, 1f);
-
+        deponderProxy.submit(ImmutableList.of(item0, item1, item2), ImmutableList.of(functionR(item0, item1)), 1f);
     }
 
     @Override
     public void onClickAddRO(View view) {
 
-    }
+        deponderProxy.submit(ImmutableList.of(item0, item1, item2), ImmutableList.of(functionR(item0, item1), functionR(item1, item2)), 1f);
 
-    /**
-     * 随便生成些数据.
-     */
-    private void incubateDate() {
-
-        list.add(mBinding.item0);
-//        list.add(mBinding.item1);
-//        list.add(mBinding.item2);
-
-        //提交view集合.
-        deponderProxy.submit(list, rubberOptions, 1f);
     }
 
 
@@ -105,22 +91,25 @@ public class DemoActivity2 extends AppCompatActivity implements DemoActivityCont
      */
     private void incubateDate2() {
 
+        //提交view集合.
+        deponderProxy.submit(ImmutableList.of(item0, item1), ImmutableList.of(ro0to1), 1f);
 
-        list.add(mBinding.item0);
-        list.add(mBinding.item1);
-//        list.add(mBinding.item2);
+    }
 
+    private PlanetOption functionP(@NonNull View p) {
+        return MyPlanetOption
+                .builder()
+                .itemView(p)
+                .id(String.valueOf(p.hashCode()))
+                .build();
+    }
 
-        MyRubberOption rubberOption = MyRubberOption.builder()
-                .id(String.valueOf(mBinding.item0.hashCode()))
-                .eId(String.valueOf(mBinding.item1.hashCode()))
+    private RubberOption functionR(PlanetOption s, PlanetOption e) {
+        return MyRubberOption.builder()
+                .id(s.id())
+                .eId(e.id())
                 .naturalLength(300)
                 .itemView(DataBindingUtil.inflate(LayoutInflater.from(mBinding.layoutRoot.getContext()), R.layout.rubber_demo, mBinding.layoutRoot, false).getRoot())
                 .build();
-
-        rubberOptions.add(rubberOption);
-
-        //提交view集合.
-        deponderProxy.submit(list, rubberOptions, 1f);
     }
 }

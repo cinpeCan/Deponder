@@ -4,10 +4,13 @@ import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.os.Build;
 import android.util.Log;
+import android.util.SparseBooleanArray;
 import android.view.MotionEvent;
 import android.view.TouchDelegate;
 import android.view.View;
+import android.view.ViewStructure;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import androidx.annotation.NonNull;
@@ -32,87 +35,29 @@ public class DeponderDelegate extends TouchDelegate {
 
     private static final String TAG = "DeponderDelegate";
 
-    private final Collection<? extends PlanetOption> optionList;
-
-    /**
-     * 当前选中的planet
-     */
-    private PlanetOption option;
+    final private RootOption rootOption;
 
     /**
      * Constructor
      */
-    public DeponderDelegate(@NonNull Collection<? extends PlanetOption> planetOptions) {
-        super(new Rect(1, 1, 1, 1), planetOptions.stream().findFirst().get().itemView());
-        optionList = planetOptions;
+    public DeponderDelegate(@NonNull RootOption rootOption) {
+        super(new Rect(1, 1, 1, 1), new View(rootOption.itemView().getContext()));
+        this.rootOption = rootOption;
     }
 
     @Override
     public boolean onTouchEvent(@NonNull MotionEvent event) {
 
-        int action = event.getAction();
-        final PlanetOption mOption = option;
-        Log.i(TAG, "进入PlanetOption的touch");
-
-        if (mOption != null) {
-            boolean b = sendToDelegate(mOption, event);
-            if (b) {
-                if (action == MotionEvent.ACTION_CANCEL || action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_OUTSIDE) {
-                    mOption.itemView().setPressed(false);
-                } else {
-                    mOption.itemView().setPressed(true);
-                    mOption.speed().set(0, 0);
-                }
-                return true;
-            } else {
-                mOption.itemView().setPressed(false);
-                option = null;
-            }
+        for (int i = rootOption.itemView().getChildCount() - 1; i >= 0; i--) {
+            final View child = rootOption.itemView().getChildAt(i);
+            if (child != null && sendToDelegate(child, event)) return true;
         }
-
-
-        if (action == MotionEvent.ACTION_DOWN) {
-
-            final PointF point = new PointF(event.getX(), event.getY());
-            boolean intersect = false;
-
-            final Iterator<? extends PlanetOption> iterator = optionList.iterator();
-
-            while (iterator.hasNext() && !intersect) {
-                final PlanetOption option = iterator.next();
-                Rect hitRect = new Rect();
-                option.itemView().getHitRect(hitRect);
-                RectF rectF = new RectF(hitRect);
-                Matrix matrix = option.matrix();
-
-                Matrix temp = new Matrix();
-                float[] floats = new float[9];
-                matrix.getValues(floats);
-                rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
-                temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.left, rectF.top);
-                temp.mapRect(rectF);
-
-                intersect = rectF.contains(point.x, point.y);
-
-                if (intersect) {
-                    this.option = option;
-
-                    intersect = sendToDelegate(option, event);
-
-                    option.itemView().setPressed(true);
-                    option.speed().set(0, 0);
-                }
-
-
-            }
-
-        }
-
-        return true;
+        return super.onTouchEvent(event);
     }
 
-    private boolean sendToDelegate(final PlanetOption mOption, @NonNull MotionEvent event) {
-        Log.i(TAG, "发射事件到planet上");
-        return mOption.itemView().dispatchTouchEvent(event);
+    private boolean sendToDelegate(@NonNull final View view, @NonNull MotionEvent event) {
+        boolean b=view.dispatchTouchEvent(event);
+        if(b) view.bringToFront();
+        return b;
     }
 }

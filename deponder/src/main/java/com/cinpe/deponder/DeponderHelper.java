@@ -225,8 +225,8 @@ public class DeponderHelper {
         return new PointF(x, y);
     }
 
-    public static void bindDelegateRootTouch(@NonNull RootOption rootOption, @NonNull Collection<? extends PlanetOption> clt) {
-        rootOption.itemView().post(() -> rootOption.itemView().setTouchDelegate(new DeponderDelegate(clt)));
+    public static void bindDelegateRootTouch(@NonNull RootOption rootOption) {
+        rootOption.itemView().post(() -> rootOption.itemView().setTouchDelegate(new DeponderDelegate(rootOption)));
 //        todo 暂不考虑root的触控
 //        todo rootOption.itemView().setOnTouchListener(new RootTouchHelper(rootOption.matrix()));
     }
@@ -284,6 +284,9 @@ public class DeponderHelper {
             boolean retVal = mScaleGestureDetector.onTouchEvent(event);
             retVal = mGestureDetector.onTouchEvent(event) || retVal;
 
+            if (event.getAction() == MotionEvent.ACTION_UP || event.getAction() == MotionEvent.ACTION_CANCEL)
+                option.itemView().setPressed(false);
+
             return retVal;
         }
 
@@ -327,6 +330,7 @@ public class DeponderHelper {
         @Override
         public boolean onDown(MotionEvent e) {
 
+            this.option.itemView().setPressed(true);
             return true;
         }
 

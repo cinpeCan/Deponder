@@ -27,6 +27,7 @@ public class DefSubscriber<T> extends DisposableSubscriber<T> {
     @Override
     public void onError(Throwable t) {
         Log.d(TAG, "doOnError() called with: throwable = [" + t + "]");
+        t.printStackTrace();
     }
 
     @Override

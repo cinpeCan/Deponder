@@ -122,7 +122,7 @@ public abstract class DeponderProxy<PO extends PlanetOption, RO extends RubberOp
 
     private void init() {
         if (this.flowable == null) {
-            DeponderHelper.bindDelegateRootTouch(this.rootOption, this.poMap.values());
+            DeponderHelper.bindDelegateRootTouch(this.rootOption);
             bindRootMotion(this.rootOption);
             this.flowable.subscribe(new DefSubscriber<>());
         }

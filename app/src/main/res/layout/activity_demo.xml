@@ -22,16 +22,18 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="@color/teal_200">
+        android:background="@color/teal_200"
+        android:paddingBottom="30dp">
 
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/layout_root"
             android:layout_width="300dp"
-            android:layout_height="500dp"
+            android:layout_height="400dp"
             android:layout_marginTop="50dp"
             android:background="@color/white"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
+
             app:layout_constraintTop_toTopOf="parent">
 
             <ImageView
@@ -88,6 +90,18 @@
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toEndOf="@id/btn_add_po"
             app:layout_constraintTop_toBottomOf="@id/layout_root" />
+
+        <com.google.android.material.slider.Slider
+            android:id="@+id/slide"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:value="1f"
+            android:valueFrom=".5f"
+            android:valueTo="2f"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/btn_add_po" />
 
 
     </androidx.constraintlayout.widget.ConstraintLayout>
