@@ -34,7 +34,7 @@ public class NAnimator extends Animation {
      * 回调.
      */
     public interface ApplyTransformationListener {
-        void onApplyTransformation(Transformation t);
+        void onApplyTransformation(float interpolatedTime);
     }
 
     public NAnimator(@NonNull final Matrix matrix) {
@@ -49,7 +49,7 @@ public class NAnimator extends Animation {
     protected void applyTransformation(float interpolatedTime, Transformation t) {
 
         if (transformationListener != null)
-            transformationListener.onApplyTransformation(t);
+            transformationListener.onApplyTransformation(interpolatedTime);
 
         Log.i(TAG, "matrix动画中的hashCode:" + mMatrix.hashCode());
 

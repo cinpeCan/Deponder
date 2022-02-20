@@ -24,6 +24,7 @@
         <import type="androidx.lifecycle.LiveData" />
 
         <import type="android.text.TextUtils" />
+        <import type="com.cinpe.deponder.DeponderHelper" />
 
     </data>
 
@@ -31,22 +32,26 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:elevation="-1dp"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:clipToOutline="false"
         android:background="#00000000">
 
         <TextView
             android:id="@+id/un_rubber"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="10dp"
+            android:layout_marginBottom="3dp"
             android:text="@string/app_name"
+            android:tag="@string/un_rubber"
             app:layout_constraintBottom_toTopOf="@id/rubber"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
 
         <View
             android:id="@+id/rubber"
-            android:layout_width="100dp"
-            android:layout_height="20dp"
+            android:layout_width="300dp"
+            android:layout_height="5dp"
             android:background="@color/cardview_dark_background"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"

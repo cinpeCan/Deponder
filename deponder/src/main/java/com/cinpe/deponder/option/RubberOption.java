@@ -9,6 +9,8 @@ import androidx.annotation.NonNull;
 import com.cinpe.deponder.NAnimator;
 import com.google.auto.value.AutoValue;
 
+import java.util.List;
+
 /**
  * @Description: 橡皮筋(因变对象)
  * @Author: Cinpe
@@ -19,7 +21,13 @@ import com.google.auto.value.AutoValue;
 public abstract class RubberOption extends BaseOption {
 
     /**
-     * the other Planet id.
+     * the start Planet id.
+     */
+    @NonNull
+    public abstract String sId();
+
+    /**
+     * the end Planet id.
      */
     @NonNull
     public abstract String eId();
@@ -33,5 +41,10 @@ public abstract class RubberOption extends BaseOption {
      * 自然长度(px).
      */
     public abstract int naturalLength();
+
+    /**
+     * 可拉伸的矢量View. 例如9.png
+     */
+    public abstract List<BaseOption> vArr();
 
 }

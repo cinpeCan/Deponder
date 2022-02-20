@@ -20,6 +20,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Px;
 import androidx.core.util.Pair;
 
+import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RootOption;
 
@@ -79,17 +80,17 @@ public class DeponderHelper {
     /**
      * root的弹性系数.
      */
-    public final static float DEFAULT_ROOT_ELASTICITY_COEFFICIENT = 7.293f;
+    public final static float DEFAULT_ROOT_ELASTICITY_COEFFICIENT = 3.293f;
 
     /**
      * planet的弹性系数.
      */
-    public final static float DEFAULT_ELASTICITY_COEFFICIENT = 5.293f;
+    public final static float DEFAULT_ELASTICITY_COEFFICIENT = 3f;
 
     /**
      * rubber的弹性系数.
      */
-    public final static float DEFAULT_RUBBER_ELASTICITY_COEFFICIENT = 1.293f;
+    public final static float DEFAULT_RUBBER_ELASTICITY_COEFFICIENT = 8f;
 
     /**
      * 四壁内压的感应距离.(px)
@@ -104,7 +105,17 @@ public class DeponderHelper {
     /**
      * rubber的自然长度.(px)
      */
-    public final static int DEFAULT_RUBBER_NATURAL_LENGTH = 600;
+    public final static int DEFAULT_RUBBER_NATURAL_LENGTH = 350;
+
+    /**
+     * acceleration阈值.(高倍放大时防抖,低于阈值不进行计算)
+     */
+    public final static float MIN_ACCELERATION = 1f;
+
+    /**
+     * rubber的tag.
+     */
+    public final static String TAG_OF_UN_RUBBER = "UN_RUBBER_RUBBER";
 
     /**
      * dp->px
@@ -152,11 +163,31 @@ public class DeponderHelper {
         return new PointF((s.x + e.x) / 2, (s.y + e.y) / 2);
     }
 
+    public static @NonNull
+    PointF centerPointF(BaseOption p) {
+        RectF src = DeponderHelper.hitRectF(p.itemView());
+        float[] values = values(p.matrix());
+        float dw = src.width() * (values[Matrix.MSCALE_X] - 1) * 0.5f;
+        float dh = src.height() * (values[Matrix.MSCALE_Y] - 1) * 0.5f;
+        return new PointF(src.centerX() + values[Matrix.MTRANS_X] + dw, src.centerY() + values[Matrix.MTRANS_Y] + dh);
+    }
+
+    /**
+     * 自身内部中心点坐标.
+     */
+    public static @NonNull
+    PointF centerPointFInternal(BaseOption p) {
+        Rect rect = DeponderHelper.hitRect(p.itemView());
+        float[] values = new float[9];
+        p.matrix().getValues(values);
+        return new PointF((rect.width() / 2f) * values[Matrix.MSCALE_X] + values[Matrix.MTRANS_X], (rect.height() / 2f) * values[Matrix.MSCALE_Y] + values[Matrix.MTRANS_Y]);
+    }
+
     /**
      * 矩形长宽获取斜边长.
      */
     public static float pythagorean(float dx, float dy) {
-        return Math.round(Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2)));
+        return new PointF(dx, dy).length();
     }
 
     /**
@@ -331,6 +362,7 @@ public class DeponderHelper {
         public boolean onDown(MotionEvent e) {
 
             this.option.itemView().setPressed(true);
+            this.option.speed().set(0, 0);
             return true;
         }
 

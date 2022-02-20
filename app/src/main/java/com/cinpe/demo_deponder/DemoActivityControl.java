@@ -12,11 +12,6 @@ import android.view.View;
 public interface DemoActivityControl {
 
     /**
-     * 点击planet
-     */
-    void onClickPlanet(View view);
-
-    /**
      * 点击添加PO
      */
     void onClickAddPO(View view);

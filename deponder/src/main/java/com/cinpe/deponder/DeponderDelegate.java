@@ -36,6 +36,7 @@ public class DeponderDelegate extends TouchDelegate {
     private static final String TAG = "DeponderDelegate";
 
     final private RootOption rootOption;
+    private volatile View front;
 
     /**
      * Constructor
@@ -52,12 +53,21 @@ public class DeponderDelegate extends TouchDelegate {
             final View child = rootOption.itemView().getChildAt(i);
             if (child != null && sendToDelegate(child, event)) return true;
         }
+        if(front!=null){
+            front.setPressed(false);
+        }
         return super.onTouchEvent(event);
     }
 
     private boolean sendToDelegate(@NonNull final View view, @NonNull MotionEvent event) {
-        boolean b=view.dispatchTouchEvent(event);
-        if(b) view.bringToFront();
+        boolean b = view.dispatchTouchEvent(event);
+        if (b) {
+            if (front != view) {
+                if (front != null) front.setPressed(false);
+                view.bringToFront();
+                front = view;
+            }
+        }
         return b;
     }
 }

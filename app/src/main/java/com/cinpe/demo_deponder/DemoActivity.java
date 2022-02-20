@@ -1,23 +1,36 @@
 package com.cinpe.demo_deponder;
 
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.databinding.DataBindingUtil;
-
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.databinding.DataBindingUtil;
+
 import com.cinpe.demo_deponder.databinding.ActivityDemoBinding;
-import com.cinpe.deponder.DeponderProxy;
+import com.cinpe.demo_deponder.databinding.RubberDemoBinding;
+import com.cinpe.deponder.Deponder;
 import com.cinpe.deponder.model.MyPlanetOption;
 import com.cinpe.deponder.model.MyRubberOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RubberOption;
+import com.google.android.material.slider.Slider;
+import com.google.common.collect.ImmutableList;
+import com.jakewharton.rxbinding4.slidingpanelayout.RxSlidingPaneLayout;
+import com.jakewharton.rxbinding4.widget.RxSeekBar;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Random;
+import java.util.Set;
+import java.util.UUID;
+
+import io.reactivex.rxjava3.core.Observable;
 
 
 /**
@@ -25,39 +38,37 @@ import java.util.List;
  */
 public class DemoActivity extends AppCompatActivity implements DemoActivityControl {
 
-    private static final String TAG = "DemoActivity";
+    private static final String TAG = "DemoActivity2";
 
     private ActivityDemoBinding mBinding;
 
-    DeponderProxy<MyPlanetOption, MyRubberOption> deponderProxy;
+    Deponder<PlanetOption, RubberOption> deponderProxy;
+
+//    PlanetOption item0;
+//    PlanetOption item1;
+//    PlanetOption item2;
+
+    List<PlanetOption> pList = new ArrayList<>();
+    List<RubberOption> rList = new ArrayList<>();
+
+//    RubberOption ro0to1;
 
 
     @Override
     protected void onPostCreate(@Nullable Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
         mBinding = DataBindingUtil.setContentView(this, R.layout.activity_demo);
+        mBinding.slide.addOnChangeListener((slider, value, fromUser) -> {
+            if (deponderProxy != null & fromUser) deponderProxy.submitScale(value);
+        });
+        mBinding.setControl(this);
 
-        deponderProxy = new DeponderProxy<MyPlanetOption, MyRubberOption>(mBinding.layoutRoot) {
-            @Override
-            public MyPlanetOption functionP(View p) {
-                return MyPlanetOption
-                        .builder()
-                        .itemView(p)
-                        .id(String.valueOf(p.hashCode()))
-                        .build();
-            }
+//        item0 = functionP(mBinding.item0);
+//        item1 = functionP(mBinding.item1);
+//        item2 = functionP(mBinding.item2);
+//        ro0to1 = functionR(item0, item1);
 
-//            @Override
-//            public RubberOption functionR(View r) {
-////                return null;
-//                return MyRubberOption
-//                        .builder()
-//                        .id()
-//                        .eId()
-//                        .itemView(r)
-//                        .build();
-//            }
-        };
+        deponderProxy = new Deponder<PlanetOption, RubberOption>(this, mBinding.layoutRoot);
 
         incubateDate2();
 
@@ -65,32 +76,27 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
     }
 
     @Override
-    public void onClickPlanet(View view) {
-        Log.d(TAG, "onClickPlanet() called with: view = [" + view + "]");
-    }
-
-    @Override
     public void onClickAddPO(View view) {
 
+        PlanetOption po = buildPo();
+        mBinding.layoutRoot.addView(po.itemView());
+        pList.add(po);
+
+        //提交view集合.
+        deponderProxy.submitPlanet(pList);
     }
 
     @Override
     public void onClickAddRO(View view) {
 
-    }
+        int sIndex = new Random().nextInt(pList.size());
+        int eIndex = new Random().nextInt(pList.size());
+        while (sIndex == eIndex) {
+            eIndex = new Random().nextInt(pList.size());
+        }
 
-    /**
-     * 随便生成些数据.
-     */
-    private void incubateDate() {
-
-        List<View> list = new ArrayList<>();
-        list.add(mBinding.item0);
-//        list.add(mBinding.item1);
-//        list.add(mBinding.item2);
-
-        //提交view集合.
-        deponderProxy.submit(list);
+        rList.add(buildRo(pList.get(sIndex), pList.get(eIndex)));
+        deponderProxy.submitRubber(rList);
     }
 
 
@@ -99,24 +105,33 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
      */
     private void incubateDate2() {
 
-        List<View> list = new ArrayList<>();
-        list.add(mBinding.item0);
-//        list.add(mBinding.item1);
-//        list.add(mBinding.item2);
+        PlanetOption p0 = buildPo();
+        PlanetOption p1 = buildPo();
 
-        List<MyRubberOption> rubberOptions = new ArrayList<>();
+        mBinding.layoutRoot.addView(p0.itemView());
+        mBinding.layoutRoot.addView(p1.itemView());
 
-//        MyRubberOption rubberOption = MyRubberOption.builder()
-//                .id(String.valueOf(mBinding.item0.hashCode()))
-//                .eId(String.valueOf(mBinding.item1.hashCode()))
-//                .naturalLength(300)
-//                .itemView(DataBindingUtil.inflate(LayoutInflater.from(this), R.layout.rubber_demo, mBinding.layoutRoot, false).getRoot())
-//                .build();
-
-//        rubberOptions.add(rubberOption);
+        pList.add(p0);
+        pList.add(p1);
 
         //提交view集合.
-//        mBinding.item0.post(()->deponderProxy.submit(list, null, 1f));
-        deponderProxy.submit(list, null, 1f);
+        deponderProxy.submit(pList, rList, 1f);
+
+    }
+
+    private PlanetOption buildPo() {
+        return MyPlanetOption
+                .builder()
+                .itemView(DataBindingUtil.inflate(LayoutInflater.from(mBinding.layoutRoot.getContext()), R.layout.planet_demo, mBinding.layoutRoot, false).getRoot())
+                .id(UUID.randomUUID().toString())
+                .build();
+    }
+
+    private RubberOption buildRo(@NonNull PlanetOption s, @NonNull PlanetOption e) {
+        return MyRubberOption.builder()
+                .sId(s.id())
+                .eId(e.id())
+                .itemView(DataBindingUtil.inflate(LayoutInflater.from(mBinding.layoutRoot.getContext()), R.layout.rubber_demo, mBinding.layoutRoot, false).getRoot())
+                .build();
     }
 }
