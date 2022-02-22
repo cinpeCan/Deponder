@@ -40,32 +40,32 @@ public abstract class PlanetOption extends BaseOption implements QualityProperty
      * 当前速度矢量.
      */
     @NonNull
-    public abstract PointF speed();
+    public abstract Matrix speed();
 
-    /**
-     * 当前加速度矢量.
-     */
-    @NonNull
-    public abstract PointF acceleration();
+//    /**
+//     * 当前加速度矢量.
+//     */
+//    @NonNull
+//    public abstract PointF acceleration();
 
     /**
      * 弹性系数.
      */
     public abstract float elasticityCoefficient();
 
-    @NonNull
-    @Override
-    public final RectF rectF() {
-        final Rect rect = new Rect();
-        itemView().getHitRect(rect);
-        final RectF rectF = new RectF(rect);
-        float[] floats = new float[9];
-        matrix().getValues(floats);
-        rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
-        final Matrix matrix = new Matrix();
-        matrix.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.centerX(), rectF.centerY());
-        matrix.mapRect(rectF);
-        return rectF;
-    }
+//    @NonNull
+//    @Override
+//    public final RectF rectF() {
+//        final Rect rect = new Rect();
+//        itemView().getHitRect(rect);
+//        final RectF rectF = new RectF(rect);
+//        float[] floats = new float[9];
+//        matrix().getValues(floats);
+//        rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
+//        final Matrix matrix = new Matrix();
+//        matrix.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.centerX(), rectF.centerY());
+//        matrix.mapRect(rectF);
+//        return rectF;
+//    }
 
 }

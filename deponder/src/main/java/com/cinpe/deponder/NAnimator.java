@@ -8,6 +8,9 @@ import android.view.animation.Transformation;
 
 import androidx.annotation.NonNull;
 
+import io.reactivex.rxjava3.android.MainThreadDisposable;
+import io.reactivex.rxjava3.disposables.Disposable;
+
 
 /**
  * @Description: 描述
@@ -33,8 +36,11 @@ public class NAnimator extends Animation {
     /**
      * 回调.
      */
-    public interface ApplyTransformationListener {
+    public interface ApplyTransformationListener extends Disposable {
         void onApplyTransformation(float interpolatedTime);
+
+        @Override
+        void dispose();
     }
 
     public NAnimator(@NonNull final Matrix matrix) {
@@ -70,7 +76,19 @@ public class NAnimator extends Animation {
     }
 
     public void setApplyTransformationListener(ApplyTransformationListener transformationListener) {
+        if(this.transformationListener!=null){
+            this.transformationListener.dispose();
+        }
         this.transformationListener = transformationListener;
     }
+
+    @Override
+    public void cancel() {
+        super.cancel();
+        if(this.transformationListener!=null){
+            this.transformationListener.dispose();
+        }
+    }
+
 
 }

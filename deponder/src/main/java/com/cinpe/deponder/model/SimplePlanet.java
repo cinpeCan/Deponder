@@ -1,10 +1,6 @@
 package com.cinpe.deponder.model;
 
 import android.graphics.Matrix;
-import android.graphics.PointF;
-import android.graphics.Rect;
-import android.graphics.RectF;
-import android.text.TextUtils;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -14,8 +10,6 @@ import com.cinpe.deponder.NAnimator;
 import com.cinpe.deponder.option.PlanetOption;
 import com.google.auto.value.AutoValue;
 
-import java.util.UUID;
-
 /**
  * @Description: 描述
  * @Author: Cinpe
@@ -24,7 +18,7 @@ import java.util.UUID;
  * @Version: 0.01
  */
 @AutoValue
-public abstract class MyPlanetOption extends PlanetOption {
+public abstract class SimplePlanet extends PlanetOption {
 
 
     @NonNull
@@ -40,7 +34,7 @@ public abstract class MyPlanetOption extends PlanetOption {
     @NonNull
     @Override
     @AutoValue.CopyAnnotations
-    public abstract PointF speed();
+    public abstract Matrix speed();
 
     @NonNull
     @Override
@@ -66,12 +60,12 @@ public abstract class MyPlanetOption extends PlanetOption {
     @Override
     public abstract float elasticityCoefficient();
 
-    @NonNull
-    @Override
-    @AutoValue.CopyAnnotations
-    public abstract PointF acceleration();
+//    @NonNull
+//    @Override
+//    @AutoValue.CopyAnnotations
+//    public abstract PointF acceleration();
 
-    public static MyPlanetOption create(View itemView, String id, float quality, float frontalArea, float mInternalPressure, float elasticityCoefficient) {
+    public static SimplePlanet create(View itemView, String id, float quality, float frontalArea, float mInternalPressure, float elasticityCoefficient) {
         return builder()
                 .itemView(itemView)
                 .id(id)
@@ -84,7 +78,7 @@ public abstract class MyPlanetOption extends PlanetOption {
 
 
     public static Builder builder() {
-        return new AutoValue_MyPlanetOption.Builder().quality(DeponderHelper.DEFAULT_QUALITY_PROPERTY).mInternalPressure(DeponderHelper.DEFAULT_PLANET_INTERNAL_PRESSURE).speed(new PointF()).acceleration(new PointF()).frontalArea(DeponderHelper.DEFAULT_INIT_SCALE).elasticityCoefficient(DeponderHelper.DEFAULT_ELASTICITY_COEFFICIENT);
+        return new AutoValue_SimplePlanet.Builder().quality(DeponderHelper.DEFAULT_QUALITY_PROPERTY).mInternalPressure(DeponderHelper.DEFAULT_PLANET_INTERNAL_PRESSURE).frontalArea(DeponderHelper.DEFAULT_INIT_SCALE).elasticityCoefficient(DeponderHelper.DEFAULT_ELASTICITY_COEFFICIENT);
     }
 
     @AutoValue.Builder
@@ -105,22 +99,22 @@ public abstract class MyPlanetOption extends PlanetOption {
 
         abstract Matrix matrix();
 
-        abstract MyPlanetOption autoBuild();
+        abstract SimplePlanet autoBuild();
 
-        abstract Builder speed(PointF speed);
+        abstract Builder speed(Matrix speed);
 
         public abstract Builder mInternalPressure(float mInternalPressure);
 
         public abstract Builder elasticityCoefficient(float elasticityCoefficient);
 
-        abstract Builder acceleration(PointF acceleration);
+//        abstract Builder acceleration(PointF acceleration);
 
-        public final MyPlanetOption build() {
+        public final SimplePlanet build() {
 
             return matrix(itemView().getMatrix())
                     .animator(new NAnimator(matrix()))
-                    .speed(new PointF())
-                    .acceleration(new PointF())
+                    .speed(new Matrix())
+//                    .acceleration(new PointF())
                     .autoBuild();
         }
     }

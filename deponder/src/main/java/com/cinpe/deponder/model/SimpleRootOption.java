@@ -1,9 +1,6 @@
 package com.cinpe.deponder.model;
 
 import android.graphics.Matrix;
-import android.graphics.Rect;
-import android.graphics.RectF;
-import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -21,7 +18,7 @@ import com.google.auto.value.AutoValue;
  * @Version: 0.01
  */
 @AutoValue
-public abstract class MyRootOption extends RootOption {
+public abstract class SimpleRootOption extends RootOption {
 
 
     @NonNull
@@ -39,10 +36,6 @@ public abstract class MyRootOption extends RootOption {
     @NonNull
     @Override
     public abstract Matrix matrix();
-
-    @NonNull
-    @Override
-    public abstract RectF rectF();
 
     @Override
     public abstract float initScale();
@@ -62,7 +55,7 @@ public abstract class MyRootOption extends RootOption {
     @Override
     public abstract float elasticityCoefficient();
 
-    public static MyRootOption create(ViewGroup itemView, String id, float initScale, float maxScale, float minScale, float mRootDensity, float mInternalPressure, float elasticityCoefficient) {
+    public static SimpleRootOption create(ViewGroup itemView, String id, float initScale, float maxScale, float minScale, float mRootDensity, float mInternalPressure, float elasticityCoefficient) {
         return builder()
                 .itemView(itemView)
                 .id(id)
@@ -77,7 +70,7 @@ public abstract class MyRootOption extends RootOption {
     }
 
     public static Builder builder() {
-        return new AutoValue_MyRootOption.Builder().mInternalPressure(DeponderHelper.DEFAULT_Internal_Pressure).elasticityCoefficient(DeponderHelper.DEFAULT_ROOT_ELASTICITY_COEFFICIENT);
+        return new AutoValue_SimpleRootOption.Builder().mInternalPressure(DeponderHelper.DEFAULT_Internal_Pressure).elasticityCoefficient(DeponderHelper.DEFAULT_ROOT_ELASTICITY_COEFFICIENT);
     }
 
     @AutoValue.Builder
@@ -89,8 +82,6 @@ public abstract class MyRootOption extends RootOption {
         abstract Builder animator(NAnimator animator);
 
         abstract Builder matrix(Matrix matrix);
-
-        abstract Builder rectF(RectF rectF);
 
         public abstract Builder initScale(float initScale);
 
@@ -104,19 +95,15 @@ public abstract class MyRootOption extends RootOption {
 
         public abstract Builder elasticityCoefficient(float elasticityCoefficient);
 
-        abstract MyRootOption autoBuild();
+        abstract SimpleRootOption autoBuild();
 
         abstract ViewGroup itemView();
 
         abstract Matrix matrix();
 
-        public final MyRootOption build() {
-            final Rect rect = new Rect();
-            itemView().getHitRect(rect);
-            final RectF rectF = new RectF(rect);
+        public final SimpleRootOption build() {
             return matrix(itemView().getMatrix())
                     .animator(new NAnimator(matrix()))
-                    .rectF(rectF)
                     .autoBuild();
         }
     }

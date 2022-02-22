@@ -9,14 +9,6 @@
             name="control"
             type="com.cinpe.demo_deponder.DemoActivityControl" />
 
-        <import type="android.view.View" />
-
-        <import type="androidx.lifecycle.MutableLiveData" />
-
-        <import type="androidx.lifecycle.LiveData" />
-
-        <import type="android.text.TextUtils" />
-
     </data>
 
     <androidx.constraintlayout.widget.ConstraintLayout
@@ -30,6 +22,7 @@
             android:layout_width="0dp"
             android:layout_height="400dp"
             android:background="@color/white"
+            android:splitMotionEvents="false"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent">

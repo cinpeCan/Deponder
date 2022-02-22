@@ -49,14 +49,18 @@ public class DeponderDelegate extends TouchDelegate {
     @Override
     public boolean onTouchEvent(@NonNull MotionEvent event) {
 
+        if(front!=null){
+            if(sendToDelegate(front,event)) return true;
+        }
         for (int i = rootOption.itemView().getChildCount() - 1; i >= 0; i--) {
             final View child = rootOption.itemView().getChildAt(i);
             if (child != null && sendToDelegate(child, event)) return true;
         }
         if(front!=null){
             front.setPressed(false);
+            front=null;
         }
-        return super.onTouchEvent(event);
+        return false;
     }
 
     private boolean sendToDelegate(@NonNull final View view, @NonNull MotionEvent event) {

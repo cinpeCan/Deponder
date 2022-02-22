@@ -1,8 +1,6 @@
 package com.cinpe.deponder.model;
 
 import android.graphics.Matrix;
-import android.graphics.Rect;
-import android.graphics.RectF;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,13 +14,10 @@ import com.cinpe.deponder.option.RubberOption;
 import com.google.auto.value.AutoValue;
 import com.google.common.collect.ImmutableList;
 
-import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.ObservableSource;
-import io.reactivex.rxjava3.core.Single;
-import io.reactivex.rxjava3.functions.BiFunction;
 import io.reactivex.rxjava3.functions.Function;
 
 /**
@@ -33,7 +28,7 @@ import io.reactivex.rxjava3.functions.Function;
  * @Version: 0.01
  */
 @AutoValue
-public abstract class MyRubberOption extends RubberOption {
+public abstract class SimpleRubber extends RubberOption {
 
     @NonNull
     @Override
@@ -65,11 +60,6 @@ public abstract class MyRubberOption extends RubberOption {
     @AutoValue.CopyAnnotations
     public abstract Matrix matrix();
 
-    @NonNull
-    @Override
-    @AutoValue.CopyAnnotations
-    public abstract RectF rectF();
-
     @Override
     public abstract float elasticityCoefficient();
 
@@ -79,7 +69,7 @@ public abstract class MyRubberOption extends RubberOption {
     @Override
     public abstract ImmutableList<BaseOption> vArr();
 
-    public static MyRubberOption create(View itemView, String sId, String eId, float elasticityCoefficient, int naturalLength) {
+    public static SimpleRubber create(View itemView, String sId, String eId, float elasticityCoefficient, int naturalLength) {
         return builder()
                 .itemView(itemView)
                 .sId(sId)
@@ -90,7 +80,7 @@ public abstract class MyRubberOption extends RubberOption {
     }
 
     public static Builder builder() {
-        return new AutoValue_MyRubberOption.Builder().elasticityCoefficient(DeponderHelper.DEFAULT_RUBBER_ELASTICITY_COEFFICIENT).naturalLength(DeponderHelper.DEFAULT_RUBBER_NATURAL_LENGTH);
+        return new AutoValue_SimpleRubber.Builder().elasticityCoefficient(DeponderHelper.DEFAULT_RUBBER_ELASTICITY_COEFFICIENT).naturalLength(DeponderHelper.DEFAULT_RUBBER_NATURAL_LENGTH);
     }
 
     @AutoValue.Builder
@@ -109,8 +99,6 @@ public abstract class MyRubberOption extends RubberOption {
 
         abstract Builder matrix(Matrix matrix);
 
-        abstract Builder rectF(RectF rectF);
-
         public abstract Builder elasticityCoefficient(float elasticityCoefficient);
 
         public abstract Builder naturalLength(int naturalLength);
@@ -120,7 +108,7 @@ public abstract class MyRubberOption extends RubberOption {
             return this;
         }
 
-        abstract MyRubberOption autoBuild();
+        abstract SimpleRubber autoBuild();
 
         abstract String sId();
 
@@ -130,12 +118,9 @@ public abstract class MyRubberOption extends RubberOption {
 
         abstract Matrix matrix();
 
-        public final MyRubberOption build() {
+        public final SimpleRubber build() {
             if (TextUtils.equals(sId(), eId()))
                 throw new IllegalStateException("Start and End points cannot be same");
-            final Rect rect = new Rect();
-            itemView().getHitRect(rect);
-            final RectF rectF = new RectF(rect);
 
             Observable.just(itemView())
                     .ofType(ViewGroup.class)
@@ -179,18 +164,11 @@ public abstract class MyRubberOption extends RubberOption {
                             return view.getMatrix();
                         }
 
-                        @NonNull
-                        @Override
-                        public RectF rectF() {
-                            return DeponderHelper.hitRectF(view);
-                        }
-
                     }).blockingSubscribe(this::addV);
 
-            return id(ImmutableList.of(sId(), eId()).stream().sorted(Comparator.comparingInt(String::hashCode)).collect(StringBuilder::new, StringBuilder::append, StringBuilder::append).toString())
+            return id(DeponderHelper.concatId(sId(),eId()))
                     .matrix(itemView().getMatrix())
                     .animator(new NAnimator(matrix()))
-                    .rectF(rectF)
                     .autoBuild();
         }
     }

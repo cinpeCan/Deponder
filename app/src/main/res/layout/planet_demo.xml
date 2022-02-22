@@ -3,38 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <data>
-
-        <variable
-            name="control"
-            type="com.cinpe.demo_deponder.DemoActivityControl" />
-
-        <!--        <variable-->
-        <!--            name="src"-->
-        <!--            type="android.net.Uri" />-->
-        <!--        -->
-        <!--        <variable-->
-        <!--            name="str"-->
-        <!--            type="String" />-->
-
-        <import type="android.view.View" />
-
-        <import type="androidx.lifecycle.MutableLiveData" />
-
-        <import type="androidx.lifecycle.LiveData" />
-
-        <import type="android.text.TextUtils" />
-
-    </data>
-
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content">
 
         <ImageView
             android:id="@+id/img"
-            android:layout_width="30dp"
-            android:layout_height="30dp"
+            android:layout_width="35dp"
+            android:layout_height="35dp"
             android:contentDescription="@string/demo"
             android:scaleType="centerCrop"
             android:src="@mipmap/ic_launcher_round"

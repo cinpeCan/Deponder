@@ -27,6 +27,7 @@ import com.cinpe.deponder.option.RootOption;
 import org.reactivestreams.Publisher;
 
 import java.util.Collection;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.FlowableTransformer;
@@ -256,6 +257,18 @@ public class DeponderHelper {
         return new PointF(x, y);
     }
 
+//    /**
+//     * 计算位移(矢量),
+//     *
+//     * @param speed        速度(px/ms)
+//     * @param acceleration 加速度(px/ms2)
+//     * @param dt           时间(ms)
+//     */
+//    public static PointF calculate(@NonNull Matrix speed, PointF acceleration, long dt) {
+//        final float[] s = DeponderHelper.values(speed);
+//        return calculate(new PointF(s[Matrix.MTRANS_X], s[Matrix.MTRANS_Y]), acceleration, dt);
+//    }
+
     public static void bindDelegateRootTouch(@NonNull RootOption rootOption) {
         rootOption.itemView().post(() -> rootOption.itemView().setTouchDelegate(new DeponderDelegate(rootOption)));
 //        todo 暂不考虑root的触控
@@ -284,27 +297,30 @@ public class DeponderHelper {
         @Override
         public boolean onTouch(View v, MotionEvent event) {
 
+
             Log.i(TAG, "进入PlanetOption.onTouch()" + event.getAction());
 
             if (!v.isEnabled()) {
                 return false;
             }
-            PointF point = new PointF(event.getX(), event.getY());
-            Rect rect = new Rect();
-            v.getHitRect(rect);
+            PointF point = new PointF(event.getX(0), event.getY(0));
 
-            RectF rectF = new RectF(rect);
+            RectF rectF = hitRectF(v);
 
             Matrix temp = new Matrix();
 
-            float[] floats = new float[9];
-            this.option.matrix().getValues(floats);
+            float[] floats = values(this.option.matrix());
 
+//            rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
+//
+//            temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.left, rectF.top);
+//
+//            temp.mapRect(rectF);
+
+            temp.postScale(floats[Matrix.MSCALE_X],floats[Matrix.MSCALE_Y],rectF.width()*.5f,rectF.height()*.5f);
+            temp.mapRect(rectF);
             rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
 
-            temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.left, rectF.top);
-
-            temp.mapRect(rectF);
 
             if (!rectF.contains(point.x, point.y)) {
                 Log.i(TAG, "不包含, 不消费" + rectF + "," + this.option.matrix() + "," + point);
@@ -334,7 +350,7 @@ public class DeponderHelper {
 
         @Override
         public boolean onScaleBegin(ScaleGestureDetector detector) {
-            return true;
+            return false;
         }
 
         @Override
@@ -347,6 +363,7 @@ public class DeponderHelper {
             Log.i(TAG, "[planet]onSingleTapUp() called with: e = [" + e + "]");
             return this.option.itemView().performClick();
         }
+
 
         @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
@@ -361,8 +378,9 @@ public class DeponderHelper {
         @Override
         public boolean onDown(MotionEvent e) {
 
+
             this.option.itemView().setPressed(true);
-            this.option.speed().set(0, 0);
+            this.option.speed().reset();
             return true;
         }
 
@@ -429,8 +447,6 @@ public class DeponderHelper {
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
 
             this.option.matrix().postTranslate(-distanceX, -distanceY);
-
-//            v.scrollBy(Math.round(distanceX), Math.round(distanceY));
             return true;
         }
 
@@ -460,8 +476,8 @@ public class DeponderHelper {
         };
     }
 
-    public static <O, P> FlowableTransformer<O, P> flowableCombinations(FlowableTransformer<O, O> UpstreamTransformer, FlowableTransformer<O, P> transformer) {
-        return upstream -> upstream.compose(UpstreamTransformer).compose(transformer);
+    public static <O, P> FlowableTransformer<O, P> flowableCombinations(FlowableTransformer<O, O> UpstreamTransformer, @NonNull BiFunction<O, O, P> biFunction) {
+        return upstream -> upstream.compose(UpstreamTransformer).compose(flowableCombinationsPair(biFunction));
     }
 
     public static <O, P> CombinationsPair<O, P> combinationsPair(@NonNull BiFunction<O, O, P> biFunction) {
@@ -477,24 +493,13 @@ public class DeponderHelper {
 
     private static abstract class CombinationsPair<O, P> implements ObservableTransformer<O, P> {
 
-        private int i = 0;
+        final private AtomicInteger i = new AtomicInteger();
 
         @Override
         public @NonNull
         final ObservableSource<P> apply(@NonNull Observable<O> upstream) {
-            return upstream
-                    //todo 绘制po.
-                    .doOnNext(o -> System.out.println("upstream.doOnNext:[评估四边压力]" + o))
-                    .doAfterNext(o -> System.out.println("upstream.doAfterNext:[绘制po]" + o))
-//                    .doFinally(() -> System.out.println("upstream.doFinally"))
-                    .flatMap(o -> upstream.skip(++i)
-//                            .doOnNext(e -> System.out.println("doOnNext o:" + o + ",e:" + e))
-//                            .doAfterNext(e -> System.out.println("doAfterNext o:" + o + ",e:" + e))
-                            //用来处理o.
-//                            .doFinally(() -> System.out.println("doFinally:" + o))
-                            , biFunction());
+            return upstream.flatMap(o -> upstream.skip(i.incrementAndGet()), biFunction());
         }
-
         abstract protected @NonNull
         BiFunction<O, O, P> biFunction();
 
@@ -503,26 +508,21 @@ public class DeponderHelper {
 
     private static abstract class FlowableCombinationsPair<O, P> implements FlowableTransformer<O, P> {
 
-        private int i = 0;
+        final private AtomicInteger i = new AtomicInteger();
 
         @Override
         public @NonNull
         final Publisher<P> apply(@NonNull Flowable<O> upstream) {
-            return upstream
-                    //todo 绘制po.
-                    .doOnNext(o -> Log.i(TAG, "看看i:" + i))
-                    .doAfterNext(o -> Log.i(TAG, "看看after-i:" + i))
-//                    .doFinally(() -> System.out.println("upstream.doFinally"))
-                    .flatMap(o -> upstream.skip(++i)
-//                            .doOnNext(e -> System.out.println("doOnNext o:" + o + ",e:" + e))
-//                            .doAfterNext(e -> System.out.println("doAfterNext o:" + o + ",e:" + e))
-                            //用来处理o.
-//                            .doFinally(() -> System.out.println("doFinally:" + o))
-                            , biFunction());
+            return upstream.flatMap(o -> upstream.skip(i.incrementAndGet()), biFunction());
         }
 
         abstract protected @NonNull
         BiFunction<O, O, P> biFunction();
 
+    }
+
+
+    public static String concatId(@NonNull String sId, @NonNull String eId) {
+        return sId.hashCode() < eId.hashCode() ? sId + eId : eId + sId;
     }
 }

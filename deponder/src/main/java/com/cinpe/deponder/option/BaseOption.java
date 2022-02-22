@@ -32,11 +32,11 @@ public abstract class BaseOption {
     @NonNull
     public abstract Matrix matrix();
 
-    /**
-     * rectF
-     */
-    @NonNull
-    public abstract RectF rectF();
+//    /**
+//     * rectF
+//     */
+//    @NonNull
+//    public abstract RectF rectF();
 
 
 }
