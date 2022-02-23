@@ -19,3 +19,30 @@ touch事件也将自动通过(占用view的touchListener接口)逆矩阵偏移�
 
 目前最新是0.01版.
 
+
+## NOTICE
+
+    Copyright (c) 2022-present, Cinpecan and Deponder Contributors.
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+    
+    Deponder baseUrl:https://github.com/cinpeCan/DemoDeponder
+    
+    Deponder Subcomponents:
+    
+    The following components are provided under the Apache License. See project link for details.
+    The text of each license is the standard Apache 2.0 license.
+    
+    io.reactivex.rxjava3:rxandroid from https://github.com/ReactiveX/RxJava Apache-2.0 License
+    com.google.guava from https://github.com/google/guava Apache-2.0 License
+
