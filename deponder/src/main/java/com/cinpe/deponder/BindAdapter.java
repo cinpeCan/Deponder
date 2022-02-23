@@ -31,38 +31,10 @@ public abstract class BindAdapter<P, R, PO extends PlanetOption, RO extends Rubb
 
     private final String TAG = this.getClass().getSimpleName();
 
-    final MutableLiveData<Collection<PO>> poClt;
-    final MutableLiveData<Collection<RO>> roClt;
+    public BindAdapter() {
 
-//    @NonNull
-//    private final DiffUtil.ItemCallback<T> mDiffCallback;
-
-    public BindAdapter(@NonNull MutableLiveData<Collection<PO>> poClt, @NonNull MutableLiveData<Collection<RO>> roClt) {
-
-        this.poClt = poClt;
-        this.roClt = roClt;
-        //        mDiffCallback = callback;
 
     }
 
 
-    /**
-     * 提交P
-     */
-    public void submitP(@NonNull Collection<P> pList) {
-
-    }
-
-    /**
-     * 提交R
-     */
-    public void submitR(@NonNull Collection<R> rList) {
-
-    }
-
-    public abstract @NonNull
-    PO functionP(@NonNull P p, @NonNull View parent);
-
-    public abstract @NonNull
-    RO functionR(@NonNull R p, @NonNull View parent);
 }

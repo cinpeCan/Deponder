@@ -8,6 +8,7 @@ import android.graphics.RectF;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
@@ -18,6 +19,7 @@ import androidx.lifecycle.LiveData;
 import androidx.lifecycle.LiveDataReactiveStreams;
 import androidx.lifecycle.MutableLiveData;
 
+import com.cinpe.deponder.control.DeponderControl;
 import com.cinpe.deponder.model.SimpleRootOption;
 import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
@@ -32,7 +34,9 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
 import io.reactivex.rxjava3.android.MainThreadDisposable;
@@ -42,19 +46,20 @@ import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.FlowableEmitter;
 import io.reactivex.rxjava3.core.FlowableSubscriber;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.functions.BiFunction;
 import io.reactivex.rxjava3.functions.Function4;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.Timed;
 import io.reactivex.rxjava3.subscribers.DisposableSubscriber;
 
 /**
- * @Description: T 唯一标识接口.
+ * @Description:
  * @Author: Cinpe
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
  * @Version: 0.01
  */
-public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
+public class Deponder<PO extends PlanetOption, RO extends RubberOption> implements DeponderControl<PO,RO> {
 
     public static final String TAG = "Deponder";
 
@@ -92,16 +97,10 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
     }
 
 
-    public void submit(@NonNull Collection<PO> pList, @Nullable Collection<RO> rList, float scale) {
-        //todo 比对差异.
-        submitPlanet(pList);
-        submitRubber(rList == null ? ImmutableList.of() : rList);
-        submitScale(scale);
-    }
-
     /**
      * 提交P
      */
+    @Override
     public void submitPlanet(@NonNull Collection<PO> pList) {
 
         Observable.fromIterable(pList)
@@ -110,19 +109,21 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
                 .subscribeOn(Schedulers.io())
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnSuccess(l -> {
-                    l.forEach(po -> {
-                        if (po.itemView().getAnimation() != po.animator()) {
-                            po.itemView().startAnimation(po.animator());
-                            DeponderHelper.bindPlanet(po);
-                        }
-                    });
+                    Collection<PO> clt = poClt.getValue();
+                    if (clt != null)
+                        clt.stream().map(BaseOption::itemView).forEach(View::clearAnimation);
                 })
-                .subscribe(new DefSingleSubscriber<>(poClt::setValue));
+                .doOnSuccess(l -> l.stream().filter(po -> po.itemView().getAnimation() != po.animator()).forEach(po -> {
+                    po.itemView().startAnimation(po.animator());
+                    DeponderHelper.bindPlanet(po);
+                }))
+                .subscribe(new DefSingleSubscriber<>(poClt::postValue));
     }
 
     /**
      * 提交R
      */
+    @Override
     public void submitRubber(@NonNull Collection<RO> rList) {
         Observable.fromIterable(rList)
                 .distinct(BaseOption::id)
@@ -135,137 +136,26 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
                         v.clearAnimation();
                         rootOption.itemView().removeView(v);
                     });
-                    l.forEach(ro -> {
-                        rootOption.itemView().addView(ro.itemView());
-                        ro.itemView().startAnimation(ro.animator());
-                    });
                 })
-                .subscribe(new DefSingleSubscriber<>(roClt::setValue));
+                .doOnSuccess(l -> l.forEach(ro -> {
+                    rootOption.itemView().addView(ro.itemView());
+                    ro.itemView().startAnimation(ro.animator());
+                }))
+                .subscribe(new DefSingleSubscriber<>(roClt::postValue));
     }
 
     /**
      * 提交scale
      */
+    @Override
     public void submitScale(float scale) {
         scaleLD.postValue(scale);
     }
-//
-//    static class Newton<PO extends PlanetOption, RO extends RubberOption> {
-//
-//        public Newton(@NonNull PO sPlanet, @NonNull PO ePlanet, @Nullable RO rubberOption) {
-//            this.sPlanet = sPlanet;
-//            this.ePlanet = ePlanet;
-//            this.rubber = rubberOption;
-//            this.vector = new Matrix();
-//        }
-//
-//        /**
-//         * 评估.
-//         */
-//        private void evaluate() {
-//
-//
-//            //最终的力.
-//            final PointF newton = new PointF();
-//
-////            final Matrix sMatrix = this.sPlanet.matrix();
-////            final Matrix eMatrix = this.ePlanet.matrix();
-//
-////            final Matrix invert = new Matrix();
-////            sMatrix.invert(invert);
-//
-//            //获取矩阵差.
-//            Matrix matrix = DeponderHelper.matrixDiff(this.sPlanet.matrix(), this.ePlanet.matrix());
-////            this.vector.setConcat(invert, eMatrix);
-//
-//
-//            //如果不处于斥力感应范围,则reset.
-//            float[] values = new float[9];
-//            matrix.getValues(values);
-//
-//            //缩放
-//            final float mScale = values[Matrix.MSCALE_Y];
-//
-//            //角度.
-//            double angle = Math.atan2(values[Matrix.MTRANS_X], values[Matrix.MTRANS_Y]);
-//
-//            Log.i(TAG, "计算出的角度:" + angle);
-//
-//            //缩放后的斜边.
-//            float radius = DeponderHelper.pythagorean(values[Matrix.MTRANS_X], values[Matrix.MTRANS_Y]);
-////            this.vector.mapRadius(radius);
-//
-//            //评估rubber连接到sPlanet和ePlanet造成的影响.
-//
-//            //这里values [Matrix.MSCALE_X] = values[Matrix.MSCALE_Y]必成立.
-//
-//            if (rubber != null) {
-//
-//                //弹簧的自然长度.
-//                final float natural = rubber.naturalLength() * mScale;
-//
-//                //计算弹簧的形变量.
-//                float rubberDiff = DeponderHelper.dDistance(radius, natural);
-//
-//                PointF rubberDiffDistance = new PointF(Math.round(Math.sin(angle) * rubberDiff), Math.round(Math.cos(angle) * rubberDiff));
-//                Log.i(TAG, "计算弹簧的形变量:" + rubberDiffDistance);
-//
-//                //计算弹簧的力.
-//                PointF rubberNewton = DeponderHelper.calculate(rubberDiffDistance, rubber.elasticityCoefficient());
-//
-//                //记录弹簧的力.
-//                newton.offset(rubberNewton.x, rubberNewton.y);
-//
-//            }
-//
-//
-//            Log.d(TAG, "评估() called[半径]=" + radius + ",[矩阵]=" + this.vector);
-//
-//            final float mInternalPressure = sPlanet.mInternalPressure() * mScale;
-//            if (Math.abs(radius) > mInternalPressure) {
-//                //超出感应范围->重置.
-////                this.vector.reset();
-//            } else {
-//                float planetDiff = DeponderHelper.dDistance(radius, mInternalPressure);
-//
-//                //感应范围内, 距离->形变
-//                PointF planetDiffDistance = new PointF(Math.round(Math.sin(angle) * planetDiff), Math.round(Math.cos(angle) * planetDiff));
-//
-//                //感应范围内, 形变->力
-//                PointF planetDiffNewton = DeponderHelper.calculate(planetDiffDistance, sPlanet.elasticityCoefficient());
-//                newton.offset(planetDiffNewton.x, planetDiffNewton.y);
-//            }
-//            this.vector.setTranslate(newton.x, newton.y);
-//        }
-//
-//        /**
-//         * sPlanet
-//         */
-//        @NonNull
-//        final PO sPlanet;
-//
-//        /**
-//         * ePlanet
-//         */
-//        @NonNull
-//        final PO ePlanet;
-//
-//        @Nullable
-//        final RO rubber;
-//
-//        /**
-//         * e -> s 的矢量.
-//         * 力.
-//         */
-//        final Matrix vector;
-//
-//    }
 
 
     static class Listener extends MainThreadDisposable implements NAnimator.ApplyTransformationListener {
 
         final NAnimator nAnimator;
-        //        Observer<Float> observer;
         final FlowableEmitter<Float> emitter;
 
         public Listener(NAnimator nAnimator, FlowableEmitter<Float> emitter) {
@@ -287,199 +177,62 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
 
     private void bind(@NonNull RootOption option, @NonNull LiveData<Collection<PO>> poClt, @NonNull LiveData<Collection<RO>> roClt, @NonNull LiveData<Float> scaleLD) {
 
-        //scale
-        Flowable<Float> scaleFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, scaleLD)).subscribeOn(Schedulers.io());
+        Flowable<? extends Collection<NT<PO>>> ntCltFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().map(NT::new).collect(Collectors.toList())).subscribeOn(Schedulers.io());
 
-        //po.
-        Flowable<Collection<PO>> poCltFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt)).defaultIfEmpty(Collections.emptyList()).subscribeOn(Schedulers.io());
+        Flowable.<Float>create(emitter -> option.animator().setApplyTransformationListener(new Listener(option.animator(), emitter)), BackpressureStrategy.DROP)
+                .timeInterval().map(Timed::time).map(t -> Math.min(16L, t))
+                .withLatestFrom(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, scaleLD)).subscribeOn(Schedulers.io()),
+                        Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, roClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().collect(Collectors.<RO, String, RO>toMap(BaseOption::id, ro -> ro))).subscribeOn(Schedulers.io()),
+                        Environment::new)
+//                .onBackpressureBuffer()
+                .withLatestFrom(ntCltFlowable, (roEnvironment, nts) -> {
+                    Flowable.fromIterable(nts).compose(DeponderHelper.flowableCombinations(upstream -> upstream.doOnNext(s -> {
+                        s.newton.postConcat(evaluate(s.pointF, roEnvironment.scale));
+                    }).doAfterNext(s -> {
+                        drawPo(s.p, s.newton, roEnvironment.time, roEnvironment.scale);
+                        //更新
+                        s.update();
+                    }), (s, e) -> {
+                        if (TextUtils.equals(s.p.id(), e.p.id()))
+                            return new Matrix();
+                        Matrix m;
+                        RO ro = roEnvironment.map.get(DeponderHelper.concatId(s.p.id(), e.p.id()));
+                        if (ro != null) {
+                            if (ro.id().startsWith(s.p.id())) {
+                                drawRo(ro, s.pointF, e.pointF, roEnvironment.scale);
+                            } else {
+                                drawRo(ro, e.pointF, s.pointF, roEnvironment.scale);
+                            }
+                            final float IncrementalScale = (s.count.getAndIncrement() + e.count.getAndIncrement()) * DeponderHelper.INCREMENTAL_SCALE;
+                            m = evaluate(s.pointF, e.pointF, roEnvironment.scale + IncrementalScale, true);
+                        } else {
+                            m = evaluate(s.pointF, e.pointF, roEnvironment.scale, false);
+                        }
+                        Matrix v = new Matrix();
+                        m.invert(v);
+                        s.newton.postConcat(v);
+                        e.newton.postConcat(m);
+                        return m;
+                    }))
+                            .subscribeOn(Schedulers.io())
+                            .blockingSubscribe();
 
-        //ro.
-        Flowable<Map<String, RO>> roCltFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, roClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().collect(Collectors.<RO, String, RO>toMap(BaseOption::id, ro -> ro))).subscribeOn(Schedulers.io());
+                    return roEnvironment.time;
 
-        Flowable<Collection<NT<PO>>> ntCltFlowable = poCltFlowable.map(clt -> clt.stream().map(p -> {
-            Log.i(TAG, "[evaluate]执行了初始化NT:" + p.id());
-            return new NT<>(p);
-        }).collect(Collectors.toList()));
-
-        Flowable<Long> timer = Flowable.<Float>create(emitter -> option.animator().setApplyTransformationListener(new Listener(option.animator(), emitter)), BackpressureStrategy.LATEST)
-                .doOnNext(f -> Log.i(TAG, "[evaluate]FLOAT:" + f)).timeInterval().map(Timed::time).map(t -> Math.min(16L, t)).subscribeOn(Schedulers.io());
-
-
-//        timer.withLatestFrom(scaleFlowable, roCltFlowable, Environment::new)
-//                .subscribeOn(Schedulers.io())
-//                .observeOn(Schedulers.io())
-//                .subscribe(new FlowableSubscriber<Environment<RO>>() {
-//
-//                    Subscription s;
-//                    @Override
-//                    public void onSubscribe(@NonNull Subscription s) {
-//                        this.s=s;
-//                        s.request(Long.MAX_VALUE);
-//                    }
-//
-//                    @Override
-//                    public void onNext(Environment<RO> environment) {
-//                        Log.i(TAG,"[开始搞事!]"+Thread.currentThread().getName());
-//                        ntCltFlowable
-//                                .doOnNext(clt->Log.i(TAG,"[开始搞事2!]"+Thread.currentThread().getName()))
-//                                .flatMapIterable(clt -> clt)
-//                                .compose(upstream -> {
-//                                            return upstream
-//                                                    .doOnNext(s -> {
-//                                                        Log.i(TAG, "[evaluate][刚发射出来的s]" + s.p.id() + ",newton:" + s.newton);
-//                                                        s.newton.postConcat(evaluate(s.pointF, environment.scale));
-//                                                    })
-//                                                    .doAfterNext(s -> {
-//                                                        Log.i(TAG, "[evaluate][检查]" + s.p.id() + ",newton:" + s.newton);
-//                                                        drawPo(s.p, s.newton, environment.time, environment.scale);
-//                                                        //更新
-//                                                        s.update();
-//                                                    })
-////                                            .flatMap(s -> iterable.skip(index.incrementAndGet()), (s, e) -> {
-////                                                if (s.equals(e)) return new Matrix();
-////                                                Matrix m;
-////                                                RO ro = stringROMap.get(DeponderHelper.concatId(s.p.id(), e.p.id()));
-////                                                if (ro != null) {
-////                                                    drawRo(ro, s.pointF, e.pointF, aFloat);
-////                                                    m = evaluate(s.pointF, e.pointF, aFloat, true);
-////                                                } else {
-////                                                    m = evaluate(s.pointF, e.pointF, aFloat, false);
-////                                                }
-////                                                Matrix v = new Matrix();
-////                                                m.invert(v);
-////                                                s.newton.postConcat(v);
-////                                                e.newton.postConcat(m);
-////                                                return m;
-////
-////                                            });
-//                                                    .flatMap(s -> {
-//                                                        AtomicInteger index = new AtomicInteger();
-//
-//                                                        return upstream.skip(index.incrementAndGet()).map((e -> {
-//                                                            if (s.equals(e)) return new Matrix();
-//                                                            Matrix m;
-//                                                            RO ro = environment.map.get(DeponderHelper.concatId(s.p.id(), e.p.id()));
-//                                                            if (ro != null) {
-//                                                                if (ro.id().startsWith(s.p.id())) {
-//                                                                    drawRo(ro, s.pointF, e.pointF, environment.scale);
-//                                                                } else {
-//                                                                    drawRo(ro, e.pointF, s.pointF, environment.scale);
-//                                                                }
-//                                                                m = evaluate(s.pointF, e.pointF, environment.scale, true);
-//                                                            } else {
-//                                                                m = evaluate(s.pointF, e.pointF, environment.scale, false);
-//                                                            }
-//                                                            Matrix v = new Matrix();
-//                                                            m.invert(v);
-//                                                            Log.i(TAG, "[evaluate]完成前 s:" + s.newton + ",e:" + e.newton);
-//                                                            s.newton.postConcat(v);
-//                                                            e.newton.postConcat(m);
-//                                                            Log.i(TAG, "[evaluate]完成 s:" + s.p.id() + " " + v + ",e:" + e.p.id() + " " + m);
-//                                                            Log.i(TAG, "[evaluate]完成后 s:" + s.newton + ",e:" + e.newton);
-//                                                            return e.newton;
-//                                                        }));
-//
-//                                                    }).subscribeOn(Schedulers.io());
-//                                        }
-//                                )
-//
-//                                .subscribeOn(Schedulers.io())
-//                                .subscribe(new FlowableSubscriber<Matrix>() {
-//                                    Subscription s;
-//                                    @Override
-//                                    public void onSubscribe(@NonNull Subscription s) {
-//                                        this.s=s;
-//                                        s.request(Long.MAX_VALUE);
-//                                    }
-//
-//                                    @Override
-//                                    public void onNext(Matrix matrix) {
-//
-//                                    }
-//
-//                                    @Override
-//                                    public void onError(Throwable t) {
-//                                        s.cancel();
-//                                    }
-//
-//                                    @Override
-//                                    public void onComplete() {
-//                                        s.cancel();
-//                                    }
-//                                });
-//                    }
-//
-//                    @Override
-//                    public void onError(Throwable t) {
-//                        s.cancel();
-//                    }
-//
-//                    @Override
-//                    public void onComplete() {
-//                        s.cancel();
-//                    }
-//                });
-
-
-        timer.observeOn(Schedulers.io()).withLatestFrom(ntCltFlowable, roCltFlowable, scaleFlowable, new Function4<Long, Collection<NT<PO>>, Map<String, RO>, Float, Object>() {
-            @Override
-            public Object apply(Long timed, Collection<NT<PO>> pos, Map<String, RO> stringROMap, Float aFloat) throws Throwable {
-                Flowable.fromIterable(pos)
-
-                        .compose(DeponderHelper.flowableCombinations(upstream -> upstream.skipWhile(nt -> nt.p.itemView().isPressed())
-                                        .doOnNext(s -> {
-                                            Log.i(TAG, "[evaluate][刚发射出来的s]" + s.p.id() + ",newton:" + s.newton);
-                                            s.newton.postConcat(evaluate(s.pointF, aFloat));
-                                        })
-                                        .doAfterNext(s -> {
-                                            Log.i(TAG, "[evaluate][检查]" + s.p.id() + ",newton:" + s.newton);
-                                            drawPo(s.p, s.newton, timed, aFloat);
-                                            //更新
-                                            s.update();
-                                        })
-                                , (s, e) -> {
-                                    if (TextUtils.equals(s.p.id(), e.p.id()))
-                                        return new Matrix();
-                                    Matrix m;
-                                    RO ro = stringROMap.get(DeponderHelper.concatId(s.p.id(), e.p.id()));
-                                    if (ro != null) {
-                                        if (ro.id().startsWith(s.p.id())) {
-                                            drawRo(ro, s.pointF, e.pointF, aFloat);
-                                        } else {
-                                            drawRo(ro, e.pointF, s.pointF, aFloat);
-                                        }
-                                        m = evaluate(s.pointF, e.pointF, aFloat, true);
-                                    } else {
-                                        m = evaluate(s.pointF, e.pointF, aFloat, false);
-                                    }
-                                    Matrix v = new Matrix();
-                                    m.invert(v);
-                                    s.newton.postConcat(v);
-                                    e.newton.postConcat(m);
-                                    return m;
-
-                                }))
-                        .subscribeOn(Schedulers.io())
-                        .blockingSubscribe();
-
-                return timed;
-
-            }
-        })
+                })
                 .subscribeOn(Schedulers.io())
-//                .onBackpressureBuffer(Integer.MAX_VALUE,true,true,()->Log.i(TAG,"[溢出]"))
                 .subscribe(new FlowableSubscriber<Object>() {
                     Subscription s;
 
                     @Override
                     public void onSubscribe(@NonNull Subscription s) {
                         this.s = s;
-                        s.request(Long.MAX_VALUE);
+                        s.request(1);
                     }
 
                     @Override
                     public void onNext(Object o) {
-
+                        s.request(1);
                     }
 
                     @Override
@@ -493,11 +246,6 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
                     }
                 });
 
-    }
-
-
-    private void logIndexNTime(final String i, int index, final long dt) {
-        Log.i(TAG, "[INDEX][" + i + "],[count]: " + index + ",时间间隔: " + dt);
     }
 
 
@@ -516,9 +264,6 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
         PointF acceleration = new PointF(n[Matrix.MTRANS_X] / po.quality(), n[Matrix.MTRANS_Y] / po.quality());
         PointF speed = new PointF(s[Matrix.MTRANS_X], s[Matrix.MTRANS_Y]);
 
-//        //todo 防抖.
-//        float minAcceleration = DeponderHelper.MIN_ACCELERATION * scale;
-//        po.acceleration().set(Math.abs(po.acceleration().x) < minAcceleration ? 0 : po.acceleration().x, Math.abs(po.acceleration().y) < minAcceleration ? 0 : po.acceleration().y);
 
         //损耗
         acceleration.offset(-speed.x * rootOption.mRootDensity(), -speed.y * rootOption.mRootDensity());
@@ -526,7 +271,13 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
 
         //进行位移.
         PointF p = DeponderHelper.calculate(speed, acceleration, interval);
-        Log.i(TAG, "po[速度]=" + po.speed() + ",[加速度]=" + acceleration + ",[间隔时间]=" + interval + ",[位移]=" + p);
+
+        //低速防抖.
+        final float minAcceleration = DeponderHelper.MIN_ACCELERATION * scale;
+        if (p.length() < minAcceleration) {
+            po.speed().setTranslate(0, 0);
+            return;
+        }
 
         float[] values = DeponderHelper.values(po.matrix());
         Rect rect = DeponderHelper.hitRect(po.itemView());
@@ -540,67 +291,13 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
 //
         po.matrix().postConcat(matrix);
 
-        Log.i("NAnimator", "回调中的hashCode:" + po.matrix().hashCode());
         //记录位移末速度.
         po.speed().postTranslate(acceleration.x * interval, acceleration.y * interval);
-        Log.i(TAG, "drawPo" + po.itemView().getAnimation());
-    }
 
-    /**
-     * 绘制ro.
-     */
-    @WorkerThread
-    protected void drawRo(@Nullable RO ro, @NonNull PO sPo, @NonNull PO ePo, final float scale) {
-
-        if (ro == null) return;
-
-        Log.i(TAG, "[evaluate]绘制RO" + ro.id() + "," + Thread.currentThread().getName());
-
-        final Rect rRect = DeponderHelper.hitRect(ro.itemView());
-
-        final PointF sP = DeponderHelper.centerPointF(sPo);
-        final PointF eP = DeponderHelper.centerPointF(ePo);
-        final PointF diff = new PointF(eP.x - sP.x, eP.y - sP.y);
-
-        //当前中点.
-        final PointF center = DeponderHelper.centerPointF(sP, eP);
-
-        //当前长度.
-        final float length = PointF.length(diff.x, diff.y);
-        //当前角度.
-        final double angle = Math.atan2(diff.x, diff.y);
-
-        final Matrix d = new Matrix();
-
-        d.setRectToRect(DeponderHelper.hitRectF(ro.itemView()), new RectF(center.x - length / 2, center.y - rRect.height() * scale / 2, center.x + length / 2, center.y + rRect.height() * scale / 2), Matrix.ScaleToFit.FILL);
-//
-//        //设置角度.
-//        d.postRotate(Math.round(90 - angle / Math.PI * 180), center.x, center.y);
-//
-//        ro.matrix().set(d);
-
-//        d.setRectToRect(DeponderHelper.hitRectF(ro.itemView()), new RectF(center.x - rRect.width() * scale * .5f, center.y - rRect.height() * scale * .5f, center.x + rRect.width() * scale * .5f, center.y + rRect.height() * scale * .5f), Matrix.ScaleToFit.FILL);
-
-        //设置角度.
-        d.postRotate(Math.round(90 - angle / Math.PI * 180), center.x, center.y);
-
-        ro.vArr().forEach(o -> {
-            if (o.itemView().getAnimation() == null) {
-                o.itemView().startAnimation(o.animator());
-            }
-            PointF c = DeponderHelper.centerPointFInternal(o);
-            o.matrix().setScale(rRect.width() / length * scale, scale, c.x, c.y);
-        });
-
-        ro.matrix().set(d);
-
-        Log.i(TAG, "drawRo");
     }
 
     @NonNull
     private Matrix evaluate(@NonNull final PointF point, final float scale) {
-
-        Log.i(TAG, "[evaluate]====================分析四边[" + point + "]====================================");
 
         //root的参数.
         final RectF rootRect = DeponderHelper.hitRectF(rootOption.itemView());
@@ -650,8 +347,6 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
         //角度.
         double angle = Math.atan2(diff.x, diff.y);
 
-        Log.i(TAG, "计算出的角度:" + angle);
-
         //缩放后的斜边.
         final float length = diff.length();
 
@@ -667,8 +362,6 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
 
             //计算弹簧的力.
             PointF rubberNewton = DeponderHelper.calculate(rubberDiffDistance, DeponderHelper.DEFAULT_RUBBER_ELASTICITY_COEFFICIENT);
-
-            Log.i(TAG, "[评估]斜边长:" + length + ",自然长度:" + natural + ",计算弹簧的形变量" + rubberDiff + ",计算弹簧的坐标形变量:" + rubberDiffDistance + ",弹簧力:" + rubberNewton);
 
             //记录弹簧的力.
             matrix.postTranslate(rubberNewton.x, rubberNewton.y);
@@ -689,11 +382,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
 
             matrix.postTranslate(planetDiffNewton.x, planetDiffNewton.y);
 
-            Log.i(TAG, "[评估]PO - 斜边长:" + length + ",自然长度:" + mInternalPressure + ",计算弹簧的形变量" + planetDiff + ",计算弹簧的坐标形变量:" + planetDiffDistance + ",弹簧力:" + planetDiffNewton + ",newton:" + planetDiffNewton);
         }
-
-
-        Log.i(TAG, "[evaluate]分析内力" + ",耗时:[" + (SystemClock.currentThreadTimeMillis() - input) + "]:" + "[" + s + "," + e + "]");
 
         return matrix;
     }
@@ -746,10 +435,13 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
             this.p = p;
             this.newton = new Matrix();
             this.pointF = DeponderHelper.centerPointF(p);
+            this.count = new AtomicInteger();
+//            this.speed = new Matrix();
         }
 
         public void update() {
             newton.reset();
+            count.set(0);
             this.pointF.set(DeponderHelper.centerPointF(p));
         }
 
@@ -767,9 +459,13 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
 
         @NonNull
         final PointF pointF;
+        @NonNull
+        final AtomicInteger count;
+
+//        @NonNull
+//        final Matrix speed;
 
     }
-
 
     static class Environment<RO extends RubberOption> {
 
@@ -782,7 +478,6 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> {
         long time;
         float scale;
         Map<String, RO> map;
-
 
     }
 }

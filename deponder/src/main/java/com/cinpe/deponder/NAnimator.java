@@ -22,15 +22,8 @@ import io.reactivex.rxjava3.disposables.Disposable;
 public class NAnimator extends Animation {
 
     private static final String TAG = "NAnimator";
-
-    @NonNull
-    public Matrix getmMatrix() {
-        return mMatrix;
-    }
-
     @NonNull
     private final Matrix mMatrix;
-
     private ApplyTransformationListener transformationListener;
 
     /**
@@ -44,7 +37,6 @@ public class NAnimator extends Animation {
     }
 
     public NAnimator(@NonNull final Matrix matrix) {
-        Log.i("Deponder", "创建了nAnimal:" + matrix.hashCode()+","+matrix);
         mMatrix = matrix;
         this.setDuration(3600000L);
         this.setZAdjustment(Animation.ZORDER_TOP);
@@ -56,9 +48,6 @@ public class NAnimator extends Animation {
 
         if (transformationListener != null)
             transformationListener.onApplyTransformation(interpolatedTime);
-
-        Log.i(TAG, "matrix动画中的hashCode:" + mMatrix.hashCode());
-
         final Matrix fromMatrix = t.getMatrix();
         fromMatrix.set(mMatrix);
         super.applyTransformation(interpolatedTime, t);

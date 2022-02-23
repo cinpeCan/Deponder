@@ -16,10 +16,10 @@ import java.util.Collection;
  */
 public interface DeponderControl<PO, RO> {
 
-    void submit(@NonNull Collection<View> pList);
+    void submitPlanet(@NonNull Collection<PO> pList);
 
-    void submit(@NonNull Collection<View> pList, @Nullable Collection<RO> rList);
+    void submitRubber(@NonNull Collection<RO> rList);
 
-    void submit(@NonNull Collection<View> pList, @Nullable Collection<RO> rList, float scale);
+    void submitScale(float scale);
 
 }

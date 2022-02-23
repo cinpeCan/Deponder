@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">Deponder</string>
     <string name="demo">Demo</string>
+    <string name="planet">planet</string>
+    <string name="rubber">rubber</string>
     <string name="add_po_button">just add a point</string>
     <string name="add_ro_button">just add a line</string>
 </resources>

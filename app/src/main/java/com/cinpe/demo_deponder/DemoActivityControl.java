@@ -12,12 +12,12 @@ import android.view.View;
 public interface DemoActivityControl {
 
     /**
-     * 点击添加PO
+     * 点击随便添加一个PO
      */
     void onClickAddPO(View view);
 
     /**
-     * 点击添加RO
+     * 点击随便添加一个RO
      */
     void onClickAddRO(View view);
 

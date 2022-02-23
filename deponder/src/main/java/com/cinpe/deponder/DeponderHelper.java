@@ -106,12 +106,17 @@ public class DeponderHelper {
     /**
      * rubber的自然长度.(px)
      */
-    public final static int DEFAULT_RUBBER_NATURAL_LENGTH = 350;
+    public final static int DEFAULT_RUBBER_NATURAL_LENGTH = 300;
 
     /**
-     * acceleration阈值.(高倍放大时防抖,低于阈值不进行计算)
+     * distance阈值.(高倍放大时防抖,低于阈值不进行绘制)
      */
-    public final static float MIN_ACCELERATION = 1f;
+    public final static float MIN_ACCELERATION = 0.01f;
+
+    /**
+     * 连接
+     */
+    public final static float INCREMENTAL_SCALE = 0.15f;
 
     /**
      * rubber的tag.
@@ -317,7 +322,7 @@ public class DeponderHelper {
 //
 //            temp.mapRect(rectF);
 
-            temp.postScale(floats[Matrix.MSCALE_X],floats[Matrix.MSCALE_Y],rectF.width()*.5f,rectF.height()*.5f);
+            temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.width() * .5f, rectF.height() * .5f);
             temp.mapRect(rectF);
             rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
 
@@ -476,8 +481,20 @@ public class DeponderHelper {
         };
     }
 
-    public static <O, P> FlowableTransformer<O, P> flowableCombinations(FlowableTransformer<O, O> UpstreamTransformer, @NonNull BiFunction<O, O, P> biFunction) {
-        return upstream -> upstream.compose(UpstreamTransformer).compose(flowableCombinationsPair(biFunction));
+    public static <O, P> FlowableTransformer<O, P> flowableCombinations(@NonNull FlowableTransformer<O, O> UpstreamTransformer, @NonNull BiFunction<O, O, P> biFunction) {
+        return new FlowableCombinationsPair<O, P>() {
+            @NonNull
+            @Override
+            protected BiFunction<O, O, P> biFunction() {
+                return biFunction;
+            }
+
+            @NonNull
+            @Override
+            protected FlowableTransformer<O, O> compose() {
+                return UpstreamTransformer;
+            }
+        };
     }
 
     public static <O, P> CombinationsPair<O, P> combinationsPair(@NonNull BiFunction<O, O, P> biFunction) {
@@ -500,6 +517,7 @@ public class DeponderHelper {
         final ObservableSource<P> apply(@NonNull Observable<O> upstream) {
             return upstream.flatMap(o -> upstream.skip(i.incrementAndGet()), biFunction());
         }
+
         abstract protected @NonNull
         BiFunction<O, O, P> biFunction();
 
@@ -513,11 +531,17 @@ public class DeponderHelper {
         @Override
         public @NonNull
         final Publisher<P> apply(@NonNull Flowable<O> upstream) {
-            return upstream.flatMap(o -> upstream.skip(i.incrementAndGet()), biFunction());
+            return upstream.compose(compose())
+                    .flatMap(o -> upstream.skip(i.incrementAndGet()), biFunction());
         }
 
         abstract protected @NonNull
         BiFunction<O, O, P> biFunction();
+
+        protected @NonNull
+        FlowableTransformer<O, O> compose() {
+            return upstream -> upstream;
+        }
 
     }
 
