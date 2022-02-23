@@ -49,30 +49,8 @@ dependencies {
     androidTestUtil "androidx.test:orchestrator:$orchestrator"
     implementation 'com.google.guava:guava:30.1.1-android'
 
-    //recyclerview
-    implementation "androidx.recyclerview:recyclerview:$recyclerViewVersion"
-
-    //谷歌图片处理框架
-    implementation 'com.google.android.material:material:1.4.0'
-
-    //图片加载库
-    implementation 'com.github.bumptech.glide:glide:4.11.0'
-    annotationProcessor 'com.github.bumptech.glide:compiler:4.10.0'
-
-    //autoValue
     compileOnly "com.google.auto.value:auto-value-annotations:$autoValueVersion"
     annotationProcessor "com.google.auto.value:auto-value:$autoValueVersion"
 
-    //RxJava
-    implementation "com.jakewharton.rxbinding4:rxbinding:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-core:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-appcompat:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-drawerlayout:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-leanback:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-recyclerview:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-slidingpanelayout:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-swiperefreshlayout:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-viewpager:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-viewpager2:$rxbind"
-    implementation "com.jakewharton.rxbinding4:rxbinding-material:$rxbind"
+
 }

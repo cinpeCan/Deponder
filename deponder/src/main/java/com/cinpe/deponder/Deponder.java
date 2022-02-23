@@ -12,7 +12,6 @@ import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.annotation.WorkerThread;
 import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.LiveData;
@@ -25,18 +24,13 @@ import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RootOption;
 import com.cinpe.deponder.option.RubberOption;
-import com.google.common.collect.ImmutableList;
-
 import org.reactivestreams.Subscription;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.IntUnaryOperator;
 import java.util.stream.Collectors;
 
 import io.reactivex.rxjava3.android.MainThreadDisposable;
@@ -54,6 +48,20 @@ import io.reactivex.rxjava3.subscribers.DisposableSubscriber;
 
 /**
  * @Description:
+ *      Licensed to the Apache Software Foundation (ASF) under one or more
+ *     contributor license agreements.  See the NOTICE file distributed with
+ *     this work for additional information regarding copyright ownership.
+ *     The ASF licenses this file to You under the Apache License, Version 2.0
+ *     (the "License"); you may not use this file except in compliance with
+ *     the License.  You may obtain a copy of the License at
+ *
+ *         http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *     Unless required by applicable law or agreed to in writing, software
+ *     distributed under the License is distributed on an "AS IS" BASIS,
+ *     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *     See the License for the specific language governing permissions and
+ *     limitations under the License.
  * @Author: Cinpe
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
@@ -186,9 +194,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
                         Environment::new)
 //                .onBackpressureBuffer()
                 .withLatestFrom(ntCltFlowable, (roEnvironment, nts) -> {
-                    Flowable.fromIterable(nts).compose(DeponderHelper.flowableCombinations(upstream -> upstream.doOnNext(s -> {
-                        s.newton.postConcat(evaluate(s.pointF, roEnvironment.scale));
-                    }).doAfterNext(s -> {
+                    Flowable.fromIterable(nts).compose(DeponderHelper.flowableCombinations(upstream -> upstream.doOnNext(s -> s.newton.postConcat(evaluate(s.pointF, roEnvironment.scale))).doAfterNext(s -> {
                         drawPo(s.p, s.newton, roEnvironment.time, roEnvironment.scale);
                         //更新
                         s.update();
