@@ -3,7 +3,7 @@ version 0.01
 
 一个基于 Android原生 的散点图表库
 
-特性是利用原生优势,达到高性能(skip onMeasure,onLayout,onDraw)和低侵入性(no override view):
+目的是利用原生优势,获得尽量高的性能(skip onMeasure,onLayout,onDraw)和尽量低的侵入性(no override view):
 
 - 游动的view,仅第一帧经过onMeasure,onLayout,onDraw绘制, 其后view的真实位置不变
 - 通过矩阵计算(占用view的animal接口)进行移动,缩放,旋转,翻转(不再触发onMeasure,onLayout,onDraw), 
