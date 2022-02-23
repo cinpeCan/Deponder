@@ -1,13 +1,6 @@
 package com.cinpe.deponder;
 
 import android.util.Log;
-import android.view.animation.Transformation;
-
-import org.reactivestreams.Subscription;
-
-import io.reactivex.rxjava3.annotations.NonNull;
-import io.reactivex.rxjava3.core.FlowableSubscriber;
-import io.reactivex.rxjava3.schedulers.Timed;
 import io.reactivex.rxjava3.subscribers.DisposableSubscriber;
 
 /**

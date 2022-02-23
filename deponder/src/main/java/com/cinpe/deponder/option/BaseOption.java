@@ -1,7 +1,6 @@
 package com.cinpe.deponder.option;
 
 import android.graphics.Matrix;
-import android.graphics.RectF;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -31,12 +30,5 @@ public abstract class BaseOption {
      */
     @NonNull
     public abstract Matrix matrix();
-
-//    /**
-//     * rectF
-//     */
-//    @NonNull
-//    public abstract RectF rectF();
-
 
 }

@@ -237,7 +237,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
 
                     @Override
                     public void onError(Throwable t) {
-                        Log.i(TAG, "[溢出]出现了,溢出怪.!" + t.getMessage());
+                        Log.i(TAG, "" + t.getMessage());
                     }
 
                     @Override
@@ -265,14 +265,14 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
         PointF speed = new PointF(s[Matrix.MTRANS_X], s[Matrix.MTRANS_Y]);
 
 
-        //损耗
+        //loss
         acceleration.offset(-speed.x * rootOption.mRootDensity(), -speed.y * rootOption.mRootDensity());
 
 
-        //进行位移.
+        //displacement
         PointF p = DeponderHelper.calculate(speed, acceleration, interval);
 
-        //低速防抖.
+        //Low-speed anti-shake
         final float minAcceleration = DeponderHelper.MIN_ACCELERATION * scale;
         if (p.length() < minAcceleration) {
             po.speed().setTranslate(0, 0);
@@ -291,7 +291,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
 //
         po.matrix().postConcat(matrix);
 
-        //记录位移末速度.
+        //Record the final speed.
         po.speed().postTranslate(acceleration.x * interval, acceleration.y * interval);
 
     }
@@ -299,16 +299,14 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
     @NonNull
     private Matrix evaluate(@NonNull final PointF point, final float scale) {
 
-        //root的参数.
         final RectF rootRect = DeponderHelper.hitRectF(rootOption.itemView());
 
-        //先获取到root的[四个边距]的[有效]矢量和.
-        //正方向取力的方向.
+        //displacement vector
         PointF distance = new PointF();
 
         final Matrix matrix = new Matrix();
 
-        //分析四边.
+        //rectangle with four sides
         float l = point.x;
         float t = point.y;
         float r = rootRect.width() - point.x;
@@ -338,32 +336,31 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
 
         long input = SystemClock.currentThreadTimeMillis();
 
-        //最终的力.
+        //newton
         final Matrix matrix = new Matrix();
         if (s.equals(e)) return matrix;
 
         final PointF diff = new PointF(e.x - s.x, e.y - s.y);
 
-        //角度.
         double angle = Math.atan2(diff.x, diff.y);
 
-        //缩放后的斜边.
+        //hypotenuse
         final float length = diff.length();
 
         if (hasRubber) {
 
-            //弹簧的自然长度.
+            //natural length
             final float natural = DeponderHelper.DEFAULT_RUBBER_NATURAL_LENGTH * scale;
 
-            //计算弹簧的形变量.
+            //Deformation variable
             float rubberDiff = DeponderHelper.dDistance(length, natural);
 
             PointF rubberDiffDistance = new PointF(Math.round(Math.sin(angle) * rubberDiff), Math.round(Math.cos(angle) * rubberDiff));
 
-            //计算弹簧的力.
+            //newton
             PointF rubberNewton = DeponderHelper.calculate(rubberDiffDistance, DeponderHelper.DEFAULT_RUBBER_ELASTICITY_COEFFICIENT);
 
-            //记录弹簧的力.
+            //save
             matrix.postTranslate(rubberNewton.x, rubberNewton.y);
 
 
@@ -374,10 +371,10 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
 
             float planetDiff = DeponderHelper.dDistance(length, mInternalPressure);
 
-            //感应范围内, 距离->形变
+            //displacement->Deformation variable
             PointF planetDiffDistance = new PointF(Math.round(Math.sin(angle) * planetDiff), Math.round(Math.cos(angle) * planetDiff));
 
-            //感应范围内, 形变->力
+            //Deformation variable->Newton
             PointF planetDiffNewton = DeponderHelper.calculate(planetDiffDistance, DeponderHelper.DEFAULT_ELASTICITY_COEFFICIENT);
 
             matrix.postTranslate(planetDiffNewton.x, planetDiffNewton.y);

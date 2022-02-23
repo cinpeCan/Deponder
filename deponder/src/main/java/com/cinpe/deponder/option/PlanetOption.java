@@ -1,17 +1,9 @@
 package com.cinpe.deponder.option;
 
 import android.graphics.Matrix;
-import android.graphics.PointF;
-import android.graphics.Rect;
-import android.graphics.RectF;
-import android.view.View;
-
 import androidx.annotation.NonNull;
-
-import com.cinpe.deponder.NAnimator;
 import com.cinpe.deponder.itf.FrontalAreaProperty;
 import com.cinpe.deponder.itf.QualityProperty;
-import com.google.auto.value.AutoValue;
 
 /**
  * @Description: 行星.(自变对象)

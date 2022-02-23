@@ -80,7 +80,7 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
 
 
     /**
-     * 随便生成些数据2.
+     * 随便生成些数据.
      */
     private void incubateDate() {
 

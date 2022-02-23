@@ -65,7 +65,6 @@ public abstract class SimpleRootOption extends RootOption {
                 .mRootDensity(mRootDensity)
                 .mInternalPressure(mInternalPressure)
                 .elasticityCoefficient(elasticityCoefficient)
-
                 .build();
     }
 
