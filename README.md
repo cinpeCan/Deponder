@@ -1,5 +1,7 @@
 # DemoDeponder
-version 0.01
+
+<!-- [![Maven Central](https://github.com/cinpeCan/DemoDeponder/badge.svg)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
+last version 0.0.2
 
 一个基于 Android原生 的散点图表库
 
@@ -8,7 +10,7 @@ version 0.01
 - 游动的view,仅第一帧经过onMeasure,onLayout,onDraw绘制, 其后view的真实位置不变
 - 通过矩阵计算(占用view的animal接口)进行移动,缩放,旋转,翻转(不再触发onMeasure,onLayout,onDraw), 
   因此开发者仍然可以使用它们对view进行叠加调整.
-- touch事件也将自动通过(占用view的touchListener接口)逆矩阵偏移到view真实位置上处理.
+- touch事件(占用view的touchListener接口)逆矩阵偏移到view真实位置上处理.
 - 对view的left,top,right,bottom,translationX,translationY等接口均不主动占用.
 
 #### 游动动画模仿物理特性
@@ -17,9 +19,126 @@ version 0.01
 - 连线(rubberOption)的自然长度,弹性系数
 - 环境(rootOption)的空气摩擦,四壁约束力(斥力)的辐射范围,四壁约束力(斥力)的系数
 - 缩放(scale),对所有散点(planetOption)和连线(rubberOption)生效, 但对环境(rootOption)的视图和空气摩擦不生效(会对辐射范围和斥力生效).
-来控制动画效果.
 
-目前最新是0.01版.
+以控制动画效果.
+
+### 简单使用
+
+```java
+//创建一个Deponder对象:
+DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner/*生命周期持有者*/, [YOUR GROUPVIEW]);
+
+
+//1. 申明 散点(planetOption) 对象.
+PlanetOption planetA=SimplePlanet
+            .builder()
+            //在[YOUR GROUPVIEW]下的子view,且希望这个view由Deponder控制.
+            .itemView([YOUR CHILD VIEW])
+            //如果不打算用hashCode作为唯一标识,可以自行修改,例如使用UUID.
+            .id([YOUR CHILD VIEW].hashCode())
+            .build();
+            
+//可以申明更多...
+PlanetOption planetB...
+...
+            
+List<PlanetOption> listPlanet=new ArrayList();
+listPlanet.add(planetA);
+listPlanet.add(planetB);
+...
+
+//2. 申明 连线(rubberOption) 对象.
+RubberOption rubberA=SimpleRubber
+                //两个散点对象的id值.  他们的组合应是唯一的.
+                .sId(planetA.id())
+                .eId(planetB.id())
+                .itemView([期望的连线对象展示的view,例如是一条线段(矩形)])
+                .build();
+                
+//可以申明更多...
+RubberOption rubberB...
+...
+                
+List<PlanetOption> listRubber=new ArrayList();
+listRubber.add(rubberA);
+...
+
+//最后提交它们(第一次初始化的条件是提交了他们)当然,提交空的list也在预期中,之后你也可以随时提交新的view,旧的view将失去动画.
+deponder.submitPlanet (listPlanet);
+deponder.submitRubber(listRubber);
+//提交希望的缩放比例(这不是初始化必须,因为默认初始值已经为1)当Planet数量有较大差距时,对于保持良好观感可能非常有用, 之后你也可以随时提交新的缩放比例.
+//deponder.submitScale(1);
+
+```
+好了,它们开始动起来了.
+
+### 依赖
+
+Example for Gradle:
+
+```groovy
+repositories {
+  mavenCentral()
+}
+
+implementation 'io.github.cinpecan:deponder:0.0.2@aar'
+```
+
+and for Maven:
+
+```xml
+<dependency>
+    <groupId>io.github.cinpecan</groupId>
+    <artifactId>deponder</artifactId>
+    <version>0.0.2</version>
+</dependency>
+```
+
+### 更进一步
+
+```java
+DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(this, SimpleRootOption.builder()
+                //初始化缩放值
+                .initScale()
+                //最大缩放值
+                .maxScale()
+                //最小缩放值
+                .minScale()
+                //空气阻尼
+                .mRootDensity()
+                //斥力的辐射范围
+                .mInternalPressure()
+                //斥力系数
+                .elasticityCoefficient()
+                .build());
+```
+
+```java
+PlanetOption planetA=SimplePlanet
+            .builder()
+            ...
+            //质量
+            .quality()
+            //斥力(引力)辐射的范围
+            .mInternalPressure()
+            //斥力(引力)系数
+            .elasticityCoefficient()
+            .build();
+```
+            
+```java
+RubberOption rubberA=SimpleRubber
+                ...
+                //弹性系数
+                .elasticityCoefficient()
+                //弹簧的自然长度
+                .naturalLength()
+                .build();
+```
+
+- 动画并不改变view的实际位置.占用且仅占用animal接口.
+- 占用planet的touchListen接口并不是必须的,后续版本将删除对该接口的占用,改为在上层viewGroup自动偏移touch事件,你可以像平时一样使用touchListen.
+
 
 
 ## NOTICE
