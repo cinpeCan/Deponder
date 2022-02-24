@@ -24,12 +24,13 @@ last version 0.0.2
 
 ### 简单使用
 
+
+1. 创建一个Deponder对象:
 ```java
-//创建一个Deponder对象:
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner/*生命周期持有者*/, [YOUR GROUPVIEW]);
-
-
-//1. 申明 散点(planetOption) 对象.
+```
+2. 申明一些 散点(planetOption) 对象.
+```java
 PlanetOption planetA=SimplePlanet
             .builder()
             //在[YOUR GROUPVIEW]下的子view,且希望这个view由Deponder控制.
@@ -37,38 +38,42 @@ PlanetOption planetA=SimplePlanet
             //如果不打算用hashCode作为唯一标识,可以自行修改,例如使用UUID.
             .id([YOUR CHILD VIEW].hashCode())
             .build();
-            
-//可以申明更多...
+```
+也可以申明更多...然后放入一个集合.
+```java
 PlanetOption planetB...
 ...
-            
 List<PlanetOption> listPlanet=new ArrayList();
 listPlanet.add(planetA);
 listPlanet.add(planetB);
 ...
+```
 
-//2. 申明 连线(rubberOption) 对象.
+3. 申明 连线(rubberOption) 对象.
+```java
 RubberOption rubberA=SimpleRubber
                 //两个散点对象的id值.  他们的组合应是唯一的.
                 .sId(planetA.id())
                 .eId(planetB.id())
-                .itemView([期望的连线对象展示的view,例如是一条线段(矩形)])
+                .itemView([期望连线对象展示的view,例如是一条线段(矩形)])
                 .build();
-                
-//可以申明更多...
+```
+也可以申明更多...同样放入一个集合.
+```java
 RubberOption rubberB...
 ...
-                
 List<PlanetOption> listRubber=new ArrayList();
 listRubber.add(rubberA);
 ...
-
-//最后提交它们(第一次初始化的条件是提交了他们)当然,提交空的list也在预期中,之后你也可以随时提交新的view,旧的view将失去动画.
-deponder.submitPlanet (listPlanet);
+```
+4. 最后提交它们(第一次初始化的条件)当然,提交空的list也在预期中,之后你也可以随时提交新的view,旧的view将失去动画.
+```java
+deponder.submitPlanet(listPlanet);
 deponder.submitRubber(listRubber);
-//提交希望的缩放比例(这不是初始化必须,因为默认初始值已经为1)当Planet数量有较大差距时,对于保持良好观感可能非常有用, 之后你也可以随时提交新的缩放比例.
+```
+提交希望的缩放比例(这不是初始化必须,因为默认初始值已经为1)当Planet数量有较大差距时,对于保持良好观感可能非常有用, 之后你也可以随时提交新的缩放比例.
+```java
 //deponder.submitScale(1);
-
 ```
 好了,它们开始动起来了.
 
