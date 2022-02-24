@@ -56,12 +56,12 @@ public class DeponderHelper {
     /**
      * 空间最大缩放值(在初始化缩放值基础上.)
      */
-    public final static float DEFAULT_MAX_SCALE = 5f;
+    public final static float DEFAULT_MAX_SCALE = 1.5f;
 
     /**
      * 空间最小缩放值(在初始化缩放值基础上.)
      */
-    public final static float DEFAULT_MIN_SCALE = 0.2f;
+    public final static float DEFAULT_MIN_SCALE = .5f;
 
     /**
      * 空间中以太密度.

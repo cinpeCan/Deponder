@@ -12,6 +12,7 @@ public interface FrontalAreaProperty {
     /**
      * @return 迎风面积.(对角线长度)(直径)
      */
+    @Deprecated
     float frontalArea();
 
 }

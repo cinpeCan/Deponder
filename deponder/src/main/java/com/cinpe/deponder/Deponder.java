@@ -11,6 +11,7 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.WorkerThread;
 import androidx.lifecycle.LifecycleOwner;
@@ -78,7 +79,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
     final private RootOption rootOption;
     final private MutableLiveData<Collection<PO>> poClt = new MutableLiveData<>(Collections.emptyList());
     final private MutableLiveData<Collection<RO>> roClt = new MutableLiveData<>(Collections.emptyList());
-    final private MutableLiveData<Float> scaleLD = new MutableLiveData<>(1f);
+    final private MutableLiveData<Float> scaleLD;
 
     public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull ViewGroup rootView) {
         this(lifecycleOwner, SimpleRootOption.builder()
@@ -94,6 +95,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
     public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull RootOption rootOption) {
         this.owner = lifecycleOwner;
         this.rootOption = rootOption;
+        scaleLD = new MutableLiveData<>(rootOption.initScale());
         init();
     }
 
@@ -156,8 +158,9 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
      * 提交scale
      */
     @Override
-    public void submitScale(float scale) {
-        scaleLD.postValue(scale);
+    public void submitScale(@FloatRange(from = 0, fromInclusive = false) float scale) {
+        if (scale <= rootOption.maxScale() && scale >= rootOption.minScale())
+            scaleLD.postValue(scale);
     }
 
 

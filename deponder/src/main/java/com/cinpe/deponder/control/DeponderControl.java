@@ -2,6 +2,7 @@ package com.cinpe.deponder.control;
 
 import android.view.View;
 
+import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -20,6 +21,6 @@ public interface DeponderControl<PO, RO> {
 
     void submitRubber(@NonNull Collection<RO> rList);
 
-    void submitScale(float scale);
+    void submitScale(@FloatRange(from = 0, fromInclusive = false) float scale);
 
 }

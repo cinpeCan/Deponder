@@ -21,6 +21,7 @@ public abstract class PlanetOption extends BaseOption implements QualityProperty
      * 迎风面积.(对角线长度)
      */
     @Override
+    @Deprecated
     public abstract float frontalArea();
 
     /**

@@ -52,6 +52,7 @@ public abstract class SimplePlanet extends PlanetOption {
 
     @Override
     @AutoValue.CopyAnnotations
+    @Deprecated
     public abstract float frontalArea();
 
     @Override

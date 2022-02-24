@@ -112,7 +112,7 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
         deponderProxy.submitPlanet(pList);
         //提交rList
         deponderProxy.submitRubber(rList);
-        //默认scale为1,可不用.
+        //默认scale为1
         deponderProxy.submitScale(1);
 
     }
