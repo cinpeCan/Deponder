@@ -31,8 +31,7 @@ DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleO
 ```
 2. 申明一些 散点(planetOption) 对象.
 ```java
-PlanetOption planetA=SimplePlanet
-            .builder()
+PlanetOption planetA=SimplePlanet.builder()
             //在[YOUR GROUPVIEW]下的子view,且希望这个view由Deponder控制.
             .itemView([YOUR CHILD VIEW])
             //如果不打算用hashCode作为唯一标识,可以自行修改,例如使用UUID.
@@ -51,7 +50,7 @@ listPlanet.add(planetB);
 
 3. 申明 连线(rubberOption) 对象.
 ```java
-RubberOption rubberA=SimpleRubber
+RubberOption rubberA=SimpleRubber.builder()
                 //两个散点对象的id值.  他们的组合应是唯一的.
                 .sId(planetA.id())
                 .eId(planetB.id())
@@ -119,8 +118,7 @@ DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(this, Simp
 ```
 
 ```java
-PlanetOption planetA=SimplePlanet
-            .builder()
+PlanetOption planetA=SimplePlanet.builder()
             ...
             //质量
             .quality()
@@ -132,7 +130,7 @@ PlanetOption planetA=SimplePlanet
 ```
             
 ```java
-RubberOption rubberA=SimpleRubber
+RubberOption rubberA=SimpleRubber.builder()
                 ...
                 //弹性系数
                 .elasticityCoefficient()
