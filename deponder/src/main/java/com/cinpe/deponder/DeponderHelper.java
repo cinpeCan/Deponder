@@ -74,24 +74,19 @@ public class DeponderHelper {
     public final static float DEFAULT_QUALITY_PROPERTY = 2.293f;
 
     /**
-     * 默认的直径PX [动态]
-     */
-    public final static int DEFAULT_FRONTAL_AREA_PROPERTY = -1;
-
-    /**
      * root的弹性系数.
      */
-    public final static float DEFAULT_ROOT_ELASTICITY_COEFFICIENT = 3.293f;
+    public final static float DEFAULT_ROOT_ELASTICITY_COEFFICIENT = 1.44f;
 
     /**
      * planet的弹性系数.
      */
-    public final static float DEFAULT_ELASTICITY_COEFFICIENT = 3f;
+    public final static float DEFAULT_ELASTICITY_COEFFICIENT = 1.33f;
 
     /**
      * rubber的弹性系数.
      */
-    public final static float DEFAULT_RUBBER_ELASTICITY_COEFFICIENT = 8f;
+    public final static float DEFAULT_RUBBER_ELASTICITY_COEFFICIENT = 1.68f;
 
     /**
      * 四壁内压的感应距离.(px)

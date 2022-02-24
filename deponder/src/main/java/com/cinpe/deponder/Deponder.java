@@ -24,6 +24,7 @@ import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RootOption;
 import com.cinpe.deponder.option.RubberOption;
+
 import org.reactivestreams.Subscription;
 
 import java.util.Collection;
@@ -47,27 +48,26 @@ import io.reactivex.rxjava3.schedulers.Timed;
 import io.reactivex.rxjava3.subscribers.DisposableSubscriber;
 
 /**
- * @Description:
- *      Licensed to the Apache Software Foundation (ASF) under one or more
- *     contributor license agreements.  See the NOTICE file distributed with
- *     this work for additional information regarding copyright ownership.
- *     The ASF licenses this file to You under the Apache License, Version 2.0
- *     (the "License"); you may not use this file except in compliance with
- *     the License.  You may obtain a copy of the License at
- *
- *         http://www.apache.org/licenses/LICENSE-2.0
- *
- *     Unless required by applicable law or agreed to in writing, software
- *     distributed under the License is distributed on an "AS IS" BASIS,
- *     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *     See the License for the specific language governing permissions and
- *     limitations under the License.
+ * @Description: Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  * @Author: Cinpe
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
  * @Version: 0.01
  */
-public class Deponder<PO extends PlanetOption, RO extends RubberOption> implements DeponderControl<PO,RO> {
+public class Deponder<PO extends PlanetOption, RO extends RubberOption> implements DeponderControl<PO, RO> {
 
     public static final String TAG = "Deponder";
 
@@ -209,10 +209,11 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
                             } else {
                                 drawRo(ro, e.pointF, s.pointF, roEnvironment.scale);
                             }
-                            final float IncrementalScale = (s.count.getAndIncrement() + e.count.getAndIncrement()) * DeponderHelper.INCREMENTAL_SCALE;
-                            m = evaluate(s.pointF, e.pointF, roEnvironment.scale + IncrementalScale, true);
+                            s.count.incrementAndGet();
+                            e.count.incrementAndGet();
+                            m = evaluate(s.pointF, e.pointF, roEnvironment.scale, ro.elasticityCoefficient(), ro.naturalLength(), s.p.elasticityCoefficient(), s.p.mInternalPressure() + s.count.get() * DeponderHelper.INCREMENTAL_SCALE);
                         } else {
-                            m = evaluate(s.pointF, e.pointF, roEnvironment.scale, false);
+                            m = evaluate(s.pointF, e.pointF, roEnvironment.scale, 0, 0, s.p.elasticityCoefficient(), s.p.mInternalPressure() + s.count.get() * DeponderHelper.INCREMENTAL_SCALE);
                         }
                         Matrix v = new Matrix();
                         m.invert(v);
@@ -282,7 +283,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
         final float minAcceleration = DeponderHelper.MIN_ACCELERATION * scale;
         if (p.length() < minAcceleration) {
             po.speed().setTranslate(0, 0);
-            return;
+            p.set(0, 0);
         }
 
         float[] values = DeponderHelper.values(po.matrix());
@@ -338,9 +339,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
 
 
     @NonNull
-    private Matrix evaluate(@NonNull final PointF s, @NonNull final PointF e, final float scale, boolean hasRubber) {
-
-        long input = SystemClock.currentThreadTimeMillis();
+    private Matrix evaluate(@NonNull final PointF s, @NonNull final PointF e, final float scale, final float rubber_elasticity_coefficient, final int rubber_natural_length, float elasticity_coefficient, float planet_internal_pressure) {
 
         //newton
         final Matrix matrix = new Matrix();
@@ -353,10 +352,10 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
         //hypotenuse
         final float length = diff.length();
 
-        if (hasRubber) {
+        if (rubber_elasticity_coefficient != 0) {
 
             //natural length
-            final float natural = DeponderHelper.DEFAULT_RUBBER_NATURAL_LENGTH * scale;
+            final float natural = rubber_natural_length * scale;
 
             //Deformation variable
             float rubberDiff = DeponderHelper.dDistance(length, natural);
@@ -364,7 +363,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
             PointF rubberDiffDistance = new PointF(Math.round(Math.sin(angle) * rubberDiff), Math.round(Math.cos(angle) * rubberDiff));
 
             //newton
-            PointF rubberNewton = DeponderHelper.calculate(rubberDiffDistance, DeponderHelper.DEFAULT_RUBBER_ELASTICITY_COEFFICIENT);
+            PointF rubberNewton = DeponderHelper.calculate(rubberDiffDistance, rubber_elasticity_coefficient);
 
             //save
             matrix.postTranslate(rubberNewton.x, rubberNewton.y);
@@ -372,7 +371,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
 
         }
 
-        final float mInternalPressure = DeponderHelper.DEFAULT_PLANET_INTERNAL_PRESSURE * scale;
+        final float mInternalPressure = planet_internal_pressure * scale;
         if (length < mInternalPressure) {
 
             float planetDiff = DeponderHelper.dDistance(length, mInternalPressure);
@@ -381,7 +380,7 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
             PointF planetDiffDistance = new PointF(Math.round(Math.sin(angle) * planetDiff), Math.round(Math.cos(angle) * planetDiff));
 
             //Deformation variable->Newton
-            PointF planetDiffNewton = DeponderHelper.calculate(planetDiffDistance, DeponderHelper.DEFAULT_ELASTICITY_COEFFICIENT);
+            PointF planetDiffNewton = DeponderHelper.calculate(planetDiffDistance, elasticity_coefficient);
 
             matrix.postTranslate(planetDiffNewton.x, planetDiffNewton.y);
 

@@ -1,28 +1,11 @@
 package com.cinpe.deponder;
-
-import android.graphics.Matrix;
-import android.graphics.PointF;
 import android.graphics.Rect;
-import android.graphics.RectF;
-import android.os.Build;
-import android.util.Log;
-import android.util.SparseBooleanArray;
 import android.view.MotionEvent;
 import android.view.TouchDelegate;
 import android.view.View;
-import android.view.ViewStructure;
-import android.view.accessibility.AccessibilityNodeInfo;
-
 import androidx.annotation.NonNull;
-
-import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RootOption;
 
-import java.lang.ref.WeakReference;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.List;
 
 /**
  * @Description: 描述

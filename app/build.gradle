@@ -4,6 +4,12 @@ plugins {
 
 android {
     signingConfigs {
+    release {
+    storeFile file('.\\deponderStore.jks')
+        storePassword 'storePassword'
+        keyAlias 'keyAlias'
+        keyPassword 'keyPassword'
+    }
     }
     compileSdk 31
 
@@ -19,7 +25,7 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -29,6 +35,13 @@ android {
     }
     buildFeatures {
         dataBinding true
+    }
+    sourceSets {
+        main {
+            assets {
+                srcDirs 'src\\main\\assets'
+            }
+        }
     }
 }
 

@@ -1,14 +1,7 @@
 package com.cinpe.deponder.option;
-
-import android.graphics.Matrix;
-import android.graphics.RectF;
-import android.view.View;
 import android.view.ViewGroup;
-
 import androidx.annotation.NonNull;
 
-import com.cinpe.deponder.NAnimator;
-import com.google.auto.value.AutoValue;
 
 /**
  * @Description: 根布局.
