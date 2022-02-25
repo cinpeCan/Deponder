@@ -1,6 +1,6 @@
 # DemoDeponder
 
-<!-- [![Maven Central](https://github.com/cinpeCan/DemoDeponder/badge.svg)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
+<!-- [![Maven Central](raw/badge.svg)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
 last version 0.0.2
 
 一个基于 Android原生 的散点图表库
@@ -142,7 +142,9 @@ RubberOption rubberA=SimpleRubber.builder()
 - 动画并不改变view的实际位置.占用且仅占用animal接口.
 - 占用planet的touchListen接口并不是必须的,后续版本将删除对该接口的占用,改为在上层viewGroup自动偏移touch事件,你可以像平时一样使用touchListen.
 
+### 效果示例
 
+![Image](https://s4.ax1x.com/2022/02/25/bAEZwj.gif)
 
 ## NOTICE
 
