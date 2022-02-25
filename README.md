@@ -171,4 +171,5 @@ RubberOption rubberA=SimpleRubber.builder()
     
     io.reactivex.rxjava3:rxandroid from https://github.com/ReactiveX/RxJava Apache-2.0 License
     com.google.guava from https://github.com/google/guava Apache-2.0 License
+    com.google.auto.value from https://github.com/google/auto Apache-2.0 License
 
