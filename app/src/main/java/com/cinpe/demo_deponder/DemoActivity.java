@@ -39,6 +39,7 @@ import java.util.UUID;
     See the License for the specific language governing permissions and
     limitations under the License.
  */
+
 /**
  * An example activity that shows how to use DeponderProxy.
  */
@@ -50,8 +51,8 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
 
     DeponderControl<PlanetOption, RubberOption> deponderProxy;
 
-    List<PlanetOption> pList = new ArrayList<>();
-    List<RubberOption> rList = new ArrayList<>();
+    final List<PlanetOption> pList = new ArrayList<>();
+    final List<RubberOption> rList = new ArrayList<>();
 
 
     @Override
@@ -59,7 +60,7 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
         super.onPostCreate(savedInstanceState);
         mBinding = DataBindingUtil.setContentView(this, R.layout.activity_demo);
         mBinding.slide.addOnChangeListener((slider, value, fromUser) -> {
-            if (deponderProxy != null & fromUser) deponderProxy.submitScale(value);
+            if (deponderProxy != null && fromUser) deponderProxy.submitScale(value);
         });
         mBinding.setControl(this);
 

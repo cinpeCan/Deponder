@@ -25,12 +25,17 @@ import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RootOption;
 import com.cinpe.deponder.option.RubberOption;
+import com.google.common.collect.Collections2;
+import com.google.common.collect.MapDifference;
+import com.google.common.collect.Maps;
+import com.google.common.collect.Sets;
 
 import org.reactivestreams.Subscription;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -68,7 +73,7 @@ import io.reactivex.rxjava3.subscribers.DisposableSubscriber;
  * @CreateDate: 2021/12/22
  * @Version: 0.01
  */
-public class Deponder<PO extends PlanetOption, RO extends RubberOption> implements DeponderControl<PO, RO> {
+public final class Deponder<PO extends PlanetOption, RO extends RubberOption> implements DeponderControl<PO, RO> {
 
     public static final String TAG = "Deponder";
 
@@ -120,10 +125,14 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnSuccess(l -> {
                     Collection<PO> clt = poClt.getValue();
-                    if (clt != null)
-                        clt.stream().map(BaseOption::itemView).forEach(View::clearAnimation);
+                    if (clt != null) {
+                        Map<String, PO> mapOld = clt.stream().collect(Collectors.toMap(BaseOption::id, po -> po));
+                        Map<String, PO> mapNew = l.stream().collect(Collectors.toMap(BaseOption::id, po -> po));
+                        MapDifference<String, PO> dif = Maps.difference(mapOld, mapNew);
+                        dif.entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(View::clearAnimation);
+                    }
                 })
-                .doOnSuccess(l -> l.stream().filter(po -> po.itemView().getAnimation() != po.animator()).forEach(po -> {
+                .doOnSuccess(l -> l.stream().filter(po -> !Objects.equals(po.itemView().getAnimation(), po.animator())).forEach(po -> {
                     po.itemView().startAnimation(po.animator());
                     DeponderHelper.bindPlanet(po);
                 }))
@@ -142,12 +151,16 @@ public class Deponder<PO extends PlanetOption, RO extends RubberOption> implemen
                 .observeOn(AndroidSchedulers.mainThread())
                 .doOnSuccess(l -> {
                     Collection<RO> clt = roClt.getValue();
-                    if (clt != null) clt.stream().map(BaseOption::itemView).forEach(v -> {
-                        v.clearAnimation();
-                        rootOption.itemView().removeView(v);
-                    });
+                    if (clt != null) {
+                        Map<String, RO> mapOld = clt.stream().collect(Collectors.toMap(BaseOption::id, ro -> ro));
+                        Map<String, RO> mapNew = l.stream().collect(Collectors.toMap(BaseOption::id, ro -> ro));
+                        Maps.difference(mapOld, mapNew).entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(v -> {
+                            v.clearAnimation();
+                            rootOption.itemView().removeView(v);
+                        });
+                    }
                 })
-                .doOnSuccess(l -> l.forEach(ro -> {
+                .doOnSuccess(l -> l.stream().filter(ro -> !Objects.equals(ro.itemView().getAnimation(), ro.animator())).forEach(ro -> {
                     rootOption.itemView().addView(ro.itemView());
                     ro.itemView().startAnimation(ro.animator());
                 }))

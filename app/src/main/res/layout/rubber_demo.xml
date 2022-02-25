@@ -6,16 +6,16 @@
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:elevation="-1dp"
-        android:background="#00000000">
+        android:background="#00000000"
+        android:elevation="-1dp">
 
         <TextView
             android:id="@+id/un_rubber"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginBottom="1dp"
-            android:text="@string/rubber"
             android:tag="@string/un_rubber"
+            android:text="@string/rubber"
             app:layout_constraintBottom_toTopOf="@id/rubber"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent" />
@@ -24,6 +24,7 @@
             android:id="@+id/rubber"
             android:layout_width="300dp"
             android:layout_height="3dp"
+            android:alpha=".6"
             android:background="@color/cardview_dark_background"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
