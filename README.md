@@ -3,7 +3,7 @@
 <!-- [![Maven Central](https://drive.google.com/file/d/1prIi6cIf2rr3BSLW3SYvPPBvk-KTvdVv/view)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
 last version [0.0.2](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar)
 
-一个基于 Android原生 的散点图表库
+一个基于 Android原生 散点游动的动画SDK
 
 目的是利用原生优势,获得尽量高的性能(skip onMeasure,onLayout,onDraw)和尽量低的侵入性(no override view):
 
