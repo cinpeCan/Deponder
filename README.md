@@ -4,7 +4,7 @@
 last version [0.0.3](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.3/aar)
 <!-- [![Maven Central](https://github.com/cinpeCan/DemoDeponder/actions/workflows/main.yml/badge.svg)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
 
-一个基于 Android原生 散点游动的动画SDK
+一个Android原生的动画SDK
 
 目的是利用原生优势,获得尽量高的性能(skip onMeasure,onLayout,onDraw)和尽量低的侵入性(no override view):
 
