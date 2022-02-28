@@ -142,15 +142,15 @@ RubberOption rubberA=SimpleRubber.builder()
 
 - 动画并不改变view的实际位置.占用且仅占用animal接口.
 - 占用planet的touchListen接口并不是必须的,后续版本将删除对该接口的占用,改为在上层viewGroup自动偏移touch事件,你可以像平时一样使用touchListen.
-- 目前,可以在Rubber下每个子view中,添加
+- 目前,可以在Rubber下需要保持宽高不变的子view中,添加"UN_RUBBER_RUBBER"(@string/un_rubber)
   ```
   addtag("UN_RUBBER_RUBBER")
   ```
-  或在textView的xml布局中添加
+  或在子view的xml布局中添加
   ```
-  android:tag="@string/un_rubber"
+  android:tag="UN_RUBBER_RUBBER"
   ```
-  以保持子view的宽高比不变.
+  以保持宽高比恒定.
 
 ### 效果示例
 
