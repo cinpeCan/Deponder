@@ -142,6 +142,7 @@ RubberOption rubberA=SimpleRubber.builder()
 
 - 动画并不改变view的实际位置.占用且仅占用animal接口.
 - 占用planet的touchListen接口并不是必须的,后续版本将删除对该接口的占用,改为在上层viewGroup自动偏移touch事件,你可以像平时一样使用touchListen.
+- 目前,可以在Rubber下每个textView控件中,添加```addtag("UN_RUBBER_RUBBER")```或在textView的xml布局中添加```android:tag="@string/un_rubber"```以避免失真.
 
 ### 效果示例
 
