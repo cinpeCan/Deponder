@@ -23,4 +23,6 @@ public interface DeponderControl<PO, RO> {
 
     void submitScale(@FloatRange(from = 0, fromInclusive = false) float scale);
 
+    void cancel();
+
 }

@@ -79,11 +79,13 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
 
     @NonNull
     final LifecycleOwner owner;
-
     @NonNull
     final private RootOption rootOption;
-    final private MutableLiveData<Collection<PO>> poClt = new MutableLiveData<>(Collections.emptyList());
-    final private MutableLiveData<Collection<RO>> roClt = new MutableLiveData<>(Collections.emptyList());
+    @NonNull
+    final private MutableLiveData<Collection<PO>> poClt;
+    @NonNull
+    final private MutableLiveData<Collection<RO>> roClt;
+    @NonNull
     final private MutableLiveData<Float> scaleLD;
 
     public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull ViewGroup rootView) {
@@ -100,6 +102,8 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
     public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull RootOption rootOption) {
         this.owner = lifecycleOwner;
         this.rootOption = rootOption;
+        poClt = new MutableLiveData<>(Collections.emptyList());
+        roClt = new MutableLiveData<>(Collections.emptyList());
         scaleLD = new MutableLiveData<>(rootOption.initScale());
         init();
     }
@@ -174,6 +178,11 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
     public void submitScale(@FloatRange(from = 0, fromInclusive = false) float scale) {
         if (scale <= rootOption.maxScale() && scale >= rootOption.minScale())
             scaleLD.postValue(scale);
+    }
+
+    @Override
+    public void cancel() {
+        rootOption.itemView().clearAnimation();
     }
 
 
@@ -297,14 +306,13 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
 
         //Low-speed anti-shake
         final float minAcceleration = DeponderHelper.MIN_ACCELERATION * scale;
-        if (p.length() < minAcceleration) {
+        if (p.length() < minAcceleration || po.itemView().isPressed()) {
             po.speed().setTranslate(0, 0);
             p.set(0, 0);
         }
 
         float[] values = DeponderHelper.values(po.matrix());
         Rect rect = DeponderHelper.hitRect(po.itemView());
-
 
         float tempX = scale / values[Matrix.MSCALE_X];
         float tempY = scale / values[Matrix.MSCALE_Y];
