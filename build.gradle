@@ -44,7 +44,6 @@ buildscript {
         lombok_version='1.18.20'
         workVersion = '2.5.0'
         rxbind = '4.0.0'
-        apiToken='7c34603284e02aa1261dd26d408b67d1'
     }
     repositories {
 //        maven{ url 'https://maven.aliyun.com/repository/public'}

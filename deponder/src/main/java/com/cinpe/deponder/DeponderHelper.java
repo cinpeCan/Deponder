@@ -164,6 +164,9 @@ public class DeponderHelper {
         return new PointF((s.x + e.x) / 2, (s.y + e.y) / 2);
     }
 
+    /**
+     * centerPointF
+     */
     public static @NonNull
     PointF centerPointF(BaseOption p) {
         RectF src = DeponderHelper.hitRectF(p.itemView());
@@ -173,22 +176,13 @@ public class DeponderHelper {
         return new PointF(src.centerX() + values[Matrix.MTRANS_X] + dw, src.centerY() + values[Matrix.MTRANS_Y] + dh);
     }
 
-    /**
-     * 自身内部中心点坐标.
-     */
+
     public static @NonNull
     PointF centerPointFInternal(BaseOption p) {
         Rect rect = DeponderHelper.hitRect(p.itemView());
         float[] values = new float[9];
         p.matrix().getValues(values);
         return new PointF((rect.width() / 2f) * values[Matrix.MSCALE_X] + values[Matrix.MTRANS_X], (rect.height() / 2f) * values[Matrix.MSCALE_Y] + values[Matrix.MTRANS_Y]);
-    }
-
-    /**
-     * 矩形长宽获取斜边长.
-     */
-    public static float pythagorean(float dx, float dy) {
-        return new PointF(dx, dy).length();
     }
 
     /**
@@ -252,22 +246,11 @@ public class DeponderHelper {
      * @param dt           时间(ms)
      */
     public static PointF calculate(PointF speed, PointF acceleration, long dt) {
-        float x = Math.round(speed.x * dt + .5f * acceleration.x * Math.pow(dt, 2)) * 0.000001f;
-        float y = Math.round(speed.y * dt + .5f * acceleration.y * Math.pow(dt, 2)) * 0.000001f;
+        float x = Math.round(speed.x * dt + .5f * acceleration.x * Math.pow(dt, 2)) /1000000f;
+        float y = Math.round(speed.y * dt + .5f * acceleration.y * Math.pow(dt, 2)) /1000000f;
         return new PointF(x, y);
     }
 
-//    /**
-//     * 计算位移(矢量),
-//     *
-//     * @param speed        速度(px/ms)
-//     * @param acceleration 加速度(px/ms2)
-//     * @param dt           时间(ms)
-//     */
-//    public static PointF calculate(@NonNull Matrix speed, PointF acceleration, long dt) {
-//        final float[] s = DeponderHelper.values(speed);
-//        return calculate(new PointF(s[Matrix.MTRANS_X], s[Matrix.MTRANS_Y]), acceleration, dt);
-//    }
 
     public static void bindDelegateRootTouch(@NonNull RootOption rootOption) {
         rootOption.itemView().post(() -> rootOption.itemView().setTouchDelegate(new DeponderDelegate(rootOption)));
@@ -297,9 +280,6 @@ public class DeponderHelper {
         @Override
         public boolean onTouch(View v, MotionEvent event) {
 
-
-            Log.i(TAG, "进入PlanetOption.onTouch()" + event.getAction());
-
             if (!v.isEnabled()) {
                 return false;
             }
@@ -323,10 +303,8 @@ public class DeponderHelper {
 
 
             if (!rectF.contains(point.x, point.y)) {
-                Log.i(TAG, "不包含, 不消费" + rectF + "," + this.option.matrix() + "," + point);
                 return false;
             }
-            Log.i(TAG, "包含, 进行消费" + rectF + "," + this.option.matrix() + "," + point);
 
             boolean retVal = mScaleGestureDetector.onTouchEvent(event);
             retVal = mGestureDetector.onTouchEvent(event) || retVal;
