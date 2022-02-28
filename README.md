@@ -1,9 +1,9 @@
 # DemoDeponder
 
-<!-- [![Maven Central](https://github.com/cinpeCan/DemoDeponder/badge.svg)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
-last version 0.0.2
+<!-- [![Maven Central](https://drive.google.com/file/d/1prIi6cIf2rr3BSLW3SYvPPBvk-KTvdVv/view)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
+last version [0.0.2](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar)
 
-一个基于 Android原生 的散点图表库
+一个基于 Android原生 散点游动的动画SDK
 
 目的是利用原生优势,获得尽量高的性能(skip onMeasure,onLayout,onDraw)和尽量低的侵入性(no override view):
 
@@ -142,7 +142,9 @@ RubberOption rubberA=SimpleRubber.builder()
 - 动画并不改变view的实际位置.占用且仅占用animal接口.
 - 占用planet的touchListen接口并不是必须的,后续版本将删除对该接口的占用,改为在上层viewGroup自动偏移touch事件,你可以像平时一样使用touchListen.
 
+### 效果示例
 
+![Image](https://s4.ax1x.com/2022/02/25/bAEZwj.gif)
 
 ## NOTICE
 
@@ -169,4 +171,5 @@ RubberOption rubberA=SimpleRubber.builder()
     
     io.reactivex.rxjava3:rxandroid from https://github.com/ReactiveX/RxJava Apache-2.0 License
     com.google.guava from https://github.com/google/guava Apache-2.0 License
+    com.google.auto.value from https://github.com/google/auto Apache-2.0 License
 
