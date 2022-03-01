@@ -92,9 +92,10 @@ or for Maven:
 
 ```xml
 <dependency>
-    <groupId>io.github.cinpecan</groupId>
-    <artifactId>deponder</artifactId>
-    <version>0.2.1</version>
+  <groupId>io.github.cinpecan</groupId>
+  <artifactId>deponder</artifactId>
+  <version>0.2.1</version>
+  <type>aar</type>
 </dependency>
 ```
 
