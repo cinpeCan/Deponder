@@ -19,7 +19,8 @@ last version [0.0.3](https://search.maven.org/artifact/io.github.cinpecan/depond
 - 散点(planetOption)的质量,引力(或斥力)的辐射范围,引力(或斥力)的系数
 - 连线(rubberOption)的自然长度,弹性系数
 - 环境(rootOption)的空气摩擦,四壁约束力(斥力)的辐射范围,四壁约束力(斥力)的系数
-- 缩放(scale)
+- 缩放(scale),对所有散点(planetOption)和连线(rubberOption)生效, 但对环境(rootOption)的视图和空气摩擦不生效(会对辐射范围和斥力生效).
+
 
 以控制动画效果.
 
