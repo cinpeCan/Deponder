@@ -1,8 +1,6 @@
 # DemoDeponder
 
-<!-- [![Maven Central](https://drive.google.com/file/d/1prIi6cIf2rr3BSLW3SYvPPBvk-KTvdVv/view)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
-last version [0.0.3](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.3/aar)
-<!-- [![Maven Central](https://github.com/cinpeCan/DemoDeponder/actions/workflows/main.yml/badge.svg)](https://search.maven.org/artifact/io.github.cinpecan/deponder/0.0.2/aar) -->
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.cinpecan/deponder.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22io.github.cinpecan%22%20AND%20a:%22deponder%22)
 
 一个Android原生的动画SDK
 
@@ -87,7 +85,7 @@ repositories {
   mavenCentral()
 }
 
-implementation 'io.github.cinpecan:deponder:0.0.3@aar'
+implementation 'io.github.cinpecan:deponder:0.2.1@aar'
 ```
 
 or for Maven:
@@ -96,7 +94,7 @@ or for Maven:
 <dependency>
     <groupId>io.github.cinpecan</groupId>
     <artifactId>deponder</artifactId>
-    <version>0.0.3</version>
+    <version>0.2.1</version>
 </dependency>
 ```
 
