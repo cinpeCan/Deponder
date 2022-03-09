@@ -153,6 +153,9 @@ RubberOption rubberA=SimpleRubber.builder()
   android:tag="UN_RUBBER_RUBBER"
   ```
   以保持子view的宽高比恒定.
+- 配合Recyclerview使用体验更佳，deponder仅负责管理动画，view本身创建，删除，绑定数据等操作应该由开发者来实现，
+  Recyclerview毫无疑问是个好选择，并且Deponder并不关心你使用的是什么LayoutManager。
+
 
 ### 效果示例
 
