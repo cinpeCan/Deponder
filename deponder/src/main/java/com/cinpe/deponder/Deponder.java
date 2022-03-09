@@ -208,7 +208,6 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
         public Listener(NAnimator nAnimator, FlowableEmitter<Float> emitter) {
             this.nAnimator = nAnimator;
             this.emitter = emitter;
-
         }
 
         @Override
@@ -224,61 +223,51 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
 
     private void bind(@NonNull RootOption option, @NonNull LiveData<Collection<PO>> poClt, @NonNull LiveData<Collection<RO>> roClt, @NonNull LiveData<Float> scaleLD) {
 
-        Flowable<? extends Collection<NT<PO>>> ntCltFlowable = Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().map(NT::new).collect(Collectors.toList())).subscribeOn(Schedulers.io());
-
         Flowable.<Float>create(emitter -> option.animator().setApplyTransformationListener(new Listener(option.animator(), emitter)), BackpressureStrategy.DROP)
-                .timeInterval().map(Timed::time).map(t -> Math.min(16L, t))
+                .timeInterval().map(Timed::time).map(t -> Math.min(32L, Math.max(8L, t)))
                 .withLatestFrom(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, scaleLD)).subscribeOn(Schedulers.io()),
+                        Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().map(NT::new).collect(Collectors.toList())).doOnNext(clt -> Log.i(TAG, "执行一遍又一遍")).subscribeOn(Schedulers.io()),
                         Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, roClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().collect(Collectors.<RO, String, RO>toMap(BaseOption::id, ro -> ro))).subscribeOn(Schedulers.io()),
                         Environment::new)
-//                .onBackpressureBuffer()
-                .withLatestFrom(ntCltFlowable, (roEnvironment, nts) -> {
-                    Flowable.fromIterable(nts).compose(DeponderHelper.flowableCombinations(upstream -> upstream.doOnNext(s -> s.newton.postConcat(evaluate(s.pointF, roEnvironment.scale))).doAfterNext(s -> {
-                        drawPo(s.p, s.newton, roEnvironment.time, roEnvironment.scale);
-                        //更新
-                        s.update();
-                    }), (s, e) -> {
-                        if (TextUtils.equals(s.p.id(), e.p.id()))
-                            return new Matrix();
-                        Matrix m;
-                        RO ro = roEnvironment.map.get(DeponderHelper.concatId(s.p.id(), e.p.id()));
-                        if (ro != null) {
-                            if (ro.id().startsWith(s.p.id())) {
-                                drawRo(ro, s.pointF, e.pointF, roEnvironment.scale);
+                .flatMap(roEnvironment -> Flowable.fromIterable(roEnvironment.poClt).compose(DeponderHelper.flowableCombinations(upstream -> upstream.doOnNext(s -> s.newton.postConcat(evaluate(s.pointF, roEnvironment.scale))).doAfterNext(s -> {
+                            drawPo(s.p, s.newton, roEnvironment.time, roEnvironment.scale);
+                            //更新
+                            s.update();
+                        }), (s, e) -> {
+                            if (TextUtils.equals(s.p.id(), e.p.id()))
+                                return new Matrix();
+                            Matrix m;
+                            RO ro = roEnvironment.map.get(DeponderHelper.concatId(s.p.id(), e.p.id()));
+                            if (ro != null) {
+                                if (ro.id().startsWith(s.p.id())) {
+                                    drawRo(ro, s.pointF, e.pointF, roEnvironment.scale);
+                                } else {
+                                    drawRo(ro, e.pointF, s.pointF, roEnvironment.scale);
+                                }
+                                s.count.incrementAndGet();
+                                e.count.incrementAndGet();
+                                m = evaluate(s.pointF, e.pointF, roEnvironment.scale, ro.elasticityCoefficient(), ro.naturalLength(), s.p.elasticityCoefficient(), s.p.mInternalPressure() + s.count.get() * DeponderHelper.INCREMENTAL_SCALE);
                             } else {
-                                drawRo(ro, e.pointF, s.pointF, roEnvironment.scale);
+                                m = evaluate(s.pointF, e.pointF, roEnvironment.scale, 0, 0, s.p.elasticityCoefficient(), s.p.mInternalPressure() + s.count.get() * DeponderHelper.INCREMENTAL_SCALE);
                             }
-                            s.count.incrementAndGet();
-                            e.count.incrementAndGet();
-                            m = evaluate(s.pointF, e.pointF, roEnvironment.scale, ro.elasticityCoefficient(), ro.naturalLength(), s.p.elasticityCoefficient(), s.p.mInternalPressure() + s.count.get() * DeponderHelper.INCREMENTAL_SCALE);
-                        } else {
-                            m = evaluate(s.pointF, e.pointF, roEnvironment.scale, 0, 0, s.p.elasticityCoefficient(), s.p.mInternalPressure() + s.count.get() * DeponderHelper.INCREMENTAL_SCALE);
-                        }
-                        Matrix v = new Matrix();
-                        m.invert(v);
-                        s.newton.postConcat(v);
-                        e.newton.postConcat(m);
-                        return m;
-                    }))
-                            .subscribeOn(Schedulers.io())
-                            .blockingSubscribe();
-
-                    return roEnvironment.time;
-
-                })
+                            Matrix v = new Matrix();
+                            m.invert(v);
+                            s.newton.postConcat(v);
+                            e.newton.postConcat(m);
+                            return m;
+                        }))
+                        .subscribeOn(AndroidSchedulers.mainThread()))
                 .subscribeOn(Schedulers.io())
                 .subscribe(new FlowableSubscriber<Object>() {
                     Subscription s;
-
                     @Override
                     public void onSubscribe(@NonNull Subscription s) {
                         this.s = s;
-                        s.request(1);
+                        s.request(Long.MAX_VALUE);
                     }
 
                     @Override
                     public void onNext(Object o) {
-                        s.request(1);
                     }
 
                     @Override
@@ -507,17 +496,19 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
 
     }
 
-    static class Environment<RO extends RubberOption> {
+    static class Environment<NT, RO extends RubberOption> {
 
-        public Environment(long time, float scale, Map<String, RO> map) {
+        public Environment(long time, float scale, Collection<NT> poClt, Map<String, RO> map) {
             this.time = time;
             this.scale = scale;
             this.map = map;
+            this.poClt = poClt;
         }
 
-        long time;
-        float scale;
-        Map<String, RO> map;
+        final long time;
+        final float scale;
+        final Map<String, RO> map;
+        final Collection<NT> poClt;
 
     }
 }
