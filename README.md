@@ -21,6 +21,29 @@
 
 以控制动画效果.
 
+### 依赖
+
+Example for Gradle:
+
+```groovy
+repositories {
+  mavenCentral()
+}
+
+implementation 'io.github.cinpecan:deponder:0.2.1@aar'
+```
+
+or for Maven:
+
+```xml
+<dependency>
+  <groupId>io.github.cinpecan</groupId>
+  <artifactId>deponder</artifactId>
+  <version>0.2.1</version>
+  <type>aar</type>
+</dependency>
+```
+
 ### 简单使用
 
 
@@ -74,29 +97,6 @@ deponder.submitRubber(listRubber);
 //deponder.submitScale(1);
 ```
 好了,它们开始动起来了.
-
-### 依赖
-
-Example for Gradle:
-
-```groovy
-repositories {
-  mavenCentral()
-}
-
-implementation 'io.github.cinpecan:deponder:0.2.1@aar'
-```
-
-or for Maven:
-
-```xml
-<dependency>
-  <groupId>io.github.cinpecan</groupId>
-  <artifactId>deponder</artifactId>
-  <version>0.2.1</version>
-  <type>aar</type>
-</dependency>
-```
 
 ### 更进一步
 
