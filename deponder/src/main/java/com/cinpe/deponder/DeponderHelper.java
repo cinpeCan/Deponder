@@ -246,8 +246,8 @@ public class DeponderHelper {
      * @param dt           时间(ms)
      */
     public static PointF calculate(PointF speed, PointF acceleration, long dt) {
-        float x = Math.round(speed.x * dt + .5f * acceleration.x * Math.pow(dt, 2)) /1000000f;
-        float y = Math.round(speed.y * dt + .5f * acceleration.y * Math.pow(dt, 2)) /1000000f;
+        float x = Math.round(speed.x * dt + .5f * acceleration.x * Math.pow(dt, 2)) / 1000000f;
+        float y = Math.round(speed.y * dt + .5f * acceleration.y * Math.pow(dt, 2)) / 1000000f;
         return new PointF(x, y);
     }
 
@@ -281,28 +281,6 @@ public class DeponderHelper {
         public boolean onTouch(View v, MotionEvent event) {
 
             if (!v.isEnabled()) {
-                return false;
-            }
-            PointF point = new PointF(event.getX(0), event.getY(0));
-
-            RectF rectF = hitRectF(v);
-
-            Matrix temp = new Matrix();
-
-            float[] floats = values(this.option.matrix());
-
-//            rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
-//
-//            temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.left, rectF.top);
-//
-//            temp.mapRect(rectF);
-
-            temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.width() * .5f, rectF.height() * .5f);
-            temp.mapRect(rectF);
-            rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
-
-
-            if (!rectF.contains(point.x, point.y)) {
                 return false;
             }
 
@@ -355,7 +333,6 @@ public class DeponderHelper {
 
         @Override
         public boolean onDown(MotionEvent e) {
-
 
             this.option.itemView().setPressed(true);
             this.option.speed().reset();
