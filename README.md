@@ -6,8 +6,7 @@
 
 目的是利用原生优势,获得尽量高的性能(skip onMeasure,onLayout,onDraw)和尽量低的侵入性(no override view):
 
-- 游动的view,仅第一帧经过onMeasure,onLayout,onDraw绘制, 其后view的真实位置不变
-- 通过矩阵计算(占用view的animal接口)进行移动,缩放,旋转,翻转(不再触发onMeasure,onLayout,onDraw), 
+- 通过矩阵计算(占用view的animal接口)进行移动,缩放,旋转,翻转(不触发onMeasure,onLayout,onDraw), 
   因此开发者仍然可以使用它们对view进行叠加调整.
 - touch事件(占用view的touchListener接口)逆矩阵偏移到view真实位置上处理.
 - 对view的left,top,right,bottom,translationX,translationY等接口均不主动占用.
@@ -21,6 +20,29 @@
 
 
 以控制动画效果.
+
+### 依赖
+
+Example for Gradle:
+
+```groovy
+repositories {
+  mavenCentral()
+}
+
+implementation 'io.github.cinpecan:deponder:0.2.2@aar'
+```
+
+or for Maven:
+
+```xml
+<dependency>
+  <groupId>io.github.cinpecan</groupId>
+  <artifactId>deponder</artifactId>
+  <version>0.2.2</version>
+  <type>aar</type>
+</dependency>
+```
 
 ### 简单使用
 
@@ -75,29 +97,6 @@ deponder.submitRubber(listRubber);
 //deponder.submitScale(1);
 ```
 好了,它们开始动起来了.
-
-### 依赖
-
-Example for Gradle:
-
-```groovy
-repositories {
-  mavenCentral()
-}
-
-implementation 'io.github.cinpecan:deponder:0.2.1@aar'
-```
-
-or for Maven:
-
-```xml
-<dependency>
-  <groupId>io.github.cinpecan</groupId>
-  <artifactId>deponder</artifactId>
-  <version>0.2.1</version>
-  <type>aar</type>
-</dependency>
-```
 
 ### 更进一步
 
