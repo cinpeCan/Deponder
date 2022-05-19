@@ -30,7 +30,7 @@ repositories {
   mavenCentral()
 }
 
-implementation 'io.github.cinpecan:deponder:0.2.2@aar'
+implementation 'io.github.cinpecan:deponder:0.2.3@aar'
 ```
 
 or for Maven:
