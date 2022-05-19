@@ -1,14 +1,15 @@
 package com.cinpe.deponder.option;
+
 import android.view.ViewGroup;
+
 import androidx.annotation.NonNull;
 
 
 /**
- * @Description: 根布局.
+ * @Description: viewGroup option.
  * @Author: Cinpe
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
- * @Version: 0.01
  */
 public abstract class RootOption extends BaseOption {
 
@@ -17,17 +18,17 @@ public abstract class RootOption extends BaseOption {
     public abstract ViewGroup itemView();
 
     /**
-     * 空间初始化缩放值(当行星过多或过少时,可能进行缩放)
+     * 初始化缩放值
      */
     public abstract float initScale();
 
     /**
-     * 空间最大缩放值(在初始化缩放值基础上.)
+     * 空间最大缩放值(在初始化缩放值基础上缩放.)
      */
     public abstract float maxScale();
 
     /**
-     * 空间最小缩放值(在初始化缩放值基础上.)
+     * 空间最小缩放值(在初始化缩放值基础上缩放.)
      */
     public abstract float minScale();
 

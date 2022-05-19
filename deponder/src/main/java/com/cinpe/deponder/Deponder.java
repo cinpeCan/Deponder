@@ -10,6 +10,7 @@ import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Transformation;
 
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
@@ -150,10 +151,7 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
                         dif.entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(View::clearAnimation);
                     }
                 })
-                .doOnSuccess(l -> l.stream().filter(po -> !Objects.equals(po.itemView().getAnimation(), po.animator())).forEach(po -> {
-                    po.itemView().startAnimation(po.animator());
-                    DeponderHelper.bindPlanet(po);
-                }))
+                .doOnSuccess(l -> l.stream().filter(po -> !Objects.equals(po.itemView().getAnimation(), po.animator())).forEach(po -> po.itemView().startAnimation(po.animator())))
                 .subscribe(new DefSingleSubscriber<>(poClt::postValue));
     }
 
@@ -213,6 +211,7 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
         @Override
         public void onApplyTransformation(float t) {
             emitter.onNext(t);
+
         }
 
         @Override
@@ -231,7 +230,6 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
                         Environment::new)
                 .flatMap(roEnvironment -> Flowable.fromIterable(roEnvironment.poClt).compose(DeponderHelper.flowableCombinations(upstream -> upstream.doOnNext(s -> s.newton.postConcat(evaluate(s.pointF, roEnvironment.scale))).doAfterNext(s -> {
                             drawPo(s.p, s.newton, roEnvironment.time, roEnvironment.scale);
-                            //更新
                             s.update();
                         }), (s, e) -> {
                             if (TextUtils.equals(s.p.id(), e.p.id()))
@@ -260,6 +258,7 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
                 .subscribeOn(Schedulers.io())
                 .subscribe(new FlowableSubscriber<Object>() {
                     Subscription s;
+
                     @Override
                     public void onSubscribe(@NonNull Subscription s) {
                         this.s = s;
@@ -289,9 +288,6 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
      */
     @WorkerThread
     protected void drawPo(@NonNull PO po, @NonNull Matrix newton, long interval, final float scale) {
-
-        Log.i(TAG, "[evaluate]绘制PO" + po.id());
-
 
         final float[] n = DeponderHelper.values(newton);
         final float[] s = DeponderHelper.values(po.speed());
@@ -353,8 +349,8 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
         r = r < internalPressure ? internalPressure - r : 0;
         b = b < internalPressure ? internalPressure - b : 0;
 
-        distance.x = l - r;//向右
-        distance.y = t - b;//向下
+        distance.x = l - r;//right
+        distance.y = t - b;//down
 
         //step#1
         distance.set(DeponderHelper.calculate(distance, rootOption.elasticityCoefficient()));

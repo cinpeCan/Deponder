@@ -1,7 +1,6 @@
 package com.cinpe.demo_deponder;
 
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 
@@ -12,6 +11,7 @@ import androidx.databinding.DataBindingUtil;
 
 import com.cinpe.demo_deponder.databinding.ActivityDemoBinding;
 import com.cinpe.deponder.Deponder;
+import com.cinpe.deponder.DeponderHelper;
 import com.cinpe.deponder.control.DeponderControl;
 import com.cinpe.deponder.model.SimplePlanet;
 import com.cinpe.deponder.model.SimpleRubber;
@@ -76,7 +76,7 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
 
         deponderProxy = new Deponder<>(this, mBinding.layoutRoot);
 
-        incubateDate();
+        startAnimation();
 
     }
 
@@ -84,10 +84,15 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
     public void onClickAddPO(View view) {
 
         PlanetOption po = buildPo();
+
         mBinding.layoutRoot.addView(po.itemView());
+
+        //add the defTouchListener,or your TouchListener.
+        po.itemView().setOnTouchListener(new DeponderHelper.TouchHelper(po));
+
         pList.add(po);
 
-        //提交view集合.
+        //submit the new planetCte.
         deponderProxy.submitPlanet(pList);
     }
 
@@ -104,27 +109,19 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
         deponderProxy.submitRubber(rList);
     }
 
-
     /**
-     * 随便生成些数据.
+     * when both planetList and rubberList are submitted for the first time, the Deponder starts to run.
+     * the order of submits doesn't matter
      */
-    private void incubateDate() {
+    private void startAnimation() {
 
-        PlanetOption p0 = buildPo();
-        PlanetOption p1 = buildPo();
-
-        mBinding.layoutRoot.addView(p0.itemView());
-        mBinding.layoutRoot.addView(p1.itemView());
-
-        pList.add(p0);
-        pList.add(p1);
-
-        //提交pList
+        //submit planetList
         deponderProxy.submitPlanet(pList);
-        //提交rList
+        //submit rubberList
         deponderProxy.submitRubber(rList);
-        //默认scale为1
-        deponderProxy.submitScale(1);
+
+//        //def scale is 1.0f already.
+//        deponderProxy.submitScale(1);
 
     }
 

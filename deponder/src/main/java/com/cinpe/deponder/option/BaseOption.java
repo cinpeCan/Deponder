@@ -8,11 +8,9 @@ import androidx.annotation.NonNull;
 import com.cinpe.deponder.NAnimator;
 
 /**
- * @Description: 描述
  * @Author: Cinpe
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
- * @Version: 0.01
  */
 public abstract class BaseOption {
 

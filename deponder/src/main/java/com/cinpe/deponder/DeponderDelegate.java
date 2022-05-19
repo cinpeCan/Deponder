@@ -54,24 +54,9 @@ public class DeponderDelegate extends TouchDelegate {
     }
 
     private boolean sendToDelegate(@NonNull final View view, @NonNull MotionEvent event) {
-
         Animation animation = view.getAnimation();
         if (animation instanceof NAnimator) {
-            NAnimator nAnimator = (NAnimator) animation;
-
-            PointF point = new PointF(event.getX(0), event.getY(0));
-
-            RectF rectF = DeponderHelper.hitRectF(view);
-
-            Matrix temp = new Matrix();
-
-            float[] floats = DeponderHelper.values(nAnimator.getMMatrix());
-
-            temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.width() * .5f, rectF.height() * .5f);
-            temp.mapRect(rectF);
-            rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
-
-            if (rectF.contains(point.x, point.y) && view.dispatchTouchEvent(event)) {
+            if (((front == view && front.isPressed()) || DeponderHelper.planetCurrentHitRectF(view).contains(event.getX(0), event.getY(0))) && view.dispatchTouchEvent(event)) {
                 if (front != view) {
                     if (front != null) front.setPressed(false);
                     view.bringToFront();
@@ -79,7 +64,6 @@ public class DeponderDelegate extends TouchDelegate {
                 }
                 return true;
             }
-
         }
 
         return false;

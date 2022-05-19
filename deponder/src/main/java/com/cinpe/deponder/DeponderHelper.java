@@ -13,6 +13,8 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.Transformation;
 
 import androidx.annotation.Dimension;
 import androidx.annotation.FloatRange;
@@ -26,6 +28,7 @@ import com.cinpe.deponder.option.RootOption;
 
 import org.reactivestreams.Publisher;
 
+import java.lang.reflect.Field;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -121,7 +124,7 @@ public class DeponderHelper {
     /**
      * dp->px
      */
-    public static @Px
+    protected static @Px
     int dp2px(@NonNull Context context, @Dimension int dp) {
         return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.getResources().getDisplayMetrics());
     }
@@ -129,7 +132,7 @@ public class DeponderHelper {
     /**
      * hitRect
      */
-    public static @NonNull
+    protected static @NonNull
     Rect hitRect(@NonNull View v) {
         Rect rect = new Rect();
         v.getHitRect(rect);
@@ -139,7 +142,7 @@ public class DeponderHelper {
     /**
      * hitRectF
      */
-    public static @NonNull
+    protected static @NonNull
     RectF hitRectF(@NonNull View v) {
         Rect rect = new Rect();
         v.getHitRect(rect);
@@ -147,9 +150,24 @@ public class DeponderHelper {
     }
 
     /**
+     * hitRectF
+     */
+    protected static @NonNull
+    RectF planetCurrentHitRectF(@NonNull View v) {
+        NAnimator animation = (NAnimator) v.getAnimation();
+        RectF rectF = hitRectF(v);
+        Matrix temp = new Matrix();
+        float[] floats = DeponderHelper.values(animation.getMMatrix());
+        temp.postScale(floats[Matrix.MSCALE_X], floats[Matrix.MSCALE_Y], rectF.width() * .5f, rectF.height() * .5f);
+        temp.mapRect(rectF);
+        rectF.offset(floats[Matrix.MTRANS_X], floats[Matrix.MTRANS_Y]);
+        return rectF;
+    }
+
+    /**
      * getValues
      */
-    public static @NonNull
+    protected static @NonNull
     float[] values(@NonNull Matrix matrix) {
         float[] floats = new float[9];
         matrix.getValues(floats);
@@ -159,7 +177,7 @@ public class DeponderHelper {
     /**
      * centerPointF
      */
-    public static @NonNull
+    protected static @NonNull
     PointF centerPointF(PointF s, PointF e) {
         return new PointF((s.x + e.x) / 2, (s.y + e.y) / 2);
     }
@@ -167,7 +185,7 @@ public class DeponderHelper {
     /**
      * centerPointF
      */
-    public static @NonNull
+    protected static @NonNull
     PointF centerPointF(BaseOption p) {
         RectF src = DeponderHelper.hitRectF(p.itemView());
         float[] values = values(p.matrix());
@@ -177,7 +195,7 @@ public class DeponderHelper {
     }
 
 
-    public static @NonNull
+    protected static @NonNull
     PointF centerPointFInternal(BaseOption p) {
         Rect rect = DeponderHelper.hitRect(p.itemView());
         float[] values = new float[9];
@@ -188,7 +206,7 @@ public class DeponderHelper {
     /**
      * 获取矩阵差.
      */
-    public static Matrix matrixDiff(Matrix sMatrix, Matrix eMatrix) {
+    protected static Matrix matrixDiff(Matrix sMatrix, Matrix eMatrix) {
         final Matrix invert = new Matrix();
         sMatrix.invert(invert);
         Matrix matrix = new Matrix();
@@ -207,7 +225,7 @@ public class DeponderHelper {
      *
      * @param distance 实际距离.
      */
-    public static float dDistance(float distance, @FloatRange(from = 0) float internalPressure) {
+    protected static float dDistance(float distance, @FloatRange(from = 0) float internalPressure) {
         if (distance == 0) {
             //距离为0, 没有力的方向. 合力为0.
             return 0;
@@ -223,7 +241,7 @@ public class DeponderHelper {
      *
      * @param difDistance 形变距离.
      */
-    public static PointF calculate(@NonNull PointF difDistance, float elasticity_coefficient) {
+    protected static PointF calculate(@NonNull PointF difDistance, float elasticity_coefficient) {
         return new PointF(difDistance.x * elasticity_coefficient, difDistance.y * elasticity_coefficient);
     }
 
@@ -232,7 +250,7 @@ public class DeponderHelper {
      *
      * @param difDistance 形变距离.
      */
-    public static PointF calculate(@NonNull PointF difDistance, float elasticity_coefficient, float m) {
+    protected static PointF calculate(@NonNull PointF difDistance, float elasticity_coefficient, float m) {
         final PointF newton = calculate(difDistance, elasticity_coefficient);
         return new PointF(newton.x / m, newton.y / m);
     }
@@ -245,27 +263,27 @@ public class DeponderHelper {
      * @param acceleration 加速度(px/ms2)
      * @param dt           时间(ms)
      */
-    public static PointF calculate(PointF speed, PointF acceleration, long dt) {
+    protected static PointF calculate(PointF speed, PointF acceleration, long dt) {
         float x = Math.round(speed.x * dt + .5f * acceleration.x * Math.pow(dt, 2)) / 1000000f;
         float y = Math.round(speed.y * dt + .5f * acceleration.y * Math.pow(dt, 2)) / 1000000f;
         return new PointF(x, y);
     }
 
 
-    public static void bindDelegateRootTouch(@NonNull RootOption rootOption) {
+    protected static void bindDelegateRootTouch(@NonNull RootOption rootOption) {
         rootOption.itemView().post(() -> rootOption.itemView().setTouchDelegate(new DeponderDelegate(rootOption)));
 //        todo 暂不考虑root的触控
 //        todo rootOption.itemView().setOnTouchListener(new RootTouchHelper(rootOption.matrix()));
     }
 
-    public static void bindPlanet(PlanetOption option) {
+    protected static void bindPlanet(PlanetOption option) {
         option.itemView().setOnTouchListener(new TouchHelper(option));
     }
 
     /**
      * planet TouchHelper
      */
-    static class TouchHelper extends GestureDetector.SimpleOnGestureListener implements View.OnTouchListener, ScaleGestureDetector.OnScaleGestureListener {
+    public static class TouchHelper extends GestureDetector.SimpleOnGestureListener implements View.OnTouchListener, ScaleGestureDetector.OnScaleGestureListener {
 
         public TouchHelper(@NonNull PlanetOption option) {
             this.option = option;
@@ -324,16 +342,13 @@ public class DeponderHelper {
         @Override
         public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
 
-            if (e1 != null) {
-                this.option.matrix().postTranslate(-distanceX, -distanceY);
-            }
+            if (e1 != null) this.option.matrix().postTranslate(-distanceX, -distanceY);
 
             return true;
         }
 
         @Override
         public boolean onDown(MotionEvent e) {
-
             this.option.itemView().setPressed(true);
             this.option.speed().reset();
             return true;
@@ -411,7 +426,7 @@ public class DeponderHelper {
         }
     }
 
-    public static <O> CombinationsPair<O, Pair<O, O>> combinationsPair() {
+    protected static <O> CombinationsPair<O, Pair<O, O>> combinationsPair() {
         return new CombinationsPair<O, Pair<O, O>>() {
             @NonNull
             @Override
@@ -421,7 +436,7 @@ public class DeponderHelper {
         };
     }
 
-    public static <O, P> FlowableCombinationsPair<O, P> flowableCombinationsPair(@NonNull BiFunction<O, O, P> biFunction) {
+    protected static <O, P> FlowableCombinationsPair<O, P> flowableCombinationsPair(@NonNull BiFunction<O, O, P> biFunction) {
         return new FlowableCombinationsPair<O, P>() {
             @NonNull
             @Override
@@ -431,7 +446,7 @@ public class DeponderHelper {
         };
     }
 
-    public static <O, P> FlowableTransformer<O, P> flowableCombinations(@NonNull FlowableTransformer<O, O> UpstreamTransformer, @NonNull BiFunction<O, O, P> biFunction) {
+    protected static <O, P> FlowableTransformer<O, P> flowableCombinations(@NonNull FlowableTransformer<O, O> UpstreamTransformer, @NonNull BiFunction<O, O, P> biFunction) {
         return new FlowableCombinationsPair<O, P>() {
             @NonNull
             @Override
@@ -447,7 +462,7 @@ public class DeponderHelper {
         };
     }
 
-    public static <O, P> CombinationsPair<O, P> combinationsPair(@NonNull BiFunction<O, O, P> biFunction) {
+    protected static <O, P> CombinationsPair<O, P> combinationsPair(@NonNull BiFunction<O, O, P> biFunction) {
         return new CombinationsPair<O, P>() {
             @NonNull
             @Override
@@ -499,4 +514,37 @@ public class DeponderHelper {
     public static String concatId(@NonNull String sId, @NonNull String eId) {
         return sId.hashCode() < eId.hashCode() ? sId + eId : eId + sId;
     }
+
+    protected static Transformation mTransformation(@NonNull Animation animation) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
+        Class<Animation> animationClass = (Class<Animation>) Class.forName("android.view.animation.Animation");
+        Field mTransformationField = animationClass.getDeclaredField("mTransformation");
+        mTransformationField.setAccessible(true);
+        final Transformation mTransformationObj = (Transformation) mTransformationField.get(animation);
+        return mTransformationObj;
+    }
+
+    protected static Transformation mPreviousTransformation(@NonNull Animation animation) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
+        Class<Animation> animationClass = (Class<Animation>) Class.forName("android.view.animation.Animation");
+        Field mPreviousTransformation = animationClass.getDeclaredField("mPreviousTransformation");
+        mPreviousTransformation.setAccessible(true);
+        final Transformation mPreviousTransformationObj = (Transformation) mPreviousTransformation.get(animation);
+        return mPreviousTransformationObj;
+    }
+
+    protected static Transformation mChildTransformation(@NonNull ViewGroup viewGroup) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
+        Class<ViewGroup> viewGroupClass = ViewGroup.class;
+        Field mChildTransformation = viewGroupClass.getDeclaredField("mChildTransformation");
+        mChildTransformation.setAccessible(true);
+        final Transformation mChildTransformationObj = (Transformation) mChildTransformation.get(viewGroup);
+        return mChildTransformationObj;
+    }
+
+    protected static Transformation mInvalidationTransformation(@NonNull ViewGroup viewGroup) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
+        Class<ViewGroup> viewGroupClass = ViewGroup.class;
+        Field mChildTransformation = viewGroupClass.getDeclaredField("mInvalidationTransformation");
+        mChildTransformation.setAccessible(true);
+        final Transformation mChildTransformationObj = (Transformation) mChildTransformation.get(viewGroup);
+        return mChildTransformationObj;
+    }
+
 }

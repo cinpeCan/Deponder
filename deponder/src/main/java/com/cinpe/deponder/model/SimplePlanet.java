@@ -61,11 +61,6 @@ public abstract class SimplePlanet extends PlanetOption {
     @Override
     public abstract float elasticityCoefficient();
 
-//    @NonNull
-//    @Override
-//    @AutoValue.CopyAnnotations
-//    public abstract PointF acceleration();
-
     public static SimplePlanet create(View itemView, String id, float quality, float frontalArea, float mInternalPressure, float elasticityCoefficient) {
         return builder()
                 .itemView(itemView)
@@ -108,14 +103,10 @@ public abstract class SimplePlanet extends PlanetOption {
 
         public abstract Builder elasticityCoefficient(float elasticityCoefficient);
 
-//        abstract Builder acceleration(PointF acceleration);
-
         public final SimplePlanet build() {
-
             return matrix(itemView().getMatrix())
                     .animator(new NAnimator(matrix()))
                     .speed(new Matrix())
-//                    .acceleration(new PointF())
                     .autoBuild();
         }
     }

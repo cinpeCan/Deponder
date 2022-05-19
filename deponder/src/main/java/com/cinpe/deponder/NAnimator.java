@@ -1,11 +1,14 @@
 package com.cinpe.deponder;
 
 import android.graphics.Matrix;
+import android.util.Log;
 import android.view.animation.Animation;
 import android.view.animation.LinearInterpolator;
 import android.view.animation.Transformation;
 
 import androidx.annotation.NonNull;
+
+import java.lang.reflect.Field;
 
 import io.reactivex.rxjava3.disposables.Disposable;
 
@@ -31,7 +34,6 @@ public class NAnimator extends Animation {
      */
     public interface ApplyTransformationListener extends Disposable {
         void onApplyTransformation(float interpolatedTime);
-
         @Override
         void dispose();
     }
@@ -39,8 +41,6 @@ public class NAnimator extends Animation {
     public NAnimator(@NonNull final Matrix matrix) {
         mMatrix = matrix;
         this.setDuration(3600000L);
-        this.setZAdjustment(Animation.ZORDER_TOP);
-        this.setInterpolator(new LinearInterpolator());
     }
 
     @Override
@@ -70,7 +70,7 @@ public class NAnimator extends Animation {
     }
 
     public void setApplyTransformationListener(ApplyTransformationListener transformationListener) {
-        if(this.transformationListener!=null){
+        if (this.transformationListener != null) {
             this.transformationListener.dispose();
         }
         this.transformationListener = transformationListener;
@@ -79,7 +79,7 @@ public class NAnimator extends Animation {
     @Override
     public void cancel() {
         super.cancel();
-        if(this.transformationListener!=null){
+        if (this.transformationListener != null) {
             this.transformationListener.dispose();
         }
     }
