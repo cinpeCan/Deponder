@@ -50,7 +50,7 @@ or for Maven:
 
 1. 创建一个Deponder对象:
 ```java
-DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner/*生命周期持有者*/, [YOUR GROUPVIEW]);
+DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, [YOUR GROUPVIEW]);
 ```
 
 或者 自定义环境设定
@@ -72,7 +72,7 @@ RootOption rootOption =SimpleRootOption.builder()
             .elasticityCoefficient(...)
             .build());
             
-DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner/*生命周期持有者*/, rootOption);
+DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, rootOption);
 ```
 
 2. 申明一些 行星(planetOption) 对象.
