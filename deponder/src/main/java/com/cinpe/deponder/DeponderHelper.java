@@ -2,7 +2,6 @@ package com.cinpe.deponder;
 
 import android.content.Context;
 import android.graphics.Matrix;
-import android.graphics.Point;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -29,7 +28,6 @@ import com.cinpe.deponder.option.RootOption;
 import org.reactivestreams.Publisher;
 
 import java.lang.reflect.Field;
-import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.reactivex.rxjava3.core.Flowable;
@@ -38,7 +36,6 @@ import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.ObservableSource;
 import io.reactivex.rxjava3.core.ObservableTransformer;
 import io.reactivex.rxjava3.functions.BiFunction;
-import io.reactivex.rxjava3.functions.Function;
 
 /**
  * @Description: 描述
@@ -276,7 +273,7 @@ public class DeponderHelper {
 //        todo rootOption.itemView().setOnTouchListener(new RootTouchHelper(rootOption.matrix()));
     }
 
-    protected static void bindPlanet(PlanetOption option) {
+    public static void bindDefTouchPlanet(PlanetOption option) {
         option.itemView().setOnTouchListener(new TouchHelper(option));
     }
 

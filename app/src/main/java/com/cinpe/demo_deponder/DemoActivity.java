@@ -87,8 +87,8 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
 
         mBinding.layoutRoot.addView(po.itemView());
 
-        //add the defTouchListener,or your TouchListener.
-        po.itemView().setOnTouchListener(new DeponderHelper.TouchHelper(po));
+        //add the defTouchListener,or your custom TouchListener.
+        DeponderHelper.bindDefTouchPlanet(po);
 
         pList.add(po);
 
