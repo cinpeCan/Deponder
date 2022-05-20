@@ -2,24 +2,25 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.cinpecan/deponder.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22io.github.cinpecan%22%20AND%20a:%22deponder%22)
 
-一个Android原生的动画SDK
+一个Android原生仿物理特性的关系图谱动画SDK 
 
-目的是利用原生优势,获得尽量高的性能(skip onMeasure,onLayout,onDraw)和尽量低的侵入性(no override view):
+在Deponder仿物理特性的动画中，对象的位移是根据施加到每一帧的受力分析与时间积分计算的。
 
-- 通过矩阵计算(占用view的animal接口)进行移动,缩放,旋转,翻转(不触发onMeasure,onLayout,onDraw), 
-  因此开发者仍然可以使用它们对view进行叠加调整.
-- touch事件(占用view的touchListener接口)逆矩阵偏移到view真实位置上处理.
-- 对view的left,top,right,bottom,translationX,translationY等接口均不主动占用.
+#### 开发者可以通过设置以下值来改变动画的效果
 
-#### 游动动画模仿物理特性
-开发者可以通过设置 
-- 散点(planetOption)的质量,引力(或斥力)的辐射范围,引力(或斥力)的系数
-- 连线(rubberOption)的自然长度,弹性系数
+- 行星(planetOption)的质量,引力(或斥力)的辐射范围,引力(或斥力)的系数
+- 弹簧(rubberOption)的自然长度,弹性系数
 - 环境(rootOption)的空气摩擦,四壁约束力(斥力)的辐射范围,四壁约束力(斥力)的系数
 - 缩放(scale),对所有散点(planetOption)和连线(rubberOption)生效, 但对环境(rootOption)的视图和空气摩擦不生效(会对辐射范围和斥力生效).
 
 
-以控制动画效果.
+### 动画特点
+
+- 通过矩阵计算和改变View位置,避免同时进行移动,缩放,旋转,翻转时多次触发invalidate
+- 动画中，planet的实际位置不发生改变，不会主动触发onMeasure,onLayout,onDraw
+- 虽然planet的实际位置完全不变，但touch的事件将被自动偏移到视觉中点击的planet上处理
+- 占用planet的animation接口
+
 
 ### 依赖
 
@@ -30,7 +31,7 @@ repositories {
   mavenCentral()
 }
 
-implementation 'io.github.cinpecan:deponder:0.2.3@aar'
+implementation 'io.github.cinpecan:deponder:0.2.4@aar'
 ```
 
 or for Maven:
@@ -39,7 +40,7 @@ or for Maven:
 <dependency>
   <groupId>io.github.cinpecan</groupId>
   <artifactId>deponder</artifactId>
-  <version>0.2.2</version>
+  <version>0.2.4</version>
   <type>aar</type>
 </dependency>
 ```
@@ -51,18 +52,47 @@ or for Maven:
 ```java
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner/*生命周期持有者*/, [YOUR GROUPVIEW]);
 ```
-2. 申明一些 散点(planetOption) 对象.
+
+或者 自定义环境设定
+
+```java
+RootOption rootOption =SimpleRootOption.builder()
+            .itemView([YOUR GROUPVIEW])
+            //初始化缩放值(非必要，默认1f)
+            .initScale(...)
+            //最大缩放值(非必要，默认1.5f)
+            .maxScale(...)
+            //最小缩放值(非必要，默认0.5f)
+            .minScale(...)
+            //空气阻尼(非必要，默认0.0006f)
+            .mRootDensity(...)
+            //环境四壁对行星作用力的影响范围(非必要，默认300)
+            .mInternalPressure(...)
+            //环境四壁对行星作用力的弹性系数(非必要，默认1.44f)
+            .elasticityCoefficient(...)
+            .build());
+            
+DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner/*生命周期持有者*/, rootOption);
+```
+
+2. 申明一些 行星(planetOption) 对象.
 ```java
 PlanetOption planetA=SimplePlanet.builder()
-            //在[YOUR GROUPVIEW]下的子view,且希望这个view由Deponder控制.
+            //在[YOUR GROUPVIEW]下的[YOUR CHILD VIEW],且希望这个view由Deponder控制.(必要)
             .itemView([YOUR CHILD VIEW])
-            //如果不打算用hashCode作为唯一标识,可以自行修改,例如使用UUID.
-            .id([YOUR CHILD VIEW].hashCode())
+            //唯一标识(非必要，默认String.valueOf([YOUR CHILD VIEW].hashCode())
+            .id(...)
+            //质量(非必要，默认2.293f)
+            .quality()
+            //行星间相互作用力的影响范围(非必要，默认220)
+            .mInternalPressure()
+            //行星间相互作用力的弹性系数(非必要，默认1.33f)
+            .elasticityCoefficient()
             .build();
 ```
 也可以申明更多...然后放入一个集合.
 ```java
-PlanetOption planetB...
+PlanetOption planetB = SimplePlanet.builder().(...).build();
 ...
 List<PlanetOption> listPlanet=new ArrayList();
 listPlanet.add(planetA);
@@ -73,87 +103,58 @@ listPlanet.add(planetB);
 3. 申明 连线(rubberOption) 对象.
 ```java
 RubberOption rubberA=SimpleRubber.builder()
-                //两个散点对象的id值.  他们的组合应是唯一的.
+                //两个散点对象的id值.  他们的组合应是唯一的.(必要)
                 .sId(planetA.id())
                 .eId(planetB.id())
-                .itemView([期望连线对象展示的view,例如是一条线段(矩形)])
+                .itemView([期望连线对象展示的view,例如是一条线段(一般为矩形有背景颜色且宽高大于0的View)])
+                //弹簧的弹性系数(非必要，默认1.68f)
+                .elasticityCoefficient()
+                //弹簧的自然长度(非必要，默认300)
+                .naturalLength()
                 .build();
 ```
 也可以申明更多...同样放入一个集合.
 ```java
-RubberOption rubberB...
+RubberOption rubberB = SimpleRubber.builder().(...).build();
 ...
 List<PlanetOption> listRubber=new ArrayList();
 listRubber.add(rubberA);
 ...
 ```
-4. 最后提交它们(第一次初始化的条件)当然,提交空的list也在预期中,之后你也可以随时提交新的view,旧的view将失去动画.
+4. 最后提交它们(第一次初始化的条件)当然,提交空的list也在预期中,之后你也可以随时提交新的planet集合或rubber集合,旧的将失去动画.
 ```java
-deponder.submitPlanet(listPlanet);
-deponder.submitRubber(listRubber);
+deponder.submitPlanet(listPlanet);(第一次启动动画时必须)
+deponder.submitRubber(listRubber);(第一次启动动画时必须)
 ```
-提交希望的缩放比例(这不是初始化必须,因为默认初始值已经为1)当Planet数量有较大差距时,对于保持良好观感可能非常有用, 之后你也可以随时提交新的缩放比例.
+提交希望的缩放比例,当Planet数量过多或过少时,可能非常有用,之后你也可以随时提交新的缩放比例.
 ```java
-//deponder.submitScale(1);
+//deponder.submitScale(1);(非必须,默认为1f)
 ```
 好了,它们开始动起来了.
 
 ### 更进一步
 
-```java
-DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(this, SimpleRootOption.builder()
-                //初始化缩放值
-                .initScale()
-                //最大缩放值
-                .maxScale()
-                //最小缩放值
-                .minScale()
-                //空气阻尼
-                .mRootDensity()
-                //斥力的辐射范围
-                .mInternalPressure()
-                //斥力系数
-                .elasticityCoefficient()
-                .build());
-```
+- elasticityCoefficient弹性系数，为正数时表现的是斥力，如果你需要引力可以设为负数。
 
-```java
-PlanetOption planetA=SimplePlanet.builder()
-            ...
-            //质量
-            .quality()
-            //斥力(引力)辐射的范围
-            .mInternalPressure()
-            //斥力(引力)系数
-            .elasticityCoefficient()
-            .build();
-```
-            
-```java
-RubberOption rubberA=SimpleRubber.builder()
-                ...
-                //弹性系数
-                .elasticityCoefficient()
-                //弹簧的自然长度
-                .naturalLength()
-                .build();
-```
+- PlanetOption中mInternalPressure(力的影响范围)设置得足够大，可以使planet完全均匀得分布在空间中。
 
-- 动画并不改变view的实际位置.占用且仅占用animal接口.
-- 占用planet的touchListen接口并不是必须的,后续将在0.3.0版本移除对该接口的占用,改为在上层viewGroup自动偏移touch事件,你可以像平时一样使用touchListen.
-- 目前,可以在Rubber下需要保持宽高比不变的子view(常见例如TextView,ImageView等形变会影响观感的view)中,
-
-  添加tag:"UN_RUBBER_RUBBER"(@string/un_rubber)
+- 弹簧的伸缩动画是将弹簧包装的View(或ViewGroup)进行拉伸,如果你的rubble有需要保持宽高的子View(如TextView,ImageView等形变会影响观感), 
+  可以在该子view中,添加tag:"UN_RUBBER_RUBBER"(@string/un_rubber),以保持它的宽高比恒定。
+  例如：
   ```
   view.addtag("UN_RUBBER_RUBBER")
   ```
   或在子view的xml布局中添加
   ```
+  <View
+  ...
   android:tag="UN_RUBBER_RUBBER"
+  ...
+  />
+  
   ```
-  以保持子view的宽高比恒定.
-- 配合Recyclerview使用体验更佳，deponder仅负责管理动画，view本身创建，删除，绑定数据等操作应该由开发者来实现，
-  Recyclerview毫无疑问是个好选择，并且Deponder并不关心你使用的是什么LayoutManager。
+  
+- Deponder并不关心你使用的是何种布局，全部适用。
 
 
 ### 效果示例
