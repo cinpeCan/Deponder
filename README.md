@@ -2,7 +2,13 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.cinpecan/deponder.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22io.github.cinpecan%22%20AND%20a:%22deponder%22)
 
-An Android's physical-like relationship graph animation SDK.
+<p align="start">
+  <a href="README_zh.md">
+    <b>中文说明</b>
+  </a>
+</p> 
+
+An Android's physical-like relationship graph animation SDK.  
 
 In Deponder's physics-like animation, the displacement of an object is calculated as the integral of the force applied to each frame over time.
 
