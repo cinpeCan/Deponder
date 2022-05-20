@@ -83,11 +83,11 @@ PlanetOption planetA=SimplePlanet.builder()
             //唯一标识(非必要，默认String.valueOf([YOUR CHILD VIEW].hashCode())
             .id(...)
             //质量(非必要，默认2.293f)
-            .quality()
+            .quality(...)
             //行星间相互作用力的影响范围(非必要，默认220)
-            .mInternalPressure()
+            .mInternalPressure(...)
             //行星间相互作用力的弹性系数(非必要，默认1.33f)
-            .elasticityCoefficient()
+            .elasticityCoefficient(...)
             .build();
 ```
 也可以申明更多...然后放入一个集合.
@@ -108,9 +108,9 @@ RubberOption rubberA=SimpleRubber.builder()
                 .eId(planetB.id())
                 .itemView([期望连线对象展示的view,例如是一条线段(一般为矩形有背景颜色且宽高大于0的View)])
                 //弹簧的弹性系数(非必要，默认1.68f)
-                .elasticityCoefficient()
+                .elasticityCoefficient(...)
                 //弹簧的自然长度(非必要，默认300)
-                .naturalLength()
+                .naturalLength(...)
                 .build();
 ```
 也可以申明更多...同样放入一个集合.
