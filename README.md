@@ -162,6 +162,8 @@ Well, now they are starting to move.
   />
   
   ```
+  
+- If you want the animation to become static as soon as possible, you can try to increase the elastic coefficient and reduce the planet quality.
 
 - Deponder doesn't care what layout you're using, it all applies.
 
