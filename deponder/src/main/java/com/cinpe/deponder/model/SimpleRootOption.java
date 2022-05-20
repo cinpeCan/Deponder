@@ -103,6 +103,7 @@ public abstract class SimpleRootOption extends RootOption {
         public final SimpleRootOption build() {
             return matrix(itemView().getMatrix())
                     .animator(new NAnimator(matrix()))
+                    .id(String.valueOf(itemView().hashCode()))
                     .autoBuild();
         }
     }

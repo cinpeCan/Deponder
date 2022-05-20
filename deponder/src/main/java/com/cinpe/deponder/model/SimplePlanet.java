@@ -107,6 +107,7 @@ public abstract class SimplePlanet extends PlanetOption {
             return matrix(itemView().getMatrix())
                     .animator(new NAnimator(matrix()))
                     .speed(new Matrix())
+                    .id(String.valueOf(itemView().hashCode()))
                     .autoBuild();
         }
     }

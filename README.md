@@ -2,27 +2,27 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.cinpecan/deponder.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22io.github.cinpecan%22%20AND%20a:%22deponder%22)
 
-一个Android原生仿物理特性的关系图谱动画SDK 
+An Android's physical-like relationship graph animation SDK.
 
-在Deponder仿物理特性的动画中，对象的位移是根据施加到每一帧的受力分析与时间积分计算的。
+In Deponder's physics-like animation, the displacement of an object is calculated as the integral of the force applied to each frame over time.
 
-#### 开发者可以通过设置以下值来改变动画的效果
+#### Set the following values to change the effect of the animation
 
-- 行星(planetOption)的质量,引力(或斥力)的辐射范围,引力(或斥力)的系数
-- 弹簧(rubberOption)的自然长度,弹性系数
-- 环境(rootOption)的空气摩擦,四壁约束力(斥力)的辐射范围,四壁约束力(斥力)的系数
-- 缩放(scale),对所有散点(planetOption)和连线(rubberOption)生效, 但对环境(rootOption)的视图和空气摩擦不生效(会对辐射范围和斥力生效)
-
-
-### 动画特点
-
-- 通过矩阵计算和改变View位置,避免同时进行移动,缩放,旋转,翻转时多次触发invalidate
-- 动画中，planet的实际位置不发生改变，不会主动触发onMeasure,onLayout,onDraw
-- 虽然planet的实际位置完全不变，但touch的事件将被自动偏移到视觉中点击的planet上处理
-- 占用planet的animation接口
+- The mass of the planet (planetOption), the radiation range of the gravitational force (or repulsion), the coefficient of the gravitational (or repulsive) force
+- The natural length of the rubber (rubberOption), the elastic coefficient
+- The air friction coefficient of the environment (rootOption), the radiation range of the four-wall force, the coefficient of the four-wall force
+- Scale (scale), effective for all planets (planetOption) and rubber (rubberOption)
 
 
-### 依赖
+### Features
+
+- Calculate and change the View position through a matrix to avoid multiple triggering of View.invalidate() when moving, scaling, rotating, and flipping at the same time.
+- In the animation, the actual position of the planet does not change, and it will not actively trigger onMeasure(), onLayout(), onDraw().
+- Although the actual position of the planet has not changed, the touch event will be automatically shifted to the clicked planet in the vision for processing.
+- Occupy the animation() interface of planetOption
+
+
+### Setting up the dependency
 
 Example for Gradle:
 
@@ -31,7 +31,7 @@ repositories {
   mavenCentral()
 }
 
-implementation 'io.github.cinpecan:deponder:0.2.4@aar'
+implementation 'io.github.cinpecan:deponder:0.2.5@aar'
 ```
 
 or for Maven:
@@ -40,57 +40,57 @@ or for Maven:
 <dependency>
   <groupId>io.github.cinpecan</groupId>
   <artifactId>deponder</artifactId>
-  <version>0.2.4</version>
+  <version>0.2.5</version>
   <type>aar</type>
 </dependency>
 ```
 
-### 开始使用
+### Start using
 
 
-1. 创建一个Deponder对象:
+1. Create a Deponder object:
 ```java
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, [YOUR GROUPVIEW]);
 ```
 
-或者 自定义环境设定
+or custom environment settings
 
 ```java
 RootOption rootOption =SimpleRootOption.builder()
             .itemView([YOUR GROUPVIEW])
-            //初始化缩放值(非必要，默认1f)
+            //Initialize the scaling value (not necessary, default 1f)
             .initScale(...)
-            //最大缩放值(非必要，默认1.5f)
+            //Maximum zoom value (not necessary, default 1.5f)
             .maxScale(...)
-            //最小缩放值(非必要，默认0.5f)
+            //Minimum zoom value (not necessary, default 0.5f)
             .minScale(...)
-            //空气阻尼(非必要，默认0.0006f)
+            //Air damping (optional, default 0.0006f)
             .mRootDensity(...)
-            //环境四壁对行星作用力的影响范围(非必要，默认300)
+            //The influence range of the environment walls on the planetary force (not necessary, default 300)
             .mInternalPressure(...)
-            //环境四壁对行星作用力的弹性系数(非必要，默认1.44f)
+            //The elastic coefficient of the force of the four walls of the environment on the planet (optional, default 1.44f)
             .elasticityCoefficient(...)
             .build());
             
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, rootOption);
 ```
 
-2. 申明一些 行星(planetOption) 对象.
+2. Declare some planetOption object.
 ```java
 PlanetOption planetA=SimplePlanet.builder()
-            //在[YOUR GROUPVIEW]下的[YOUR CHILD VIEW],且希望这个view由Deponder控制.(必要)
+            //[YOUR CHILD VIEW] under [YOUR GROUPVIEW], and want this view to be controlled by Deponder. (required)
             .itemView([YOUR CHILD VIEW])
-            //唯一标识(非必要，默认String.valueOf([YOUR CHILD VIEW].hashCode())
+            //Unique identifier (not necessary, default String.valueOf([YOUR CHILD VIEW].hashCode())
             .id(...)
-            //质量(非必要，默认2.293f)
+            //quality (optional, default 2.293f)
             .quality()
-            //行星间相互作用力的影响范围(非必要，默认220)
+            //The influence range of the interaction force between planets (not necessary, default 220)
             .mInternalPressure()
-            //行星间相互作用力的弹性系数(非必要，默认1.33f)
+            //The elastic coefficient of the interaction force between planets (optional, default 1.33f)
             .elasticityCoefficient()
             .build();
 ```
-也可以申明更多...然后放入一个集合.
+It is also possible to declare more... then put into a collection.
 ```java
 PlanetOption planetB = SimplePlanet.builder().(...).build();
 ...
@@ -100,20 +100,22 @@ listPlanet.add(planetB);
 ...
 ```
 
-3. 申明 连线(rubberOption) 对象.
+3. Declare a rubber(rubberOption) object.
 ```java
 RubberOption rubberA=SimpleRubber.builder()
-                //两个散点对象的id值.  他们的组合应是唯一的.(必要)
+                //The id values of the two planet objects. Their combination should be unique. (required)
                 .sId(planetA.id())
                 .eId(planetB.id())
-                .itemView([期望连线对象展示的view,例如是一条线段(一般为矩形有背景颜色且宽高大于0的View)])
-                //弹簧的弹性系数(非必要，默认1.68f)
-                .elasticityCoefficient()
-                //弹簧的自然长度(非必要，默认300)
-                .naturalLength()
+                //The view that the connection object is expected to display, such as a line segment 
+                //(usually a View with a rectangle with a background color and a width and height greater than 0)
+                .itemView(...)
+                //The elastic coefficient of the rubber (optional, default 1.68f)
+                .elasticityCoefficient(...)
+                //The natural length of the eraser (optional, default 300)
+                .naturalLength(...)
                 .build();
 ```
-也可以申明更多...同样放入一个集合.
+It is also possible to declare more... also into a collection.
 ```java
 RubberOption rubberB = SimpleRubber.builder().(...).build();
 ...
@@ -121,30 +123,31 @@ List<PlanetOption> listRubber=new ArrayList();
 listRubber.add(rubberA);
 ...
 ```
-4. 最后提交它们(第一次初始化的条件)当然,提交空的list也在预期中,之后你也可以随时提交新的planet集合或rubber集合,旧的将失去动画.
+4. Commit them at the end, of course, committing an empty collection is also expected, after that you can also submit a new planet collection or rubber collection at any time.
 ```java
-deponder.submitPlanet(listPlanet);(第一次启动动画时必须)
-deponder.submitRubber(listRubber);(第一次启动动画时必须)
+deponder.submitPlanet(listPlanet);(It is necessary to start the animation for the first time)
+deponder.submitRubber(listRubber);(It is necessary to start the animation for the first time)
 ```
-提交希望的缩放比例,当Planet数量过多或过少时,可能非常有用,之后你也可以随时提交新的缩放比例.
+Submit the desired scaling, which can be useful when there are too many or too few Planets, and then you can always submit a new scaling.
 ```java
-deponder.submitScale(1);(非必须,默认为1f)
+deponder.submitScale(1);(Not necessary, defaults to 1f)
 ```
-好了,它们开始动起来了.
 
-### 更进一步
+Well, now they are starting to move.
 
-- elasticityCoefficient弹性系数，为正数时表现的是斥力，如果你需要引力可以设为负数。
+### More
 
-- PlanetOption中mInternalPressure(力的影响范围)设置得足够大，可以使planet完全均匀得分布在空间中。
+- elasticityCoefficient, when it is positive, it shows repulsion. If you need gravity, you can set it to negative.
 
-- 弹簧的伸缩动画是将弹簧包装的View(或ViewGroup)进行拉伸,如果你的rubble有需要保持宽高的子View(如TextView,ImageView等形变会影响观感), 
-  可以在该子view中,添加tag:"UN_RUBBER_RUBBER"(@string/un_rubber),以保持它的宽高比恒定。
-  例如：
+- The mInternalPressure (range of influence of the force) in PlanetOption is set large enough to make the planet completely evenly distributed in space.
+
+- The spring's telescopic animation is to stretch the spring-wrapped View (or ViewGroup). If your rubble has child Views that need to maintain the width and height (for example, the deformation of TextView, ImageView, etc. will affect the look and feel),
+  You can add tag: "UN_RUBBER_RUBBER" (@string/un_rubber) in this subview to keep its aspect ratio constant.
+  E.g：
   ```
   view.addtag("UN_RUBBER_RUBBER")
   ```
-  或在子view的xml布局中添加
+  or add it in the xml layout of the child view
   ```
   <View
   ...
@@ -153,11 +156,11 @@ deponder.submitScale(1);(非必须,默认为1f)
   />
   
   ```
-  
-- Deponder并不关心你使用的是何种布局，全部适用。
+
+- Deponder doesn't care what layout you're using, it all applies.
 
 
-### 效果示例
+### Effect example
 
 ![Image](https://s4.ax1x.com/2022/02/25/bAEZwj.gif)
 
