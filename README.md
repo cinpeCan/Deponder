@@ -128,7 +128,7 @@ deponder.submitRubber(listRubber);(第一次启动动画时必须)
 ```
 提交希望的缩放比例,当Planet数量过多或过少时,可能非常有用,之后你也可以随时提交新的缩放比例.
 ```java
-//deponder.submitScale(1);(非必须,默认为1f)
+deponder.submitScale(1);(非必须,默认为1f)
 ```
 好了,它们开始动起来了.
 
