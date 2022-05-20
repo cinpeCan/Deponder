@@ -89,11 +89,11 @@ PlanetOption planetA=SimplePlanet.builder()
             //Unique identifier (not necessary, default String.valueOf([YOUR CHILD VIEW].hashCode())
             .id(...)
             //quality (optional, default 2.293f)
-            .quality()
+            .quality(...)
             //The influence range of the interaction force between planets (not necessary, default 220)
-            .mInternalPressure()
+            .mInternalPressure(...)
             //The elastic coefficient of the interaction force between planets (optional, default 1.33f)
-            .elasticityCoefficient()
+            .elasticityCoefficient(...)
             .build();
 ```
 It is also possible to declare more... then put into a collection.
