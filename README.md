@@ -125,7 +125,7 @@ It is also possible to declare more... also into a collection.
 ```java
 RubberOption rubberB = SimpleRubber.builder().(...).build();
 ...
-List<PlanetOption> listRubber=new ArrayList();
+List<RubberOption> listRubber=new ArrayList();
 listRubber.add(rubberA);
 ...
 ```
