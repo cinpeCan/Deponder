@@ -117,7 +117,7 @@ RubberOption rubberA=SimpleRubber.builder()
 ```java
 RubberOption rubberB = SimpleRubber.builder().(...).build();
 ...
-List<PlanetOption> listRubber=new ArrayList();
+List<RubberOption> listRubber=new ArrayList();
 listRubber.add(rubberA);
 ...
 ```
