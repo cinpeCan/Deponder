@@ -100,7 +100,7 @@ It is also possible to declare more... then put into a collection.
 ```java
 PlanetOption planetB = SimplePlanet.builder().(...).build();
 ...
-List<PlanetOption> listPlanet=new ArrayList();
+List<PlanetOption> listPlanet=new ArrayList<>();
 listPlanet.add(planetA);
 listPlanet.add(planetB);
 ...
@@ -125,7 +125,7 @@ It is also possible to declare more... also into a collection.
 ```java
 RubberOption rubberB = SimpleRubber.builder().(...).build();
 ...
-List<RubberOption> listRubber=new ArrayList();
+List<RubberOption> listRubber=new ArrayList<>();
 listRubber.add(rubberA);
 ...
 ```
