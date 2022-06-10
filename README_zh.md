@@ -94,7 +94,7 @@ PlanetOption planetA=SimplePlanet.builder()
 ```java
 PlanetOption planetB = SimplePlanet.builder().(...).build();
 ...
-List<PlanetOption> listPlanet=new ArrayList();
+List<PlanetOption> listPlanet=new ArrayList<>();
 listPlanet.add(planetA);
 listPlanet.add(planetB);
 ...
@@ -117,7 +117,7 @@ RubberOption rubberA=SimpleRubber.builder()
 ```java
 RubberOption rubberB = SimpleRubber.builder().(...).build();
 ...
-List<RubberOption> listRubber=new ArrayList();
+List<RubberOption> listRubber=new ArrayList<>();
 listRubber.add(rubberA);
 ...
 ```
