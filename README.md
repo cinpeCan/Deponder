@@ -36,20 +36,14 @@ Example for Gradle:
 repositories {
   mavenCentral()
 }
-
-implementation 'io.github.cinpecan:deponder:0.2.6@aar'
+```
+```groovy
+dependencies {
+  implementation 'io.github.cinpecan:deponder:0.2.6@aar'
+  implementation 'androidx.lifecycle:lifecycle-reactivestreams:2.4.1'
+}
 ```
 
-or for Maven:
-
-```xml
-<dependency>
-  <groupId>io.github.cinpecan</groupId>
-  <artifactId>deponder</artifactId>
-  <version>0.2.5</version>
-  <type>aar</type>
-</dependency>
-```
 
 ### Start using
 
@@ -59,7 +53,7 @@ or for Maven:
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, [YOUR GROUPVIEW]);
 ```
 
-or custom environment settings
+>or custom environment settings
 
 ```java
 RootOption rootOption =SimpleRootOption.builder()
@@ -142,7 +136,13 @@ Submit the desired scaling, which can be useful when there are too many or too f
 deponder.submitScale(1);(Not necessary, defaults to 1f)
 ```
 
-Well, now they are starting to move.
+>Well, now they are starting to move.
+
+If you want to drag planets, you can customize the gesture listener, or use the simple drag gesture listener provided by Deponder.
+```java
+DeponderHelper.bindDefTouchPlanet(planetA);
+DeponderHelper.bindDefTouchPlanet(planetB);
+```
 
 ### More
 
