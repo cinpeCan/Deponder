@@ -37,7 +37,7 @@ repositories {
   mavenCentral()
 }
 
-implementation 'io.github.cinpecan:deponder:0.2.5@aar'
+implementation 'io.github.cinpecan:deponder:0.2.6@aar'
 ```
 
 or for Maven:
@@ -75,7 +75,10 @@ RootOption rootOption =SimpleRootOption.builder()
             //The influence range of the environment walls on the planetary force (not necessary, default 300)
             .mInternalPressure(...)
             //The elastic coefficient of the force of the four walls of the environment on the planet (not necessary, default 1.44f)
-            .elasticityCoefficient(...)
+            .elasticityCoefficientStart(...)
+            .elasticityCoefficientTop(...)
+            .elasticityCoefficientEnd(...)
+            .elasticityCoefficientBot(...)
             .build());
             
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, rootOption);
