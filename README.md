@@ -39,7 +39,7 @@ repositories {
 ```
 ```groovy
 dependencies {
-  implementation 'io.github.cinpecan:deponder:0.2.6@aar'
+  implementation 'io.github.cinpecan:deponder:0.2.7@aar'
   implementation 'androidx.lifecycle:lifecycle-reactivestreams:2.4.1'
 }
 ```
