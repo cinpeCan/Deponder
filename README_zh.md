@@ -33,7 +33,7 @@ repositories {
 ```
 ```groovy
 dependencies {
-  implementation 'io.github.cinpecan:deponder:0.2.7@aar'
+  implementation "io.github.cinpecan:deponder:0.2.7@aar"
 }
 ```
 
