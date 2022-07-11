@@ -36,20 +36,13 @@ Example for Gradle:
 repositories {
   mavenCentral()
 }
-
-implementation 'io.github.cinpecan:deponder:0.2.5@aar'
+```
+```groovy
+dependencies {
+  implementation "io.github.cinpecan:deponder:0.2.7@aar"
+}
 ```
 
-or for Maven:
-
-```xml
-<dependency>
-  <groupId>io.github.cinpecan</groupId>
-  <artifactId>deponder</artifactId>
-  <version>0.2.5</version>
-  <type>aar</type>
-</dependency>
-```
 
 ### Start using
 
@@ -59,7 +52,7 @@ or for Maven:
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, [YOUR GROUPVIEW]);
 ```
 
-or custom environment settings
+>or custom environment settings
 
 ```java
 RootOption rootOption =SimpleRootOption.builder()
@@ -70,12 +63,15 @@ RootOption rootOption =SimpleRootOption.builder()
             .maxScale(...)
             //Minimum zoom value (not necessary, default 0.5f)
             .minScale(...)
-            //Air damping (optional, default 0.0006f)
+            //Air damping (not necessary, default 0.0006f)
             .mRootDensity(...)
             //The influence range of the environment walls on the planetary force (not necessary, default 300)
             .mInternalPressure(...)
-            //The elastic coefficient of the force of the four walls of the environment on the planet (optional, default 1.44f)
-            .elasticityCoefficient(...)
+            //The elastic coefficient of the force of the four walls of the environment on the planet (not necessary, default 1.44f)
+            .elasticityCoefficientStart(...)
+            .elasticityCoefficientTop(...)
+            .elasticityCoefficientEnd(...)
+            .elasticityCoefficientBot(...)
             .build());
             
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, rootOption);
@@ -88,11 +84,11 @@ PlanetOption planetA=SimplePlanet.builder()
             .itemView([YOUR CHILD VIEW])
             //Unique identifier (not necessary, default String.valueOf([YOUR CHILD VIEW].hashCode())
             .id(...)
-            //quality (optional, default 2.293f)
+            //quality (not necessary, default 2.293f)
             .quality(...)
             //The influence range of the interaction force between planets (not necessary, default 220)
             .mInternalPressure(...)
-            //The elastic coefficient of the interaction force between planets (optional, default 1.33f)
+            //The elastic coefficient of the interaction force between planets (not necessary, default 1.33f)
             .elasticityCoefficient(...)
             .build();
 ```
@@ -100,7 +96,7 @@ It is also possible to declare more... then put into a collection.
 ```java
 PlanetOption planetB = SimplePlanet.builder().(...).build();
 ...
-List<PlanetOption> listPlanet=new ArrayList();
+List<PlanetOption> listPlanet=new ArrayList<>();
 listPlanet.add(planetA);
 listPlanet.add(planetB);
 ...
@@ -115,9 +111,9 @@ RubberOption rubberA=SimpleRubber.builder()
                 //The view that the connection object is expected to display, such as a line segment 
                 //(usually a View with a rectangle with a background color and a width and height greater than 0)
                 .itemView(...)
-                //The elastic coefficient of the rubber (optional, default 1.68f)
+                //The elastic coefficient of the rubber (not necessary, default 1.68f)
                 .elasticityCoefficient(...)
-                //The natural length of the eraser (optional, default 300)
+                //The natural length of the eraser (not necessary, default 300)
                 .naturalLength(...)
                 .build();
 ```
@@ -125,7 +121,7 @@ It is also possible to declare more... also into a collection.
 ```java
 RubberOption rubberB = SimpleRubber.builder().(...).build();
 ...
-List<PlanetOption> listRubber=new ArrayList();
+List<RubberOption> listRubber=new ArrayList<>();
 listRubber.add(rubberA);
 ...
 ```
@@ -139,7 +135,13 @@ Submit the desired scaling, which can be useful when there are too many or too f
 deponder.submitScale(1);(Not necessary, defaults to 1f)
 ```
 
-Well, now they are starting to move.
+>Well, now they are starting to move.
+
+If you want to drag planets, you can customize the gesture listener, or use the simple drag gesture listener provided by Deponder.
+```java
+DeponderHelper.bindDefTouchPlanet(planetA);
+DeponderHelper.bindDefTouchPlanet(planetB);
+```
 
 ### More
 

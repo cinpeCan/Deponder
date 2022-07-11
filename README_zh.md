@@ -30,20 +30,14 @@ Example for Gradle:
 repositories {
   mavenCentral()
 }
-
-implementation 'io.github.cinpecan:deponder:0.2.5@aar'
+```
+```groovy
+dependencies {
+  implementation "io.github.cinpecan:deponder:0.2.7@aar"
+}
 ```
 
-or for Maven:
 
-```xml
-<dependency>
-  <groupId>io.github.cinpecan</groupId>
-  <artifactId>deponder</artifactId>
-  <version>0.2.5</version>
-  <type>aar</type>
-</dependency>
-```
 
 ### 开始使用
 
@@ -53,7 +47,7 @@ or for Maven:
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, [YOUR GROUPVIEW]);
 ```
 
-或者 自定义环境设定
+>或者 自定义环境设定
 
 ```java
 RootOption rootOption =SimpleRootOption.builder()
@@ -69,7 +63,10 @@ RootOption rootOption =SimpleRootOption.builder()
             //环境四壁对行星作用力的影响范围(非必要，默认300)
             .mInternalPressure(...)
             //环境四壁对行星作用力的弹性系数(非必要，默认1.44f)
-            .elasticityCoefficient(...)
+            .elasticityCoefficientStart(...)
+            .elasticityCoefficientTop(...)
+            .elasticityCoefficientEnd(...)
+            .elasticityCoefficientBot(...)
             .build());
             
 DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, rootOption);
@@ -94,7 +91,7 @@ PlanetOption planetA=SimplePlanet.builder()
 ```java
 PlanetOption planetB = SimplePlanet.builder().(...).build();
 ...
-List<PlanetOption> listPlanet=new ArrayList();
+List<PlanetOption> listPlanet=new ArrayList<>();
 listPlanet.add(planetA);
 listPlanet.add(planetB);
 ...
@@ -117,7 +114,7 @@ RubberOption rubberA=SimpleRubber.builder()
 ```java
 RubberOption rubberB = SimpleRubber.builder().(...).build();
 ...
-List<PlanetOption> listRubber=new ArrayList();
+List<RubberOption> listRubber=new ArrayList<>();
 listRubber.add(rubberA);
 ...
 ```
@@ -130,7 +127,13 @@ deponder.submitRubber(listRubber);(第一次启动动画时必须)
 ```java
 deponder.submitScale(1);(非必须,默认为1f)
 ```
-好了,它们开始动起来了.
+>好了,它们开始动起来了.
+
+如果你想要拖拽它们，你可以自定义手势监听，也可以使用Deponder提供的简单拖拽手势监听。
+```java
+DeponderHelper.bindDefTouchPlanet(planetA);
+DeponderHelper.bindDefTouchPlanet(planetB);
+```
 
 ### 更进一步
 
