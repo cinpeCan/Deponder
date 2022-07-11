@@ -95,6 +95,8 @@ public abstract class SimplePlanet extends PlanetOption {
 
         abstract Matrix matrix();
 
+        abstract String id();
+
         abstract SimplePlanet autoBuild();
 
         abstract Builder speed(Matrix speed);
@@ -104,11 +106,18 @@ public abstract class SimplePlanet extends PlanetOption {
         public abstract Builder elasticityCoefficient(float elasticityCoefficient);
 
         public final SimplePlanet build() {
-            return matrix(itemView().getMatrix())
+            Builder builder = matrix(itemView().getMatrix())
                     .animator(new NAnimator(matrix()))
-                    .speed(new Matrix())
-                    .id(String.valueOf(itemView().hashCode()))
-                    .autoBuild();
+                    .speed(new Matrix());
+            try {
+                if (id().length() == 0)
+                    throw new NullPointerException("Property \"id\" has not been set");
+                return builder.autoBuild();
+            } catch (NullPointerException | IllegalStateException e) {
+                return builder.id(String.valueOf(itemView().hashCode()))
+                        .autoBuild();
+            }
+
         }
     }
 

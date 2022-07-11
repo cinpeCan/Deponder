@@ -1,9 +1,12 @@
 package com.cinpe.deponder;
 
 
-import com.cinpe.deponder.option.PlanetOption;
-import com.cinpe.deponder.option.RubberOption;
+import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
+
+import com.cinpe.deponder.model.SimplePlanet;
+import com.cinpe.deponder.model.SimpleRubber;
 
 /**
  * @Description: unused
@@ -12,14 +15,13 @@ import com.cinpe.deponder.option.RubberOption;
  * @CreateDate: 2021/12/28
  * @Version: 0.01
  */
-public abstract class BindAdapter<P, R, PO extends PlanetOption, RO extends RubberOption> {
-
-    private final String TAG = this.getClass().getSimpleName();
-
-    public BindAdapter() {
+public interface BindAdapter<P, R> {
 
 
-    }
+    SimplePlanet onCreatePlanet(@NonNull ViewGroup parent, P p);
 
+    SimpleRubber onCreateRubber(@NonNull ViewGroup parent, R r);
+
+//    SimplePlanet onBindViewHolder(@NonNull ViewGroup parent, P p);
 
 }

@@ -1,9 +1,6 @@
 package com.cinpe.deponder;
 
-import android.graphics.Matrix;
-import android.graphics.PointF;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.view.MotionEvent;
 import android.view.TouchDelegate;
 import android.view.View;
@@ -11,7 +8,7 @@ import android.view.animation.Animation;
 
 import androidx.annotation.NonNull;
 
-import com.cinpe.deponder.option.RootOption;
+import com.cinpe.deponder.option.SimpleRootOption;
 
 
 /**
@@ -25,13 +22,13 @@ public class DeponderDelegate extends TouchDelegate {
 
     private static final String TAG = "DeponderDelegate";
 
-    final private RootOption rootOption;
+    final private SimpleRootOption rootOption;
     private volatile View front;
 
     /**
      * Constructor
      */
-    public DeponderDelegate(@NonNull RootOption rootOption) {
+    public DeponderDelegate(@NonNull SimpleRootOption rootOption) {
         super(new Rect(1, 1, 1, 1), new View(rootOption.itemView().getContext()));
         this.rootOption = rootOption;
     }
@@ -51,6 +48,11 @@ public class DeponderDelegate extends TouchDelegate {
             front = null;
         }
         return false;
+    }
+
+    @Override
+    public boolean onTouchExplorationHoverEvent(@NonNull MotionEvent event) {
+        return super.onTouchExplorationHoverEvent(event);
     }
 
     private boolean sendToDelegate(@NonNull final View view, @NonNull MotionEvent event) {

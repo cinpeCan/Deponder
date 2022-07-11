@@ -1,10 +1,7 @@
 package com.cinpe.deponder.control;
 
-import android.view.View;
-
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
 import java.util.Collection;
 
@@ -15,11 +12,11 @@ import java.util.Collection;
  * @CreateDate: 2021/12/22
  * @Version: 0.01
  */
-public interface DeponderControl<PO, RO> {
+public interface DeponderControl<P, R> {
 
-    void submitPlanet(@NonNull Collection<PO> pList);
+    void submitPlanet(@NonNull Collection<P> pList);
 
-    void submitRubber(@NonNull Collection<RO> rList);
+    void submitRubber(@NonNull Collection<R> rList);
 
     void submitScale(@FloatRange(from = 0, fromInclusive = false) float scale);
 

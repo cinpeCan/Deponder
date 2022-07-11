@@ -5,7 +5,7 @@ plugins {
 android {
     signingConfigs {
     release {
-    storeFile file('.\\deponderStore.jks')
+        storeFile file('..\\deponderStore.jks')
         storePassword 'storePassword'
         keyAlias 'keyAlias'
         keyPassword 'keyPassword'

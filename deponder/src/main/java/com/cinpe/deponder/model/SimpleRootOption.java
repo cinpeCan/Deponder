@@ -7,8 +7,9 @@ import androidx.annotation.NonNull;
 
 import com.cinpe.deponder.DeponderHelper;
 import com.cinpe.deponder.NAnimator;
-import com.cinpe.deponder.option.RootOption;
 import com.google.auto.value.AutoValue;
+
+import java.util.UUID;
 
 /**
  * @Description: 描述
@@ -18,7 +19,7 @@ import com.google.auto.value.AutoValue;
  * @Version: 0.01
  */
 @AutoValue
-public abstract class SimpleRootOption extends RootOption {
+public abstract class SimpleRootOption extends com.cinpe.deponder.option.SimpleRootOption {
 
 
     @NonNull
@@ -53,9 +54,15 @@ public abstract class SimpleRootOption extends RootOption {
     public abstract float mInternalPressure();
 
     @Override
-    public abstract float elasticityCoefficient();
+    public abstract float elasticityCoefficientStart();
 
-    public static SimpleRootOption create(ViewGroup itemView, String id, float initScale, float maxScale, float minScale, float mRootDensity, float mInternalPressure, float elasticityCoefficient) {
+    public abstract float elasticityCoefficientTop();
+
+    public abstract float elasticityCoefficientEnd();
+
+    public abstract float elasticityCoefficientBot();
+
+    public static SimpleRootOption create(ViewGroup itemView, String id, float initScale, float maxScale, float minScale, float mRootDensity, float mInternalPressure, float elasticityCoefficientStart, float elasticityCoefficientTop, float elasticityCoefficientEnd, float elasticityCoefficientBot) {
         return builder()
                 .itemView(itemView)
                 .id(id)
@@ -64,12 +71,20 @@ public abstract class SimpleRootOption extends RootOption {
                 .minScale(minScale)
                 .mRootDensity(mRootDensity)
                 .mInternalPressure(mInternalPressure)
-                .elasticityCoefficient(elasticityCoefficient)
+                .elasticityCoefficientStart(elasticityCoefficientStart)
+                .elasticityCoefficientTop(elasticityCoefficientTop)
+                .elasticityCoefficientEnd(elasticityCoefficientEnd)
+                .elasticityCoefficientBot(elasticityCoefficientBot)
                 .build();
     }
 
     public static Builder builder() {
-        return new AutoValue_SimpleRootOption.Builder().mInternalPressure(DeponderHelper.DEFAULT_Internal_Pressure).elasticityCoefficient(DeponderHelper.DEFAULT_ROOT_ELASTICITY_COEFFICIENT);
+        return new AutoValue_SimpleRootOption.Builder().mInternalPressure(DeponderHelper.DEFAULT_Internal_Pressure)
+                .elasticityCoefficientStart(DeponderHelper.DEFAULT_Internal_Pressure_START)
+                .elasticityCoefficientTop(DeponderHelper.DEFAULT_Internal_Pressure_TOP)
+                .elasticityCoefficientEnd(DeponderHelper.DEFAULT_Internal_Pressure_END)
+                .elasticityCoefficientBot(DeponderHelper.DEFAULT_Internal_Pressure_BOTTOM)
+                .initScale(DeponderHelper.DEFAULT_INIT_SCALE).maxScale(DeponderHelper.DEFAULT_MAX_SCALE).minScale(DeponderHelper.DEFAULT_MIN_SCALE).mRootDensity(DeponderHelper.DEFAULT_ROOT_DENSITY).id(UUID.randomUUID().toString());
     }
 
     @AutoValue.Builder
@@ -92,7 +107,13 @@ public abstract class SimpleRootOption extends RootOption {
 
         public abstract Builder mInternalPressure(float mInternalPressure);
 
-        public abstract Builder elasticityCoefficient(float elasticityCoefficient);
+        public abstract Builder elasticityCoefficientStart(float elasticityCoefficientStart);
+
+        public abstract Builder elasticityCoefficientTop(float elasticityCoefficientTop);
+
+        public abstract Builder elasticityCoefficientEnd(float elasticityCoefficientEnd);
+
+        public abstract Builder elasticityCoefficientBot(float elasticityCoefficientBot);
 
         abstract SimpleRootOption autoBuild();
 

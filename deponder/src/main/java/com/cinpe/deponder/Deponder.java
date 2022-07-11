@@ -5,12 +5,9 @@ import android.graphics.Matrix;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
-import android.view.View;
 import android.view.ViewGroup;
-import android.view.animation.Transformation;
 
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
@@ -21,22 +18,24 @@ import androidx.lifecycle.LiveDataReactiveStreams;
 import androidx.lifecycle.MutableLiveData;
 
 import com.cinpe.deponder.control.DeponderControl;
-import com.cinpe.deponder.model.SimpleRootOption;
+import com.cinpe.deponder.model.SimplePlanet;
+import com.cinpe.deponder.model.SimpleRubber;
 import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
-import com.cinpe.deponder.option.RootOption;
 import com.cinpe.deponder.option.RubberOption;
-import com.google.common.collect.Collections2;
-import com.google.common.collect.MapDifference;
+import com.cinpe.deponder.option.SimpleRootOption;
+import com.google.common.base.Equivalence;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Sets;
 
 import org.reactivestreams.Subscription;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -48,12 +47,8 @@ import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.FlowableEmitter;
 import io.reactivex.rxjava3.core.FlowableSubscriber;
 import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.functions.BiFunction;
-import io.reactivex.rxjava3.functions.Function4;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.Timed;
-import io.reactivex.rxjava3.subscribers.DisposableSubscriber;
-
 /*
  * Copyright (c) 2022-present, Cinpecan and Deponder Contributors.
  *
@@ -88,23 +83,23 @@ import io.reactivex.rxjava3.subscribers.DisposableSubscriber;
  * @CreateDate: 2021/12/22
  * @Version: 0.01
  */
-public final class Deponder<PO extends PlanetOption, RO extends RubberOption> implements DeponderControl<PO, RO> {
+public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapter<P, R> {
 
-    public static final String TAG = "Deponder";
+    private static final String TAG = "Deponder";
 
     @NonNull
-    final LifecycleOwner owner;
+    final private LifecycleOwner owner;
     @NonNull
-    final private RootOption rootOption;
+    final private SimpleRootOption rootOption;
     @NonNull
-    final private MutableLiveData<Collection<PO>> poClt;
+    final private MutableLiveData<Collection<SimplePlanet>> poClt;
     @NonNull
-    final private MutableLiveData<Collection<RO>> roClt;
+    final private MutableLiveData<Collection<SimpleRubber>> roClt;
     @NonNull
     final private MutableLiveData<Float> scaleLD;
 
     public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull ViewGroup rootView) {
-        this(lifecycleOwner, SimpleRootOption.builder()
+        this(lifecycleOwner, com.cinpe.deponder.model.SimpleRootOption.builder()
                 .initScale(DeponderHelper.DEFAULT_INIT_SCALE)
                 .maxScale(DeponderHelper.DEFAULT_MAX_SCALE)
                 .minScale(DeponderHelper.DEFAULT_MIN_SCALE)
@@ -114,7 +109,7 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
                 .build());
     }
 
-    public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull RootOption rootOption) {
+    public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull SimpleRootOption rootOption) {
         this.owner = lifecycleOwner;
         this.rootOption = rootOption;
         poClt = new MutableLiveData<>(Collections.emptyList());
@@ -135,23 +130,53 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
      * 提交P
      */
     @Override
-    public void submitPlanet(@NonNull Collection<PO> pList) {
+    public void submitPlanet(@NonNull Collection<P> pList) {
 
         Observable.fromIterable(pList)
+                .map(p -> onCreatePlanet(rootOption.itemView(), p))
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .observeOn(Schedulers.io())
                 .distinct(BaseOption::id)
                 .toList()
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .doOnSuccess(l -> {
-                    Collection<PO> clt = poClt.getValue();
-                    if (clt != null) {
-                        Map<String, PO> mapOld = clt.stream().collect(Collectors.toMap(BaseOption::id, po -> po));
-                        Map<String, PO> mapNew = l.stream().collect(Collectors.toMap(BaseOption::id, po -> po));
-                        MapDifference<String, PO> dif = Maps.difference(mapOld, mapNew);
-                        dif.entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(View::clearAnimation);
-                    }
+                .map(l -> {
+                    Collection<SimplePlanet> clt = poClt.getValue();
+                    Log.d(TAG, "pre:" + l + "\n" + clt);
+                    Map<String, SimplePlanet> mapOld = clt == null ? ImmutableMap.of() : clt.stream().collect(Collectors.toMap(BaseOption::id, po -> po));
+                    Map<String, SimplePlanet> mapNew = l.stream().collect(Collectors.toMap(BaseOption::id, po -> po));
+                    return Maps.difference(mapOld, mapNew, new Equivalence<SimplePlanet>() {
+                        @Override
+                        protected boolean doEquivalent(@NonNull SimplePlanet a, @NonNull SimplePlanet b) {
+                            return TextUtils.equals(a.id(), b.id());
+                        }
+
+                        @Override
+                        protected int doHash(@NonNull SimplePlanet po) {
+                            return po.hashCode();
+                        }
+                    });
                 })
-                .doOnSuccess(l -> l.stream().filter(po -> !Objects.equals(po.itemView().getAnimation(), po.animator())).forEach(po -> po.itemView().startAnimation(po.animator())))
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(dif -> {
+
+                    dif.entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(v -> {
+                        v.setOnTouchListener(null);
+                        v.clearAnimation();
+                        rootOption.itemView().removeView(v);
+                    });
+                    dif.entriesOnlyOnRight().values().forEach(po -> {
+                        po.matrix().postTranslate(new Random().nextFloat(), new Random().nextFloat());
+                        if (po.itemView().getParent() == null) {
+                            rootOption.itemView().addView(po.itemView());
+                            DeponderHelper.bindDefTouchPlanet(po);
+                        }
+                        po.itemView().startAnimation(po.animator());
+                    });
+
+                    List<SimplePlanet> list = Lists.newArrayList(dif.entriesInCommon().values());
+                    list.addAll(dif.entriesOnlyOnRight().values());
+                    return list;
+                })
+
                 .subscribe(new DefSingleSubscriber<>(poClt::postValue));
     }
 
@@ -159,27 +184,49 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
      * 提交R
      */
     @Override
-    public void submitRubber(@NonNull Collection<RO> rList) {
+    public void submitRubber(@NonNull Collection<R> rList) {
         Observable.fromIterable(rList)
+                .map(r -> onCreateRubber(rootOption.itemView(), r))
+                .subscribeOn(AndroidSchedulers.mainThread())
+                .observeOn(Schedulers.io())
                 .distinct(BaseOption::id)
                 .toList()
-                .subscribeOn(Schedulers.io())
-                .observeOn(AndroidSchedulers.mainThread())
-                .doOnSuccess(l -> {
-                    Collection<RO> clt = roClt.getValue();
-                    if (clt != null) {
-                        Map<String, RO> mapOld = clt.stream().collect(Collectors.toMap(BaseOption::id, ro -> ro));
-                        Map<String, RO> mapNew = l.stream().collect(Collectors.toMap(BaseOption::id, ro -> ro));
-                        Maps.difference(mapOld, mapNew).entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(v -> {
-                            v.clearAnimation();
-                            rootOption.itemView().removeView(v);
-                        });
-                    }
+                .map(l -> {
+                    final Collection<SimpleRubber> clt = roClt.getValue();
+                    Map<String, SimpleRubber> mapOld = clt == null ? ImmutableMap.of() : clt.stream().collect(Collectors.toMap(BaseOption::id, ro -> ro));
+                    Map<String, SimpleRubber> mapNew = l.stream().collect(Collectors.toMap(BaseOption::id, ro -> ro));
+                    return Maps.difference(mapOld, mapNew, new Equivalence<SimpleRubber>() {
+                        @Override
+                        protected boolean doEquivalent(@NonNull SimpleRubber a, @NonNull SimpleRubber b) {
+                            return TextUtils.equals(a.id(), b.id());
+                        }
+
+                        @Override
+                        protected int doHash(@NonNull SimpleRubber ro) {
+                            return ro.hashCode();
+                        }
+                    });
                 })
-                .doOnSuccess(l -> l.stream().filter(ro -> !Objects.equals(ro.itemView().getAnimation(), ro.animator())).forEach(ro -> {
-                    rootOption.itemView().addView(ro.itemView());
-                    ro.itemView().startAnimation(ro.animator());
-                }))
+                .observeOn(AndroidSchedulers.mainThread())
+                .map(dif -> {
+
+                    dif.entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(v -> {
+                        v.setOnTouchListener(null);
+                        v.clearAnimation();
+                        rootOption.itemView().removeView(v);
+                    });
+
+                    dif.entriesOnlyOnRight().values().forEach(ro -> {
+                        if (ro.itemView().getParent() == null)
+                            rootOption.itemView().addView(ro.itemView());
+                        ro.itemView().startAnimation(ro.animator());
+                    });
+
+                    List<SimpleRubber> list = Lists.newArrayList(dif.entriesInCommon().values());
+                    list.addAll(dif.entriesOnlyOnRight().values());
+                    return list;
+
+                })
                 .subscribe(new DefSingleSubscriber<>(roClt::postValue));
     }
 
@@ -220,13 +267,13 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
         }
     }
 
-    private void bind(@NonNull RootOption option, @NonNull LiveData<Collection<PO>> poClt, @NonNull LiveData<Collection<RO>> roClt, @NonNull LiveData<Float> scaleLD) {
+    private void bind(@NonNull SimpleRootOption option, @NonNull LiveData<Collection<SimplePlanet>> poClt, @NonNull LiveData<Collection<SimpleRubber>> roClt, @NonNull LiveData<Float> scaleLD) {
 
         Flowable.<Float>create(emitter -> option.animator().setApplyTransformationListener(new Listener(option.animator(), emitter)), BackpressureStrategy.DROP)
                 .timeInterval().map(Timed::time).map(t -> Math.min(32L, Math.max(8L, t)))
                 .withLatestFrom(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, scaleLD)).subscribeOn(Schedulers.io()),
                         Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().map(NT::new).collect(Collectors.toList())).doOnNext(clt -> Log.i(TAG, "执行一遍又一遍")).subscribeOn(Schedulers.io()),
-                        Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, roClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().collect(Collectors.<RO, String, RO>toMap(BaseOption::id, ro -> ro))).subscribeOn(Schedulers.io()),
+                        Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, roClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().collect(Collectors.<SimpleRubber, String, SimpleRubber>toMap(BaseOption::id, ro -> ro))).subscribeOn(Schedulers.io()),
                         Environment::new)
                 .flatMap(roEnvironment -> Flowable.fromIterable(roEnvironment.poClt).compose(DeponderHelper.flowableCombinations(upstream -> upstream.doOnNext(s -> s.newton.postConcat(evaluate(s.pointF, roEnvironment.scale))).doAfterNext(s -> {
                             drawPo(s.p, s.newton, roEnvironment.time, roEnvironment.scale);
@@ -235,7 +282,7 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
                             if (TextUtils.equals(s.p.id(), e.p.id()))
                                 return new Matrix();
                             Matrix m;
-                            RO ro = roEnvironment.map.get(DeponderHelper.concatId(s.p.id(), e.p.id()));
+                            SimpleRubber ro = roEnvironment.map.get(DeponderHelper.concatId(s.p.id(), e.p.id()));
                             if (ro != null) {
                                 if (ro.id().startsWith(s.p.id())) {
                                     drawRo(ro, s.pointF, e.pointF, roEnvironment.scale);
@@ -287,7 +334,7 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
      * 绘制po.
      */
     @WorkerThread
-    protected void drawPo(@NonNull PO po, @NonNull Matrix newton, long interval, final float scale) {
+    private void drawPo(@NonNull SimplePlanet po, @NonNull Matrix newton, long interval, final float scale) {
 
         final float[] n = DeponderHelper.values(newton);
         final float[] s = DeponderHelper.values(po.speed());
@@ -349,11 +396,8 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
         r = r < internalPressure ? internalPressure - r : 0;
         b = b < internalPressure ? internalPressure - b : 0;
 
-        distance.x = l - r;//right
-        distance.y = t - b;//down
-
-        //step#1
-        distance.set(DeponderHelper.calculate(distance, rootOption.elasticityCoefficient()));
+        distance.x = DeponderHelper.calculate(l, rootOption.elasticityCoefficientStart()) - DeponderHelper.calculate(r, rootOption.elasticityCoefficientEnd());//right
+        distance.y = DeponderHelper.calculate(t, rootOption.elasticityCoefficientTop()) - DeponderHelper.calculate(b, rootOption.elasticityCoefficientBot());//down
 
         matrix.postTranslate(distance.x, distance.y);
 
@@ -417,9 +461,7 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
      * 绘制ro.
      */
     @WorkerThread
-    protected void drawRo(@NonNull RO ro, @NonNull PointF sP, @NonNull PointF eP, final float scale) {
-
-        Log.i(TAG, "[evaluate]绘制RO" + ro.id() + "," + Thread.currentThread().getName());
+    private void drawRo(@NonNull SimpleRubber ro, @NonNull PointF sP, @NonNull PointF eP, final float scale) {
 
         final Rect rRect = DeponderHelper.hitRect(ro.itemView());
 
@@ -450,7 +492,6 @@ public final class Deponder<PO extends PlanetOption, RO extends RubberOption> im
 
         ro.matrix().set(d);
 
-        Log.i(TAG, "drawRo");
     }
 
 

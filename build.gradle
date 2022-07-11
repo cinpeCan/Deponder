@@ -20,7 +20,7 @@ buildscript {
         lifecycleHiltVersion = '1.0.0-alpha03'
         junitVersion = '4.12'
         ktxVersion = '1.0.2'
-        lifecycleVersion = '2.4.0'
+        lifecycleVersion = '2.4.1'
         archVersion='2.1.0'
         materialVersion = '1.2.0'
         navigationVersion = '2.4.0-beta02'
@@ -56,13 +56,13 @@ buildscript {
         jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:7.3.0-alpha07'
+        classpath 'com.android.tools.build:gradle:7.4.0-alpha04'
         classpath "com.google.dagger:hilt-android-gradle-plugin:$hiltVersion"
-//        classpath "com.google.dagger:hilt-android-testing:$hiltVersion"
         classpath "androidx.test:runner:$orchestrator"
         classpath "androidx.test:orchestrator:$orchestrator"
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
+        classpath "org.jfrog.buildinfo:build-info-extractor-gradle:latest.release"
 
     }
 

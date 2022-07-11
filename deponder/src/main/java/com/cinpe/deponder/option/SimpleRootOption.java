@@ -11,7 +11,7 @@ import androidx.annotation.NonNull;
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
  */
-public abstract class RootOption extends BaseOption {
+public abstract class SimpleRootOption extends BaseOption {
 
     @NonNull
     @Override
@@ -45,7 +45,10 @@ public abstract class RootOption extends BaseOption {
     /**
      * 弹性系数.
      */
-    public abstract float elasticityCoefficient();
+    public abstract float elasticityCoefficientStart();
+    public abstract float elasticityCoefficientTop();
+    public abstract float elasticityCoefficientEnd();
+    public abstract float elasticityCoefficientBot();
 
 
 }

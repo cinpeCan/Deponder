@@ -6,12 +6,12 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.Log;
+import android.util.Pair;
 import android.util.TypedValue;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.animation.Animation;
 import android.view.animation.Transformation;
 
@@ -19,11 +19,10 @@ import androidx.annotation.Dimension;
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Px;
-import androidx.core.util.Pair;
 
 import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
-import com.cinpe.deponder.option.RootOption;
+import com.cinpe.deponder.option.SimpleRootOption;
 
 import org.reactivestreams.Publisher;
 
@@ -76,7 +75,12 @@ public class DeponderHelper {
     /**
      * root的弹性系数.
      */
-    public final static float DEFAULT_ROOT_ELASTICITY_COEFFICIENT = 1.44f;
+//    public final static float DEFAULT_ROOT_ELASTICITY_COEFFICIENT = 1.44f;
+
+    public final static float DEFAULT_Internal_Pressure_START = 1.44f;
+    public final static float DEFAULT_Internal_Pressure_TOP = 1.44f;
+    public final static float DEFAULT_Internal_Pressure_END = 1.44f;
+    public final static float DEFAULT_Internal_Pressure_BOTTOM = 1.44f;
 
     /**
      * planet的弹性系数.
@@ -92,6 +96,7 @@ public class DeponderHelper {
      * 四壁内压的感应距离.(px)
      */
     public final static int DEFAULT_Internal_Pressure = 300;
+
 
     /**
      * planet的感应距离.(px)
@@ -238,8 +243,12 @@ public class DeponderHelper {
      *
      * @param difDistance 形变距离.
      */
+    protected static float calculate(float difDistance, float elasticity_coefficient) {
+        return difDistance * elasticity_coefficient;
+    }
+
     protected static PointF calculate(@NonNull PointF difDistance, float elasticity_coefficient) {
-        return new PointF(difDistance.x * elasticity_coefficient, difDistance.y * elasticity_coefficient);
+        return new PointF(calculate(difDistance.x, elasticity_coefficient), calculate(difDistance.y, elasticity_coefficient));
     }
 
     /**
@@ -267,7 +276,7 @@ public class DeponderHelper {
     }
 
 
-    protected static void bindDelegateRootTouch(@NonNull RootOption rootOption) {
+    protected static void bindDelegateRootTouch(@NonNull SimpleRootOption rootOption) {
         rootOption.itemView().post(() -> rootOption.itemView().setTouchDelegate(new DeponderDelegate(rootOption)));
 //        todo 暂不考虑root的触控
 //        todo rootOption.itemView().setOnTouchListener(new RootTouchHelper(rootOption.matrix()));
@@ -359,13 +368,13 @@ public class DeponderHelper {
      */
     static class RootTouchHelper extends GestureDetector.SimpleOnGestureListener implements View.OnTouchListener, ScaleGestureDetector.OnScaleGestureListener {
 
-        public RootTouchHelper(RootOption option) {
+        public RootTouchHelper(SimpleRootOption option) {
             this.option = option;
             mGestureDetector = new GestureDetector(option.itemView().getContext(), this);
             mScaleGestureDetector = new ScaleGestureDetector(option.itemView().getContext(), this);
         }
 
-        private final RootOption option;
+        private final SimpleRootOption option;
 
         private final GestureDetector mGestureDetector;
         private final ScaleGestureDetector mScaleGestureDetector;
@@ -528,20 +537,20 @@ public class DeponderHelper {
         return mPreviousTransformationObj;
     }
 
-    protected static Transformation mChildTransformation(@NonNull ViewGroup viewGroup) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
-        Class<ViewGroup> viewGroupClass = ViewGroup.class;
-        Field mChildTransformation = viewGroupClass.getDeclaredField("mChildTransformation");
-        mChildTransformation.setAccessible(true);
-        final Transformation mChildTransformationObj = (Transformation) mChildTransformation.get(viewGroup);
-        return mChildTransformationObj;
-    }
-
-    protected static Transformation mInvalidationTransformation(@NonNull ViewGroup viewGroup) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
-        Class<ViewGroup> viewGroupClass = ViewGroup.class;
-        Field mChildTransformation = viewGroupClass.getDeclaredField("mInvalidationTransformation");
-        mChildTransformation.setAccessible(true);
-        final Transformation mChildTransformationObj = (Transformation) mChildTransformation.get(viewGroup);
-        return mChildTransformationObj;
-    }
+//    protected static Transformation mChildTransformation(@NonNull ViewGroup viewGroup) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
+//        Class<ViewGroup> viewGroupClass = ViewGroup.class;
+//        Field mChildTransformation = viewGroupClass.getDeclaredField("mChildTransformation");
+//        mChildTransformation.setAccessible(true);
+//        final Transformation mChildTransformationObj = (Transformation) mChildTransformation.get(viewGroup);
+//        return mChildTransformationObj;
+//    }
+//
+//    protected static Transformation mInvalidationTransformation(@NonNull ViewGroup viewGroup) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {
+//        Class<ViewGroup> viewGroupClass = ViewGroup.class;
+//        Field mChildTransformation = viewGroupClass.getDeclaredField("mInvalidationTransformation");
+//        mChildTransformation.setAccessible(true);
+//        final Transformation mChildTransformationObj = (Transformation) mChildTransformation.get(viewGroup);
+//        return mChildTransformationObj;
+//    }
 
 }
