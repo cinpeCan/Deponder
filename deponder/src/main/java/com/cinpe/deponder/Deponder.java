@@ -6,8 +6,11 @@ import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.text.TextUtils;
-import android.util.Log;
+import android.util.Pair;
+import android.util.SparseArray;
+import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ListAdapter;
 
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
@@ -19,24 +22,33 @@ import androidx.lifecycle.MutableLiveData;
 
 import com.cinpe.deponder.control.DeponderControl;
 import com.cinpe.deponder.model.SimplePlanet;
+import com.cinpe.deponder.model.SimpleRoot;
 import com.cinpe.deponder.model.SimpleRubber;
 import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RubberOption;
 import com.cinpe.deponder.option.SimpleRootOption;
 import com.google.common.base.Equivalence;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
+import com.google.errorprone.annotations.concurrent.LazyInit;
 
 import org.reactivestreams.Subscription;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -45,10 +57,17 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.BackpressureStrategy;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.FlowableEmitter;
+import io.reactivex.rxjava3.core.FlowableOnSubscribe;
 import io.reactivex.rxjava3.core.FlowableSubscriber;
 import io.reactivex.rxjava3.core.Observable;
+import io.reactivex.rxjava3.core.Single;
+import io.reactivex.rxjava3.functions.BiConsumer;
+import io.reactivex.rxjava3.functions.BiFunction;
+import io.reactivex.rxjava3.functions.Function;
+import io.reactivex.rxjava3.functions.Supplier;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.Timed;
+import kotlin.Triple;
 /*
  * Copyright (c) 2022-present, Cinpecan and Deponder Contributors.
  *
@@ -91,30 +110,118 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
     final private LifecycleOwner owner;
     @NonNull
     final private SimpleRootOption rootOption;
+
     @NonNull
-    final private MutableLiveData<Collection<SimplePlanet>> poClt;
+    private final List<SimplePlanet> pCacheList = new ArrayList<>();
     @NonNull
-    final private MutableLiveData<Collection<SimpleRubber>> roClt;
+    private final List<SimpleRubber> rCacheList = new ArrayList<>();
+
+    @NonNull
+    final private MutableLiveData<Collection<P>> pClt;
+    @NonNull
+    final private MutableLiveData<Collection<R>> rClt;
+
+    final private SparseArray<List<View>> cacheViews = new SparseArray<>();
+
+    @NonNull
+    final private LiveData<Collection<SimplePlanet>> poClt;
+    @NonNull
+    final private LiveData<Collection<SimpleRubber>> roClt;
     @NonNull
     final private MutableLiveData<Float> scaleLD;
 
     public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull ViewGroup rootView) {
-        this(lifecycleOwner, com.cinpe.deponder.model.SimpleRootOption.builder()
+        this(lifecycleOwner, SimpleRoot.builder()
                 .initScale(DeponderHelper.DEFAULT_INIT_SCALE)
                 .maxScale(DeponderHelper.DEFAULT_MAX_SCALE)
                 .minScale(DeponderHelper.DEFAULT_MIN_SCALE)
                 .mRootDensity(DeponderHelper.DEFAULT_ROOT_DENSITY)
-                .id(UUID.randomUUID().toString())
                 .itemView(rootView)
                 .build());
     }
 
+    @SuppressWarnings("ConstantConditions")
     public Deponder(@NonNull LifecycleOwner lifecycleOwner, @NonNull SimpleRootOption rootOption) {
         this.owner = lifecycleOwner;
         this.rootOption = rootOption;
-        poClt = new MutableLiveData<>(Collections.emptyList());
-        roClt = new MutableLiveData<>(Collections.emptyList());
         scaleLD = new MutableLiveData<>(rootOption.initScale());
+        pClt = new MutableLiveData<>(Collections.emptyList());
+        rClt = new MutableLiveData<>(Collections.emptyList());
+        poClt = LiveDataReactiveStreams.fromPublisher(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(this.owner, pClt))
+                .filter(clt -> !Objects.isNull(clt))
+                .debounce(200, TimeUnit.MILLISECONDS)
+                .observeOn(Schedulers.computation())
+                .scan(Pair.create(ImmutableList.<P>of(), ImmutableList.<P>of()), (pair, p) -> Pair.create(pair.second, ImmutableList.copyOf(p)))
+                .filter(pair -> pair.first != pair.second || pair.second.isEmpty())
+                .map(pair -> {
+                    Map<String, P> mapOld = pair.first.stream().collect(Collectors.toMap(this::planetId, p -> p, (s, e) -> e));
+                    Map<String, P> mapNew = pair.second.stream().collect(Collectors.toMap(this::planetId, p -> p, (s, e) -> e));
+                    return Maps.difference(mapOld, mapNew, DeponderHelper.equivalence);
+                })
+                .filter(dif -> !dif.entriesOnlyOnLeft().isEmpty() || !dif.entriesOnlyOnRight().isEmpty() || !dif.entriesDiffering().isEmpty())
+                .observeOn(AndroidSchedulers.mainThread())
+                .scan(ImmutableMap.<String, SimplePlanet>of(), (sMap, dif) -> {
+                    //left
+                    dif.entriesOnlyOnLeft().keySet().stream().map(sMap::get).forEach(sp -> {
+                        sp.itemView().setOnTouchListener(null);
+                        sp.itemView().clearAnimation();
+                        rootOption.itemView().removeView(sp.itemView());
+                        pCacheList.add(sp);
+                    });
+                    //right
+                    Map<String, SimplePlanet> right = dif.entriesOnlyOnRight().values().stream().map(p -> pCacheList.isEmpty() ? createPlanet(this.rootOption.itemView(), p) : bindPlanet(pCacheList.remove(0), p))
+                            .collect(Collectors.toMap(BaseOption::id, sp -> sp));
+                    //diff
+                    Map<String, SimplePlanet> diff = dif.entriesDiffering().values().stream().map(p -> bindPlanet(sMap.get(planetId(p.rightValue())), p.rightValue()))
+                            .collect(Collectors.toMap(BaseOption::id, sp -> sp));
+                    return ImmutableMap.<String, SimplePlanet>builder().putAll(right).putAll(diff).putAll(dif.entriesInCommon().values().stream().map(p -> sMap.get(planetId(p))).collect(Collectors.toMap(BaseOption::id, sp -> sp))).build();
+                })
+                .doOnNext(map -> map.values().stream().filter(sp -> Objects.isNull(sp.itemView().getParent())).forEach(sp -> {
+                    sp.matrix().setTranslate(new Random().nextFloat(), new Random().nextFloat());
+                    rootOption.itemView().addView(sp.itemView());
+                    DeponderHelper.bindDefTouchPlanet(sp);
+                    sp.itemView().startAnimation(sp.animator());
+                })).map(map -> ImmutableList.copyOf(map.values())));
+        roClt = LiveDataReactiveStreams.fromPublisher(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(this.owner, rClt))
+                .filter(clt -> !Objects.isNull(clt))
+                .debounce(200, TimeUnit.MILLISECONDS)
+                .observeOn(Schedulers.computation())
+                .scan(Pair.create(ImmutableList.<R>of(), ImmutableList.<R>of()), (pair, p) -> Pair.create(pair.second, ImmutableList.copyOf(p)))
+                .filter(pair -> pair.first != pair.second || pair.second.isEmpty())
+                .map(pair -> {
+                    Map<String, R> mapOld = pair.first.stream().collect(Collectors.toMap(this::rubberId, r -> r, (s, e) -> e));
+                    Map<String, R> mapNew = pair.second.stream().collect(Collectors.toMap(this::rubberId, r -> r, (s, e) -> e));
+                    return Maps.difference(mapOld, mapNew, DeponderHelper.equivalence);
+                })
+                .filter(dif -> !dif.entriesOnlyOnLeft().isEmpty() || !dif.entriesOnlyOnRight().isEmpty() || !dif.entriesDiffering().isEmpty())
+                .observeOn(AndroidSchedulers.mainThread())
+                .scan(ImmutableMap.<String, SimpleRubber>of(), (sMap, dif) -> {
+                    //left
+                    dif.entriesOnlyOnLeft().keySet().stream().map(sMap::get).forEach(ro -> {
+                        ro.itemView().clearAnimation();
+                        for (BaseOption o :
+                                ro.vArr()) {
+                            o.itemView().clearAnimation();
+                        }
+                        rootOption.itemView().removeView(ro.itemView());
+                    });
+                    //right
+                    Map<String, SimpleRubber> right = dif.entriesOnlyOnRight().values().stream().map(p -> rCacheList.isEmpty() ? createRubber(this.rootOption.itemView(), p) : bindRubber(rCacheList.remove(0), p))
+                            .collect(Collectors.toMap(BaseOption::id, sp -> sp));
+                    //diff
+                    Map<String, SimpleRubber> diff = dif.entriesDiffering().values().stream().map(p -> bindRubber(sMap.get(rubberId(p.rightValue())), p.rightValue()))
+                            .collect(Collectors.toMap(BaseOption::id, sp -> sp));
+                    return ImmutableMap.<String, SimpleRubber>builder().putAll(right).putAll(diff).putAll(dif.entriesInCommon().values().stream().map(p -> sMap.get(rubberId(p))).collect(Collectors.toMap(BaseOption::id, sp -> sp))).build();
+                })
+                .doOnNext(map -> map.values().stream().filter(sp -> Objects.isNull(sp.itemView().getParent())).forEach(ro -> {
+                    ro.itemView().setAlpha(.03f);
+                    rootOption.itemView().addView(ro.itemView());
+                    ro.itemView().startAnimation(ro.animator());
+                    for (BaseOption o :
+                            ro.vArr()) {
+                        o.itemView().startAnimation(o.animator());
+                    }
+                })).map(map -> ImmutableList.copyOf(map.values())));
         init();
     }
 
@@ -131,53 +238,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
      */
     @Override
     public void submitPlanet(@NonNull Collection<P> pList) {
-
-        Observable.fromIterable(pList)
-                .map(p -> onCreatePlanet(rootOption.itemView(), p))
-                .subscribeOn(AndroidSchedulers.mainThread())
-                .observeOn(Schedulers.io())
-                .distinct(BaseOption::id)
-                .toList()
-                .map(l -> {
-                    Collection<SimplePlanet> clt = poClt.getValue();
-                    Log.d(TAG, "pre:" + l + "\n" + clt);
-                    Map<String, SimplePlanet> mapOld = clt == null ? ImmutableMap.of() : clt.stream().collect(Collectors.toMap(BaseOption::id, po -> po));
-                    Map<String, SimplePlanet> mapNew = l.stream().collect(Collectors.toMap(BaseOption::id, po -> po));
-                    return Maps.difference(mapOld, mapNew, new Equivalence<SimplePlanet>() {
-                        @Override
-                        protected boolean doEquivalent(@NonNull SimplePlanet a, @NonNull SimplePlanet b) {
-                            return TextUtils.equals(a.id(), b.id());
-                        }
-
-                        @Override
-                        protected int doHash(@NonNull SimplePlanet po) {
-                            return po.hashCode();
-                        }
-                    });
-                })
-                .observeOn(AndroidSchedulers.mainThread())
-                .map(dif -> {
-
-                    dif.entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(v -> {
-                        v.setOnTouchListener(null);
-                        v.clearAnimation();
-                        rootOption.itemView().removeView(v);
-                    });
-                    dif.entriesOnlyOnRight().values().forEach(po -> {
-                        po.matrix().postTranslate(new Random().nextFloat(), new Random().nextFloat());
-                        if (po.itemView().getParent() == null) {
-                            rootOption.itemView().addView(po.itemView());
-                            DeponderHelper.bindDefTouchPlanet(po);
-                        }
-                        po.itemView().startAnimation(po.animator());
-                    });
-
-                    List<SimplePlanet> list = Lists.newArrayList(dif.entriesInCommon().values());
-                    list.addAll(dif.entriesOnlyOnRight().values());
-                    return list;
-                })
-
-                .subscribe(new DefSingleSubscriber<>(poClt::postValue));
+        pClt.postValue(pList);
     }
 
     /**
@@ -185,49 +246,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
      */
     @Override
     public void submitRubber(@NonNull Collection<R> rList) {
-        Observable.fromIterable(rList)
-                .map(r -> onCreateRubber(rootOption.itemView(), r))
-                .subscribeOn(AndroidSchedulers.mainThread())
-                .observeOn(Schedulers.io())
-                .distinct(BaseOption::id)
-                .toList()
-                .map(l -> {
-                    final Collection<SimpleRubber> clt = roClt.getValue();
-                    Map<String, SimpleRubber> mapOld = clt == null ? ImmutableMap.of() : clt.stream().collect(Collectors.toMap(BaseOption::id, ro -> ro));
-                    Map<String, SimpleRubber> mapNew = l.stream().collect(Collectors.toMap(BaseOption::id, ro -> ro));
-                    return Maps.difference(mapOld, mapNew, new Equivalence<SimpleRubber>() {
-                        @Override
-                        protected boolean doEquivalent(@NonNull SimpleRubber a, @NonNull SimpleRubber b) {
-                            return TextUtils.equals(a.id(), b.id());
-                        }
-
-                        @Override
-                        protected int doHash(@NonNull SimpleRubber ro) {
-                            return ro.hashCode();
-                        }
-                    });
-                })
-                .observeOn(AndroidSchedulers.mainThread())
-                .map(dif -> {
-
-                    dif.entriesOnlyOnLeft().values().stream().map(BaseOption::itemView).forEach(v -> {
-                        v.setOnTouchListener(null);
-                        v.clearAnimation();
-                        rootOption.itemView().removeView(v);
-                    });
-
-                    dif.entriesOnlyOnRight().values().forEach(ro -> {
-                        if (ro.itemView().getParent() == null)
-                            rootOption.itemView().addView(ro.itemView());
-                        ro.itemView().startAnimation(ro.animator());
-                    });
-
-                    List<SimpleRubber> list = Lists.newArrayList(dif.entriesInCommon().values());
-                    list.addAll(dif.entriesOnlyOnRight().values());
-                    return list;
-
-                })
-                .subscribe(new DefSingleSubscriber<>(roClt::postValue));
+        rClt.postValue(rList);
     }
 
     /**
@@ -258,7 +277,6 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         @Override
         public void onApplyTransformation(float t) {
             emitter.onNext(t);
-
         }
 
         @Override
@@ -272,7 +290,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         Flowable.<Float>create(emitter -> option.animator().setApplyTransformationListener(new Listener(option.animator(), emitter)), BackpressureStrategy.DROP)
                 .timeInterval().map(Timed::time).map(t -> Math.min(32L, Math.max(8L, t)))
                 .withLatestFrom(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, scaleLD)).subscribeOn(Schedulers.io()),
-                        Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().map(NT::new).collect(Collectors.toList())).doOnNext(clt -> Log.i(TAG, "执行一遍又一遍")).subscribeOn(Schedulers.io()),
+                        Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, poClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().map(NT::new).collect(Collectors.toList())).subscribeOn(Schedulers.io()),
                         Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(owner, roClt)).defaultIfEmpty(Collections.emptyList()).map(clt -> clt.stream().collect(Collectors.<SimpleRubber, String, SimpleRubber>toMap(BaseOption::id, ro -> ro))).subscribeOn(Schedulers.io()),
                         Environment::new)
                 .flatMap(roEnvironment -> Flowable.fromIterable(roEnvironment.poClt).compose(DeponderHelper.flowableCombinations(upstream -> upstream.doOnNext(s -> s.newton.postConcat(evaluate(s.pointF, roEnvironment.scale))).doAfterNext(s -> {
@@ -318,7 +336,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
 
                     @Override
                     public void onError(Throwable t) {
-                        Log.i(TAG, "" + t.getMessage());
+
                     }
 
                     @Override
@@ -463,6 +481,10 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
     @WorkerThread
     private void drawRo(@NonNull SimpleRubber ro, @NonNull PointF sP, @NonNull PointF eP, final float scale) {
 
+        if (ro.itemView().getAlpha() == .03f && !ro.matrix().isIdentity()) {
+            ro.itemView().setAlpha(1);
+        }
+
         final Rect rRect = DeponderHelper.hitRect(ro.itemView());
 
         final PointF diff = new PointF(eP.x - sP.x, eP.y - sP.y);
@@ -483,9 +505,9 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         d.postRotate(Math.round(90 - angle / Math.PI * 180), center.x, center.y);
 
         ro.vArr().forEach(o -> {
-            if (o.itemView().getAnimation() == null) {
-                o.itemView().startAnimation(o.animator());
-            }
+//            if (o.itemView().getAnimation() == null) {
+//                o.itemView().startAnimation(o.animator());
+//            }
             PointF c = DeponderHelper.centerPointFInternal(o);
             o.matrix().setScale(rRect.width() / length * scale, scale, c.x, c.y);
         });

@@ -13,10 +13,10 @@ import com.cinpe.deponder.itf.QualityProperty;
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
  */
-public abstract class PlanetOption extends BaseOption implements QualityProperty, FrontalAreaProperty {
+public interface PlanetOption extends BaseOption,QualityProperty, FrontalAreaProperty {
 
     @Override
-    public abstract float quality();
+    float quality();
 
     /**
      * 迎风面积.(弃用)
@@ -24,20 +24,20 @@ public abstract class PlanetOption extends BaseOption implements QualityProperty
      */
     @Override
     @Deprecated
-    public abstract float frontalArea();
+    float frontalArea();
 
     /**
      * 斥力的辐射范围.(px)
      * Radiation range of repulsion.(px)
      */
-    public abstract float mInternalPressure();
+    float mInternalPressure();
 
     /**
      * 当前速度矢量.
      * current velocity vector.
      */
     @NonNull
-    public abstract Matrix speed();
+    Matrix speed();
 
     /**
      * 弹性系数.
@@ -45,6 +45,6 @@ public abstract class PlanetOption extends BaseOption implements QualityProperty
      * Elasticity coefficient.
      * When another planet approaches, the calculation of the force is simplified to the one-dimensional integral of the distance and the elastic coefficient.
      */
-    public abstract float elasticityCoefficient();
+    float elasticityCoefficient();
 
 }

@@ -23,10 +23,14 @@ import androidx.annotation.Px;
 import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.SimpleRootOption;
+import com.google.common.base.Equivalence;
 
 import org.reactivestreams.Publisher;
 
 import java.lang.reflect.Field;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.reactivex.rxjava3.core.Flowable;
@@ -122,6 +126,18 @@ public class DeponderHelper {
      * rubber的tag.
      */
     public final static String TAG_OF_UN_RUBBER = "UN_RUBBER_RUBBER";
+
+    public final static Equivalence<Object> equivalence = new Equivalence<Object>() {
+        @Override
+        protected boolean doEquivalent(@NonNull Object a, @NonNull Object b) {
+            return Objects.equals(a, b);
+        }
+
+        @Override
+        protected int doHash(@NonNull Object o) {
+            return o.hashCode();
+        }
+    };
 
     /**
      * dp->px
@@ -278,8 +294,6 @@ public class DeponderHelper {
 
     protected static void bindDelegateRootTouch(@NonNull SimpleRootOption rootOption) {
         rootOption.itemView().post(() -> rootOption.itemView().setTouchDelegate(new DeponderDelegate(rootOption)));
-//        todo 暂不考虑root的触控
-//        todo rootOption.itemView().setOnTouchListener(new RootTouchHelper(rootOption.matrix()));
     }
 
     public static void bindDefTouchPlanet(PlanetOption option) {
@@ -516,9 +530,14 @@ public class DeponderHelper {
 
     }
 
+    public static String concatId(@NonNull Pair<String, String> pair) {
+        return concatId(pair.first, pair.second);
+    }
 
     public static String concatId(@NonNull String sId, @NonNull String eId) {
-        return sId.hashCode() < eId.hashCode() ? sId + eId : eId + sId;
+        String[] sortString = {sId, eId};
+        Arrays.sort(sortString, String.CASE_INSENSITIVE_ORDER);
+        return sortString[0] + sortString[1];
     }
 
     protected static Transformation mTransformation(@NonNull Animation animation) throws NoSuchFieldException, ClassNotFoundException, IllegalAccessException {

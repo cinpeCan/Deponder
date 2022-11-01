@@ -12,21 +12,21 @@ import com.cinpe.deponder.NAnimator;
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
  */
-public abstract class BaseOption {
+public interface BaseOption {
 
     @NonNull
-    public abstract View itemView();
+    View itemView();
 
     @NonNull
-    public abstract String id();
+    String id();
 
     @NonNull
-    public abstract NAnimator animator();
+    NAnimator animator();
 
     /**
      * 矩阵
      */
     @NonNull
-    public abstract Matrix matrix();
+    Matrix matrix();
 
 }

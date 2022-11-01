@@ -1,6 +1,7 @@
 package com.cinpe.deponder.model;
 
 import android.graphics.Matrix;
+import android.text.TextUtils;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -9,6 +10,9 @@ import com.cinpe.deponder.DeponderHelper;
 import com.cinpe.deponder.NAnimator;
 import com.cinpe.deponder.option.PlanetOption;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
+
+import java.util.Objects;
 
 /**
  * @Description: 描述
@@ -18,7 +22,7 @@ import com.google.auto.value.AutoValue;
  * @Version: 0.01
  */
 @AutoValue
-public abstract class SimplePlanet extends PlanetOption {
+public abstract class SimplePlanet implements PlanetOption {
 
 
     @NonNull
@@ -34,17 +38,26 @@ public abstract class SimplePlanet extends PlanetOption {
     @NonNull
     @Override
     @AutoValue.CopyAnnotations
-    public abstract Matrix speed();
+    @Memoized
+    public Matrix speed() {
+        return new Matrix();
+    }
 
     @NonNull
     @Override
     @AutoValue.CopyAnnotations
-    public abstract NAnimator animator();
+    @Memoized
+    public NAnimator animator() {
+        return new NAnimator(matrix());
+    }
 
     @NonNull
     @Override
     @AutoValue.CopyAnnotations
-    public abstract Matrix matrix();
+    @Memoized
+    public Matrix matrix() {
+        return itemView().getMatrix();
+    }
 
     @Override
     @AutoValue.CopyAnnotations
@@ -83,43 +96,32 @@ public abstract class SimplePlanet extends PlanetOption {
 
         public abstract Builder id(String id);
 
-        abstract Builder animator(NAnimator animator);
-
-        abstract Builder matrix(Matrix matrix);
-
         public abstract Builder quality(float quality);
 
         public abstract Builder frontalArea(float frontalArea);
 
         abstract View itemView();
 
-        abstract Matrix matrix();
-
         abstract String id();
 
         abstract SimplePlanet autoBuild();
-
-        abstract Builder speed(Matrix speed);
 
         public abstract Builder mInternalPressure(float mInternalPressure);
 
         public abstract Builder elasticityCoefficient(float elasticityCoefficient);
 
         public final SimplePlanet build() {
-            Builder builder = matrix(itemView().getMatrix())
-                    .animator(new NAnimator(matrix()))
-                    .speed(new Matrix());
             try {
                 if (id().length() == 0)
                     throw new NullPointerException("Property \"id\" has not been set");
-                return builder.autoBuild();
+                return autoBuild();
             } catch (NullPointerException | IllegalStateException e) {
-                return builder.id(String.valueOf(itemView().hashCode()))
-                        .autoBuild();
+                return this.id(String.valueOf(itemView().hashCode())).autoBuild();
             }
 
         }
     }
 
+    public abstract Builder toBuilder();
 
 }

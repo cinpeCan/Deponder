@@ -1,13 +1,16 @@
 package com.cinpe.deponder.model;
 
 import android.graphics.Matrix;
+import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
 
 import com.cinpe.deponder.DeponderHelper;
 import com.cinpe.deponder.NAnimator;
+import com.cinpe.deponder.option.SimpleRootOption;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 
 import java.util.UUID;
 
@@ -19,7 +22,7 @@ import java.util.UUID;
  * @Version: 0.01
  */
 @AutoValue
-public abstract class SimpleRootOption extends com.cinpe.deponder.option.SimpleRootOption {
+public abstract class SimpleRoot implements SimpleRootOption {
 
 
     @NonNull
@@ -28,15 +31,24 @@ public abstract class SimpleRootOption extends com.cinpe.deponder.option.SimpleR
 
     @NonNull
     @Override
-    public abstract String id();
+    @Memoized
+    public String id() {
+        return String.valueOf(itemView().hashCode());
+    }
 
     @NonNull
     @Override
-    public abstract NAnimator animator();
+    @Memoized
+    public NAnimator animator() {
+        return new NAnimator(matrix());
+    }
 
     @NonNull
     @Override
-    public abstract Matrix matrix();
+    @Memoized
+    public Matrix matrix() {
+        return itemView().getMatrix();
+    }
 
     @Override
     public abstract float initScale();
@@ -62,10 +74,9 @@ public abstract class SimpleRootOption extends com.cinpe.deponder.option.SimpleR
 
     public abstract float elasticityCoefficientBot();
 
-    public static SimpleRootOption create(ViewGroup itemView, String id, float initScale, float maxScale, float minScale, float mRootDensity, float mInternalPressure, float elasticityCoefficientStart, float elasticityCoefficientTop, float elasticityCoefficientEnd, float elasticityCoefficientBot) {
+    public static SimpleRoot create(ViewGroup itemView, float initScale, float maxScale, float minScale, float mRootDensity, float mInternalPressure, float elasticityCoefficientStart, float elasticityCoefficientTop, float elasticityCoefficientEnd, float elasticityCoefficientBot) {
         return builder()
                 .itemView(itemView)
-                .id(id)
                 .initScale(initScale)
                 .maxScale(maxScale)
                 .minScale(minScale)
@@ -76,26 +87,21 @@ public abstract class SimpleRootOption extends com.cinpe.deponder.option.SimpleR
                 .elasticityCoefficientEnd(elasticityCoefficientEnd)
                 .elasticityCoefficientBot(elasticityCoefficientBot)
                 .build();
+
     }
 
     public static Builder builder() {
-        return new AutoValue_SimpleRootOption.Builder().mInternalPressure(DeponderHelper.DEFAULT_Internal_Pressure)
+        return new AutoValue_SimpleRoot.Builder().mInternalPressure(DeponderHelper.DEFAULT_Internal_Pressure)
                 .elasticityCoefficientStart(DeponderHelper.DEFAULT_Internal_Pressure_START)
                 .elasticityCoefficientTop(DeponderHelper.DEFAULT_Internal_Pressure_TOP)
                 .elasticityCoefficientEnd(DeponderHelper.DEFAULT_Internal_Pressure_END)
                 .elasticityCoefficientBot(DeponderHelper.DEFAULT_Internal_Pressure_BOTTOM)
-                .initScale(DeponderHelper.DEFAULT_INIT_SCALE).maxScale(DeponderHelper.DEFAULT_MAX_SCALE).minScale(DeponderHelper.DEFAULT_MIN_SCALE).mRootDensity(DeponderHelper.DEFAULT_ROOT_DENSITY).id(UUID.randomUUID().toString());
+                .initScale(DeponderHelper.DEFAULT_INIT_SCALE).maxScale(DeponderHelper.DEFAULT_MAX_SCALE).minScale(DeponderHelper.DEFAULT_MIN_SCALE).mRootDensity(DeponderHelper.DEFAULT_ROOT_DENSITY);
     }
 
     @AutoValue.Builder
     public abstract static class Builder {
         public abstract Builder itemView(ViewGroup itemView);
-
-        public abstract Builder id(String id);
-
-        abstract Builder animator(NAnimator animator);
-
-        abstract Builder matrix(Matrix matrix);
 
         public abstract Builder initScale(float initScale);
 
@@ -115,17 +121,10 @@ public abstract class SimpleRootOption extends com.cinpe.deponder.option.SimpleR
 
         public abstract Builder elasticityCoefficientBot(float elasticityCoefficientBot);
 
-        abstract SimpleRootOption autoBuild();
+        abstract SimpleRoot autoBuild();
 
-        abstract ViewGroup itemView();
-
-        abstract Matrix matrix();
-
-        public final SimpleRootOption build() {
-            return matrix(itemView().getMatrix())
-                    .animator(new NAnimator(matrix()))
-                    .id(String.valueOf(itemView().hashCode()))
-                    .autoBuild();
+        public final SimpleRoot build() {
+            return autoBuild();
         }
     }
 }

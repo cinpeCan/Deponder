@@ -1,6 +1,7 @@
 package com.cinpe.deponder.option;
 
 import androidx.annotation.NonNull;
+
 import java.util.List;
 
 /**
@@ -10,33 +11,33 @@ import java.util.List;
  * @CreateDate: 2021/12/22
  * @Version: 0.01
  */
-public abstract class RubberOption extends BaseOption {
+public interface RubberOption extends BaseOption {
 
     /**
      * the start Planet id.
      */
     @NonNull
-    public abstract String sId();
+    String sId();
 
     /**
      * the end Planet id.
      */
     @NonNull
-    public abstract String eId();
+    String eId();
 
     /**
      * 弹性系数.
      */
-    public abstract float elasticityCoefficient();
+    float elasticityCoefficient();
 
     /**
      * 自然长度(px).
      */
-    public abstract int naturalLength();
+    int naturalLength();
 
     /**
      * 可拉伸的矢量View. 例如9.png
      */
-    public abstract List<BaseOption> vArr();
+    List<BaseOption> vArr();
 
 }

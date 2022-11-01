@@ -1,6 +1,8 @@
 package com.cinpe.demo_deponder;
 
 import android.os.Bundle;
+import android.text.TextUtils;
+import android.util.Pair;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,12 +14,14 @@ import androidx.databinding.DataBindingUtil;
 
 import com.cinpe.demo_deponder.databinding.ActivityDemoBinding;
 import com.cinpe.deponder.Deponder;
+import com.cinpe.deponder.DeponderHelper;
 import com.cinpe.deponder.control.DeponderControl;
 import com.cinpe.deponder.model.SimplePlanet;
 import com.cinpe.deponder.model.SimpleRubber;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Random;
 import java.util.UUID;
 
@@ -73,24 +77,45 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
 
         deponderProxy = new Deponder<PModel, RModel>(this, mBinding.layoutRoot) {
             @Override
-            public SimplePlanet onCreatePlanet(@NonNull ViewGroup parent, PModel pModel) {
+            public String planetId(PModel pModel) {
+                return pModel.id;
+            }
+
+            @Override
+            public Pair<String, String> rubberPairId(RModel rModel) {
+                return Pair.create(rModel.sId, rModel.eId);
+            }
+
+            @Override
+            public SimplePlanet createPlanet(@NonNull ViewGroup parent, PModel pModel) {
                 return SimplePlanet
                         .builder()
-                        .itemView(DataBindingUtil.inflate(LayoutInflater.from(mBinding.layoutRoot.getContext()), R.layout.planet_demo, mBinding.layoutRoot, false).getRoot())
+                        .itemView(DataBindingUtil.inflate(LayoutInflater.from(parent.getContext()), R.layout.planet_demo, parent, false).getRoot())
                         .id(pModel.id)
                         .build();
             }
 
             @Override
-            public SimpleRubber onCreateRubber(@NonNull ViewGroup parent, RModel rModel) {
+            public SimpleRubber createRubber(@NonNull ViewGroup parent, RModel rModel) {
 
                 return SimpleRubber.builder()
                         .sId(rModel.sId)
                         .eId(rModel.eId)
-                        .itemView(DataBindingUtil.inflate(LayoutInflater.from(mBinding.layoutRoot.getContext()), R.layout.rubber_demo, mBinding.layoutRoot, false).getRoot())
+                        .itemView(DataBindingUtil.inflate(LayoutInflater.from(parent.getContext()), R.layout.rubber_demo, parent, false).getRoot())
                         .build();
 
             }
+
+            @Override
+            public SimplePlanet bindPlanet(@NonNull SimplePlanet holder, PModel pModel) {
+                return holder;
+            }
+
+            @Override
+            public SimpleRubber bindRubber(@NonNull SimpleRubber holder, RModel pModel) {
+                return holder;
+            }
+
         };
 
         startAnimation();
@@ -111,7 +136,7 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
     @Override
     public void onClickAddRO(View view) {
 
-        if(pList.size()<2){
+        if (pList.size() < 2) {
             return;
         }
 

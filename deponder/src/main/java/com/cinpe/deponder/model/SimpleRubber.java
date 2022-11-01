@@ -2,6 +2,7 @@ package com.cinpe.deponder.model;
 
 import android.graphics.Matrix;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -12,13 +13,17 @@ import com.cinpe.deponder.NAnimator;
 import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.RubberOption;
 import com.google.auto.value.AutoValue;
+import com.google.auto.value.extension.memoized.Memoized;
 import com.google.common.collect.ImmutableList;
 
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import io.reactivex.rxjava3.core.Observable;
 import io.reactivex.rxjava3.core.ObservableSource;
+import io.reactivex.rxjava3.functions.BiConsumer;
 import io.reactivex.rxjava3.functions.Function;
+import io.reactivex.rxjava3.functions.Supplier;
 
 /**
  * @Description: 描述
@@ -28,7 +33,7 @@ import io.reactivex.rxjava3.functions.Function;
  * @Version: 0.01
  */
 @AutoValue
-public abstract class SimpleRubber extends RubberOption {
+public abstract class SimpleRubber implements RubberOption {
 
     @NonNull
     @Override
@@ -38,7 +43,10 @@ public abstract class SimpleRubber extends RubberOption {
     @NonNull
     @Override
     @AutoValue.CopyAnnotations
-    public abstract String id();
+    @Memoized
+    public String id() {
+        return DeponderHelper.concatId(sId(), eId());
+    }
 
     @NonNull
     @Override
@@ -53,12 +61,18 @@ public abstract class SimpleRubber extends RubberOption {
     @NonNull
     @Override
     @AutoValue.CopyAnnotations
-    public abstract NAnimator animator();
+    @Memoized
+    public NAnimator animator() {
+        return new NAnimator(matrix());
+    }
 
     @NonNull
     @Override
     @AutoValue.CopyAnnotations
-    public abstract Matrix matrix();
+    @Memoized
+    public Matrix matrix() {
+        return itemView().getMatrix();
+    }
 
     @Override
     public abstract float elasticityCoefficient();
@@ -67,7 +81,30 @@ public abstract class SimpleRubber extends RubberOption {
     public abstract int naturalLength();
 
     @Override
-    public abstract ImmutableList<BaseOption> vArr();
+    @Memoized
+    public ImmutableList<BaseOption> vArr() {
+
+        return Observable.just(itemView())
+                .ofType(ViewGroup.class)
+                .flatMap((Function<ViewGroup, ObservableSource<View>>) viewGroup -> {
+                    final ImmutableList.Builder<View> builder = new ImmutableList.Builder<>();
+                    for (int i = 0; i < viewGroup.getChildCount(); i++) {
+                        builder.add(viewGroup.getChildAt(i));
+                    }
+                    return Observable.fromIterable(builder.build());
+                })
+                .filter(view -> {
+                    if (view.getTag() instanceof String) {
+                        String tag = (String) view.getTag();
+                        return TextUtils.equals(tag, DeponderHelper.TAG_OF_UN_RUBBER);
+                    }
+                    return false;
+                })
+                .map((Function<View, BaseOption>) SimpleOption::create)
+                .collect((Supplier<ImmutableList.Builder<BaseOption>>) ImmutableList.Builder::new, ImmutableList.Builder::add)
+                .map(ImmutableList.Builder::build)
+                .blockingGet();
+    }
 
     public static SimpleRubber create(View itemView, String sId, String eId, float elasticityCoefficient, int naturalLength) {
         return builder()
@@ -87,26 +124,13 @@ public abstract class SimpleRubber extends RubberOption {
     public abstract static class Builder {
         public abstract Builder itemView(View itemView);
 
-        abstract ImmutableList.Builder<BaseOption> vArrBuilder();
-
-        abstract Builder id(String id);
-
         public abstract Builder sId(String id);
 
         public abstract Builder eId(String eId);
 
-        abstract Builder animator(NAnimator animator);
-
-        abstract Builder matrix(Matrix matrix);
-
         public abstract Builder elasticityCoefficient(float elasticityCoefficient);
 
         public abstract Builder naturalLength(int naturalLength);
-
-        Builder addV(BaseOption... options) {
-            vArrBuilder().add(options);
-            return this;
-        }
 
         abstract SimpleRubber autoBuild();
 
@@ -114,62 +138,12 @@ public abstract class SimpleRubber extends RubberOption {
 
         abstract String eId();
 
-        abstract View itemView();
-
-        abstract Matrix matrix();
-
         public final SimpleRubber build() {
             if (TextUtils.equals(sId(), eId()))
                 throw new IllegalStateException("Start and End points cannot be same");
-
-            Observable.just(itemView())
-                    .ofType(ViewGroup.class)
-                    .flatMap(new Function<ViewGroup, ObservableSource<View>>() {
-                        final AtomicInteger integer = new AtomicInteger();
-
-                        @Override
-                        public ObservableSource<View> apply(ViewGroup viewGroup) {
-                            return Observable.just(viewGroup.getChildAt(integer.getAndIncrement()));
-                        }
-                    })
-                    .filter(view -> {
-                        if (view.getTag() instanceof String) {
-                            String tag = (String) view.getTag();
-                            return TextUtils.equals(tag, DeponderHelper.TAG_OF_UN_RUBBER);
-                        }
-                        return false;
-                    })
-                    .map((Function<View, BaseOption>) view -> new BaseOption() {
-                        @NonNull
-                        @Override
-                        public View itemView() {
-                            return view;
-                        }
-
-                        @NonNull
-                        @Override
-                        public String id() {
-                            return String.valueOf(view.getId());
-                        }
-
-                        @NonNull
-                        @Override
-                        public NAnimator animator() {
-                            return new NAnimator(matrix());
-                        }
-
-                        @NonNull
-                        @Override
-                        public Matrix matrix() {
-                            return view.getMatrix();
-                        }
-
-                    }).blockingSubscribe(this::addV);
-
-            return id(DeponderHelper.concatId(sId(),eId()))
-                    .matrix(itemView().getMatrix())
-                    .animator(new NAnimator(matrix()))
-                    .autoBuild();
+            return autoBuild();
         }
     }
+
+    public abstract Builder toBuilder();
 }
