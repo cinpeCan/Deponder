@@ -106,16 +106,6 @@ public class DemoActivity extends AppCompatActivity implements DemoActivityContr
 
             }
 
-            @Override
-            public SimplePlanet bindPlanet(@NonNull SimplePlanet holder, PModel pModel) {
-                return holder;
-            }
-
-            @Override
-            public SimpleRubber bindRubber(@NonNull SimpleRubber holder, RModel pModel) {
-                return holder;
-            }
-
         };
 
         startAnimation();

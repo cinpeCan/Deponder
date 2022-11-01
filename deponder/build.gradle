@@ -50,10 +50,10 @@ dependencies {
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.4.0'
 
 
-    api "io.reactivex.rxjava3:rxandroid:$rxjavaVersion"
-    api "com.google.guava:guava:31.1-android"
+    implementation "io.reactivex.rxjava3:rxandroid:$rxjavaVersion"
+    implementation "com.google.guava:guava:31.1-android"
     // optional - ReactiveStreams support for LiveData
-    api "androidx.lifecycle:lifecycle-reactivestreams:$lifecycleVersion"
+    implementation "androidx.lifecycle:lifecycle-reactivestreams:$lifecycleVersion"
 
     // optional - Test helpers for LiveData
     testImplementation "androidx.arch.core:core-testing:$archVersion"

@@ -42,9 +42,14 @@ public interface BindAdapter<P, R> {
 
     SimpleRubber createRubber(@NonNull ViewGroup parent, R r);
 
-    SimplePlanet bindPlanet(@NonNull SimplePlanet holder, P p);
+    default SimplePlanet bindPlanet(@NonNull SimplePlanet holder, P p){
+        return holder.toBuilder().id(planetId(p)).build();
+    }
 
-    SimpleRubber bindRubber(@NonNull SimpleRubber holder, R p);
+    default SimpleRubber bindRubber(@NonNull SimpleRubber holder, R r) {
+        Pair<String, String> pair = rubberPairId(r);
+        return holder.toBuilder().sId(pair.first).eId(pair.second).build();
+    }
 
     default boolean areContentsTheSameByP(@NonNull P oldItem, @NonNull P newItem) {
         return Objects.equals(oldItem, newItem);
