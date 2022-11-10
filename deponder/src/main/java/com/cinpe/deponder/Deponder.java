@@ -141,7 +141,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         rClt = new MutableLiveData<>(Collections.emptyList());
         poClt = LiveDataReactiveStreams.fromPublisher(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(this.owner, pClt))
                 .filter(clt -> !Objects.isNull(clt))
-                .debounce(200, TimeUnit.MILLISECONDS)
+                .compose(s -> this.rootOption.minInterval() == 0 ? s : s.debounce(this.rootOption.minInterval(), TimeUnit.MILLISECONDS))
                 .observeOn(Schedulers.computation())
                 .scan(Pair.create(ImmutableList.<P>of(), ImmutableList.<P>of()), (pair, p) -> Pair.create(pair.second, ImmutableList.copyOf(p)))
                 .filter(pair -> pair.first != pair.second || pair.second.isEmpty())
@@ -176,7 +176,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
                 })).map(map -> ImmutableList.copyOf(map.values())));
         roClt = LiveDataReactiveStreams.fromPublisher(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(this.owner, rClt))
                 .filter(clt -> !Objects.isNull(clt))
-                .debounce(200, TimeUnit.MILLISECONDS)
+                .compose(s -> this.rootOption.minInterval() == 0 ? s : s.debounce(this.rootOption.minInterval(), TimeUnit.MILLISECONDS))
                 .observeOn(Schedulers.computation())
                 .scan(Pair.create(ImmutableList.<R>of(), ImmutableList.<R>of()), (pair, p) -> Pair.create(pair.second, ImmutableList.copyOf(p)))
                 .filter(pair -> pair.first != pair.second || pair.second.isEmpty())
@@ -191,10 +191,10 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
                     //left
                     dif.entriesOnlyOnLeft().keySet().stream().map(pair.first::get).forEach(ro -> {
                         ro.itemView().clearAnimation();
-                        for (BaseOption o :
-                                ro.vArr()) {
-                            o.itemView().clearAnimation();
-                        }
+//                        for (BaseOption o :
+//                                ro.vArr()) {
+//                            o.itemView().clearAnimation();
+//                        }
                         rootOption.itemView().removeView(ro.itemView());
                         pair.second.add(ro);
                     });
@@ -355,6 +355,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         if (p.length() < minAcceleration || po.itemView().isPressed()) {
             po.speed().setTranslate(0, 0);
             p.set(0, 0);
+            return;
         }
 
         float[] values = DeponderHelper.values(po.matrix());

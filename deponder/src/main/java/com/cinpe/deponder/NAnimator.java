@@ -41,6 +41,8 @@ public class NAnimator extends Animation {
     public NAnimator(@NonNull final Matrix matrix) {
         mMatrix = matrix;
         this.setDuration(3600000L);
+        this.setRepeatMode(Animation.RESTART);
+        this.setRepeatCount(Animation.INFINITE);
     }
 
     @Override

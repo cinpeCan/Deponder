@@ -74,7 +74,9 @@ public abstract class SimpleRoot implements SimpleRootOption {
 
     public abstract float elasticityCoefficientBot();
 
-    public static SimpleRoot create(ViewGroup itemView, float initScale, float maxScale, float minScale, float mRootDensity, float mInternalPressure, float elasticityCoefficientStart, float elasticityCoefficientTop, float elasticityCoefficientEnd, float elasticityCoefficientBot) {
+    public abstract long minInterval();
+
+    public static SimpleRoot create(ViewGroup itemView, float initScale, float maxScale, float minScale, float mRootDensity, float mInternalPressure, float elasticityCoefficientStart, float elasticityCoefficientTop, float elasticityCoefficientEnd, float elasticityCoefficientBot, long minInterval) {
         return builder()
                 .itemView(itemView)
                 .initScale(initScale)
@@ -86,6 +88,7 @@ public abstract class SimpleRoot implements SimpleRootOption {
                 .elasticityCoefficientTop(elasticityCoefficientTop)
                 .elasticityCoefficientEnd(elasticityCoefficientEnd)
                 .elasticityCoefficientBot(elasticityCoefficientBot)
+                .minInterval(minInterval)
                 .build();
 
     }
@@ -96,7 +99,7 @@ public abstract class SimpleRoot implements SimpleRootOption {
                 .elasticityCoefficientTop(DeponderHelper.DEFAULT_Internal_Pressure_TOP)
                 .elasticityCoefficientEnd(DeponderHelper.DEFAULT_Internal_Pressure_END)
                 .elasticityCoefficientBot(DeponderHelper.DEFAULT_Internal_Pressure_BOTTOM)
-                .initScale(DeponderHelper.DEFAULT_INIT_SCALE).maxScale(DeponderHelper.DEFAULT_MAX_SCALE).minScale(DeponderHelper.DEFAULT_MIN_SCALE).mRootDensity(DeponderHelper.DEFAULT_ROOT_DENSITY);
+                .initScale(DeponderHelper.DEFAULT_INIT_SCALE).maxScale(DeponderHelper.DEFAULT_MAX_SCALE).minScale(DeponderHelper.DEFAULT_MIN_SCALE).mRootDensity(DeponderHelper.DEFAULT_ROOT_DENSITY).minInterval(0L);
     }
 
     @AutoValue.Builder
@@ -121,10 +124,14 @@ public abstract class SimpleRoot implements SimpleRootOption {
 
         public abstract Builder elasticityCoefficientBot(float elasticityCoefficientBot);
 
+        public abstract Builder minInterval(long minInterval);
+
+        abstract long minInterval();
+
         abstract SimpleRoot autoBuild();
 
         public final SimpleRoot build() {
-            return autoBuild();
+            return minInterval(Math.max(0, minInterval())).autoBuild();
         }
     }
 }

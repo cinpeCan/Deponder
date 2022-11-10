@@ -2,6 +2,7 @@ package com.cinpe.deponder.option;
 
 import android.view.ViewGroup;
 
+import androidx.annotation.LongDef;
 import androidx.annotation.NonNull;
 
 
@@ -49,6 +50,11 @@ public interface SimpleRootOption extends BaseOption {
     float elasticityCoefficientTop();
     float elasticityCoefficientEnd();
     float elasticityCoefficientBot();
+
+    /**
+     * 输入防抖（最小输入间隔）
+     */
+    long minInterval();
 
 
 }

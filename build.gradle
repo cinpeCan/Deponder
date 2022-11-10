@@ -50,7 +50,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.0.0-alpha03'
+        classpath 'com.android.tools.build:gradle:8.0.0-alpha08'
         classpath "com.google.dagger:hilt-android-gradle-plugin:$hiltVersion"
         classpath "androidx.test:runner:$orchestrator"
         classpath "androidx.test:orchestrator:$orchestrator"
