@@ -190,11 +190,11 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
                 .scan(Pair.create(ImmutableMap.<String, SimpleRubber>of(), Lists.<SimpleRubber>newArrayList()), (pair, dif) -> {
                     //left
                     dif.entriesOnlyOnLeft().keySet().stream().map(pair.first::get).forEach(ro -> {
+                        for (BaseOption o :
+                                ro.vArr()) {
+                            o.itemView().clearAnimation();
+                        }
                         ro.itemView().clearAnimation();
-//                        for (BaseOption o :
-//                                ro.vArr()) {
-//                            o.itemView().clearAnimation();
-//                        }
                         rootOption.itemView().removeView(ro.itemView());
                         pair.second.add(ro);
                     });
@@ -207,7 +207,6 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
                     return Pair.create(ImmutableMap.<String, SimpleRubber>builder().putAll(right).putAll(diff).putAll(dif.entriesInCommon().values().stream().map(p -> pair.first.get(rubberId(p))).collect(Collectors.toMap(BaseOption::id, sp -> sp))).build(), pair.second);
                 }).map(p -> p.first)
                 .doOnNext(map -> map.values().stream().filter(sp -> Objects.isNull(sp.itemView().getParent())).forEach(ro -> {
-                    ro.itemView().setAlpha(.03f);
                     rootOption.itemView().addView(ro.itemView());
                     ro.itemView().startAnimation(ro.animator());
                     for (BaseOption o :
@@ -463,10 +462,6 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
      */
     @WorkerThread
     private void drawRo(@NonNull SimpleRubber ro, @NonNull PointF sP, @NonNull PointF eP, final float scale) {
-
-        if (ro.itemView().getAlpha() == .03f && !ro.matrix().isIdentity()) {
-            ro.itemView().setAlpha(1);
-        }
 
         final Rect rRect = DeponderHelper.hitRect(ro.itemView());
 
