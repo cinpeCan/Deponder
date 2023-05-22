@@ -57,7 +57,7 @@ public abstract class SimpleOption implements BaseOption {
     @AutoValue.Builder
     public abstract static class Builder {
         public abstract Builder itemView(View itemView);
-ListView
+
         public abstract SimpleOption build();
     }
 }
