@@ -7,10 +7,7 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.text.TextUtils;
 import android.util.Pair;
-import android.util.SparseArray;
-import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ListAdapter;
 
 import androidx.annotation.FloatRange;
 import androidx.annotation.NonNull;
@@ -28,26 +25,16 @@ import com.cinpe.deponder.option.BaseOption;
 import com.cinpe.deponder.option.PlanetOption;
 import com.cinpe.deponder.option.RubberOption;
 import com.cinpe.deponder.option.SimpleRootOption;
-import com.google.common.base.Equivalence;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
-import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
-import com.google.errorprone.annotations.concurrent.LazyInit;
 
-import org.reactivestreams.Subscription;
-
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -57,18 +44,9 @@ import io.reactivex.rxjava3.android.schedulers.AndroidSchedulers;
 import io.reactivex.rxjava3.core.BackpressureStrategy;
 import io.reactivex.rxjava3.core.Flowable;
 import io.reactivex.rxjava3.core.FlowableEmitter;
-import io.reactivex.rxjava3.core.FlowableOnSubscribe;
-import io.reactivex.rxjava3.core.FlowableSubscriber;
-import io.reactivex.rxjava3.core.Observable;
-import io.reactivex.rxjava3.core.Single;
-import io.reactivex.rxjava3.functions.BiConsumer;
-import io.reactivex.rxjava3.functions.BiFunction;
-import io.reactivex.rxjava3.functions.Function;
-import io.reactivex.rxjava3.functions.Supplier;
 import io.reactivex.rxjava3.observers.DisposableCompletableObserver;
 import io.reactivex.rxjava3.schedulers.Schedulers;
 import io.reactivex.rxjava3.schedulers.Timed;
-import kotlin.Triple;
 /*
  * Copyright (c) 2022-present, Cinpecan and Deponder Contributors.
  *
@@ -230,7 +208,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
      */
     @Override
     public final void submitPlanet(@NonNull Collection<P> pList) {
-        pClt.postValue(pList);
+        pClt.setValue(pList);
     }
 
     /**
@@ -238,7 +216,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
      */
     @Override
     public final void submitRubber(@NonNull Collection<R> rList) {
-        rClt.postValue(rList);
+        rClt.setValue(rList);
     }
 
     /**
@@ -247,7 +225,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
     @Override
     public final void submitScale(@FloatRange(from = 0, fromInclusive = false) float scale) {
         if (scale <= rootOption.maxScale() && scale >= rootOption.minScale())
-            scaleLD.postValue(scale);
+            scaleLD.setValue(scale);
     }
 
     @Override
