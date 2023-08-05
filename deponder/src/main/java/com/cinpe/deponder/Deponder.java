@@ -329,11 +329,6 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
 
         //Low-speed anti-shake
         final float minAcceleration = DeponderHelper.MIN_ACCELERATION * scale;
-        if (p.length() < minAcceleration || po.itemView().isPressed()) {
-            po.speed().setTranslate(0, 0);
-            p.set(0, 0);
-            return;
-        }
 
         float[] values = DeponderHelper.values(po.matrix());
         Rect rect = DeponderHelper.hitRect(po.itemView());
@@ -342,12 +337,17 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         float tempY = scale / values[Matrix.MSCALE_Y];
         Matrix matrix = new Matrix();
         matrix.postScale(tempX, tempY, (rect.width() / 2f) * values[Matrix.MSCALE_X] + values[Matrix.MTRANS_X], (rect.height() / 2f) * values[Matrix.MSCALE_Y] + values[Matrix.MTRANS_Y]);
-        matrix.postTranslate(p.x, p.y);
-//
-        po.matrix().postConcat(matrix);
 
-        //Record the final speed.
-        po.speed().postTranslate(acceleration.x * interval, acceleration.y * interval);
+        if (p.length() < minAcceleration || po.itemView().isPressed()) {
+            po.speed().setTranslate(0, 0);
+            p.set(0, 0);
+        }else {
+            matrix.postTranslate(p.x, p.y);
+            //Record the final speed.
+            po.speed().postTranslate(acceleration.x * interval, acceleration.y * interval);
+        }
+
+        po.matrix().postConcat(matrix);
 
     }
 

@@ -20,15 +20,15 @@ buildscript {
         lifecycleHiltVersion = '1.0.0-alpha03'
         junitVersion = '4.12'
         ktxVersion = '1.0.2'
-        lifecycleVersion = '2.5.1'
-        archVersion='2.1.0'
+        lifecycleVersion = '2.6.1'
+        archVersion='2.2.0'
         materialVersion = '1.2.0'
         navigationVersion = '2.4.0-beta02'
         okhttpLoggingVersion = '4.7.2'
         pagingVersion = '3.0.0-alpha02'
         recyclerViewVersion = '1.2.1'
         retrofitVersion = '2.9.0'
-        rxjavaVersion='3.0.0'
+        rxjavaVersion='3.0.2'
         roomVersion = '2.4.0'
         runnerVersion = '1.0.1'
         truthVersion = '0.42'
@@ -50,7 +50,6 @@ buildscript {
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.2.0-alpha15'
-        classpath "com.google.dagger:hilt-android-gradle-plugin:$hiltVersion"
         classpath "androidx.test:runner:$orchestrator"
         classpath "androidx.test:orchestrator:$orchestrator"
         // NOTE: Do not place your application dependencies here; they belong
@@ -69,6 +68,6 @@ allprojects {
     }
 }
 
-task clean(type: Delete) {
+tasks.register('clean', Delete) {
     delete rootProject.buildDir
 }
