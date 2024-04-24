@@ -1,4 +1,4 @@
-# DemoDeponder
+# Deponder
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.cinpecan/deponder.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22io.github.cinpecan%22%20AND%20a:%22deponder%22)
 
