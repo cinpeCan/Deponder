@@ -112,7 +112,7 @@ public abstract class SimplePlanet implements PlanetOption {
 
         public final SimplePlanet build() {
             try {
-                if (id().length() == 0)
+                if (id().isEmpty())
                     throw new NullPointerException("Property \"id\" has not been set");
                 return autoBuild();
             } catch (NullPointerException | IllegalStateException e) {

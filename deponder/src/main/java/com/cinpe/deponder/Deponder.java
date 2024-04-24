@@ -28,10 +28,14 @@ import com.cinpe.deponder.option.SimpleRootOption;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.collect.MapDifference;
 import com.google.common.collect.Maps;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
@@ -120,50 +124,90 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         poClt = LiveDataReactiveStreams.fromPublisher(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(this.owner, pClt))
                 .filter(clt -> !Objects.isNull(clt))
                 .compose(s -> this.rootOption.minInterval() == 0 ? s : s.debounce(this.rootOption.minInterval(), TimeUnit.MILLISECONDS))
-                .observeOn(Schedulers.computation())
-                .scan(Pair.create(ImmutableList.<P>of(), ImmutableList.<P>of()), (pair, p) -> Pair.create(pair.second, ImmutableList.copyOf(p)))
-                .filter(pair -> pair.first != pair.second || pair.second.isEmpty())
+                .map(ImmutableList::copyOf)
+                .buffer(2, 1)
                 .map(pair -> {
-                    Map<String, P> mapOld = pair.first.stream().collect(Collectors.toMap(this::planetId, p -> p, (s, e) -> e));
-                    Map<String, P> mapNew = pair.second.stream().collect(Collectors.toMap(this::planetId, p -> p, (s, e) -> e));
+                    Map<String, P> mapOld = pair.get(0).stream().collect(Collectors.toMap(this::planetId, p -> p, (s, e) -> e));
+                    Map<String, P> mapNew = pair.get(1).stream().collect(Collectors.toMap(this::planetId, p -> p, (s, e) -> e));
                     return Maps.difference(mapOld, mapNew, DeponderHelper.equivalence);
                 })
                 .filter(dif -> !dif.entriesOnlyOnLeft().isEmpty() || !dif.entriesOnlyOnRight().isEmpty() || !dif.entriesDiffering().isEmpty())
-                .observeOn(AndroidSchedulers.mainThread())
-                .scan(Pair.create(ImmutableMap.<String, SimplePlanet>of(), Lists.<SimplePlanet>newArrayList()), (pair, dif) -> {
+                .scan(new DataPool<P, SimplePlanet>(), (pool, dif) -> {
                     //left
-                    dif.entriesOnlyOnLeft().keySet().stream().map(pair.first::get).forEach(sp -> {
-                        sp.itemView().setOnTouchListener(null);
-                        sp.itemView().clearAnimation();
-                        rootOption.itemView().removeView(sp.itemView());
-                        pair.second.add(sp);
+                    dif.entriesOnlyOnLeft().values().forEach(p -> {
+                        SimplePlanet po = pool.clt.remove(planetId(p));
+                        if (po != null) {
+                            pool.cacheClt.add(po);
+                        }
                     });
                     //right
-                    Map<String, SimplePlanet> right = dif.entriesOnlyOnRight().values().stream().map(p -> pair.second.isEmpty() ? createPlanet(this.rootOption.itemView(), p) : bindPlanet(pair.second.remove(0), p))
-                            .collect(Collectors.toMap(BaseOption::id, sp -> sp));
-                    //diff
-                    Map<String, SimplePlanet> diff = dif.entriesDiffering().values().stream().map(p -> bindPlanet(pair.first.get(planetId(p.rightValue())), p.rightValue()))
-                            .collect(Collectors.toMap(BaseOption::id, sp -> sp));
-                    return Pair.create(ImmutableMap.<String, SimplePlanet>builder().putAll(right).putAll(diff).putAll(dif.entriesInCommon().values().stream().map(p -> pair.first.get(planetId(p))).collect(Collectors.toMap(BaseOption::id, sp -> sp))).build(), pair.second);
-                }).map(p -> p.first)
-                .doOnNext(map -> map.values().stream().filter(sp -> Objects.isNull(sp.itemView().getParent())).forEach(sp -> {
-                    sp.matrix().setTranslate(new Random().nextFloat(), new Random().nextFloat());
-                    rootOption.itemView().addView(sp.itemView());
-                    DeponderHelper.bindDefTouchPlanet(sp);
-                    sp.itemView().startAnimation(sp.animator());
-                })).map(map -> ImmutableList.copyOf(map.values())));
-        roClt = LiveDataReactiveStreams.fromPublisher(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(this.owner, rClt))
-                .filter(clt -> !Objects.isNull(clt))
+                    if (pool.cacheClt.size() >= dif.entriesOnlyOnRight().size()) {
+                        pool.reuseClt.addAll(dif.entriesOnlyOnRight().values());
+                    } else {
+                        List<P> l = new ArrayList<>(dif.entriesOnlyOnRight().values());
+                        for (int i = 0; i < pool.cacheClt.size(); i++) {
+                            pool.reuseClt.add(l.remove(0));
+                        }
+                        pool.createClt.addAll(l);
+                    }
+                    //dif
+                    pool.difClt.addAll(dif.entriesDiffering().values().stream().map(MapDifference.ValueDifference::rightValue).collect(Collectors.toList()));
+                    return pool;
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .doOnNext(pool -> {
+                    pool.reuseClt.forEach(p -> {
+                        SimplePlanet sp = bindPlanet(pool.cacheClt.remove(pool.cacheClt.size() - 1), p);
+                        pool.clt.put(sp.id(), sp);
+                        if (sp.itemView().getParent() == null) {
+                            rootOption.itemView().addView(sp.itemView());
+                            DeponderHelper.bindDefTouchPlanet(sp);
+                            sp.itemView().startAnimation(sp.animator());
+                        }
+                    });
+                    pool.createClt.forEach(p -> {
+                        SimplePlanet sp = createPlanet(rootOption.itemView(), p);
+                        pool.clt.put(sp.id(), sp);
+                        rootOption.itemView().addView(sp.itemView());
+                        DeponderHelper.bindDefTouchPlanet(sp);
+                        sp.itemView().startAnimation(sp.animator());
+                        sp.matrix().setTranslate(new Random().nextFloat(), new Random().nextFloat());
+                    });
+                    pool.difClt.forEach(p -> {
+                        bindPlanet(pool.clt.get(planetId(p)), p);
+                    });
+                    pool.cacheClt.forEach(po -> {
+                        if (po.itemView().getParent() != null) {
+                            po.itemView().setOnTouchListener(null);
+                            po.itemView().clearAnimation();
+                            rootOption.itemView().removeView(po.itemView());
+                        }
+                    });
+                    pool.createClt.clear();
+                    pool.reuseClt.clear();
+                    pool.difClt.clear();
+                })
+                .map(pool -> ImmutableList.copyOf(pool.clt.values())));
+
+        roClt = LiveDataReactiveStreams.fromPublisher(Flowable.combineLatest(Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(this.owner, rClt))
+                        .filter(clt -> !Objects.isNull(clt)), Flowable.fromPublisher(LiveDataReactiveStreams.toPublisher(this.owner, poClt))
+                        .filter(clt -> !Objects.isNull(clt)), (rr, pp) -> Flowable.fromIterable(pp).collect(() -> new HashMap<String, String>(), (map, p) -> map.put(p.id(), p.id()))
+                        .map(m -> Flowable.fromIterable(rr).filter(r -> {
+                            Pair<String, String> pair = this.rubberPairId(r);
+                            return m.containsKey(pair.first) && m.containsKey(pair.second);
+                        }).toList().subscribeOn(Schedulers.computation()).blockingGet()).blockingGet()
+                )
                 .compose(s -> this.rootOption.minInterval() == 0 ? s : s.debounce(this.rootOption.minInterval(), TimeUnit.MILLISECONDS))
-                .observeOn(Schedulers.computation())
-                .scan(Pair.create(ImmutableList.<R>of(), ImmutableList.<R>of()), (pair, p) -> Pair.create(pair.second, ImmutableList.copyOf(p)))
-                .filter(pair -> pair.first != pair.second || pair.second.isEmpty())
+                .map(ImmutableList::copyOf)
+                .buffer(2, 1)
                 .map(pair -> {
-                    Map<String, R> mapOld = pair.first.stream().collect(Collectors.toMap(this::rubberId, r -> r, (s, e) -> e));
-                    Map<String, R> mapNew = pair.second.stream().collect(Collectors.toMap(this::rubberId, r -> r, (s, e) -> e));
+                    Map<String, R> mapOld = pair.get(0).stream().collect(Collectors.toMap(this::rubberId, r -> r, (s, e) -> e));
+                    Map<String, R> mapNew = pair.get(1).stream().collect(Collectors.toMap(this::rubberId, r -> r, (s, e) -> e));
                     return Maps.difference(mapOld, mapNew, DeponderHelper.equivalence);
                 })
                 .filter(dif -> !dif.entriesOnlyOnLeft().isEmpty() || !dif.entriesOnlyOnRight().isEmpty() || !dif.entriesDiffering().isEmpty())
+                .subscribeOn(Schedulers.computation())
                 .observeOn(AndroidSchedulers.mainThread())
                 .scan(Pair.create(ImmutableMap.<String, SimpleRubber>of(), Lists.<SimpleRubber>newArrayList()), (pair, dif) -> {
                     //left
@@ -204,7 +248,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
 
 
     /**
-     * 提交P
+     * submit P
      */
     @Override
     public final void submitPlanet(@NonNull Collection<P> pList) {
@@ -212,7 +256,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
     }
 
     /**
-     * 提交R
+     * submit R
      */
     @Override
     public final void submitRubber(@NonNull Collection<R> rList) {
@@ -220,7 +264,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
     }
 
     /**
-     * 提交scale
+     * submit scale
      */
     @Override
     public final void submitScale(@FloatRange(from = 0, fromInclusive = false) float scale) {
@@ -308,7 +352,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
 
 
     /**
-     * 绘制po.
+     * draw po.
      */
     @WorkerThread
     private void drawPo(@NonNull SimplePlanet po, @NonNull Matrix newton, long interval, final float scale) {
@@ -341,7 +385,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         if (p.length() < minAcceleration || po.itemView().isPressed()) {
             po.speed().setTranslate(0, 0);
             p.set(0, 0);
-        }else {
+        } else {
             matrix.postTranslate(p.x, p.y);
             //Record the final speed.
             po.speed().postTranslate(acceleration.x * interval, acceleration.y * interval);
@@ -367,7 +411,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         float r = rootRect.width() - point.x;
         float b = rootRect.height() - point.y;
 
-        //四边产生的力.
+        //force analysis of a four-sided frame
         final float internalPressure = rootOption.mInternalPressure() * scale;
         l = l < internalPressure ? internalPressure - l : 0;
         t = t < internalPressure ? internalPressure - t : 0;
@@ -436,7 +480,7 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
 
 
     /**
-     * 绘制ro.
+     * draw ro.
      */
     @WorkerThread
     private void drawRo(@NonNull SimpleRubber ro, @NonNull PointF sP, @NonNull PointF eP, final float scale) {
@@ -445,19 +489,19 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
 
         final PointF diff = new PointF(eP.x - sP.x, eP.y - sP.y);
 
-        //当前中点.
+        //current midpoint.
         final PointF center = DeponderHelper.centerPointF(sP, eP);
 
-        //当前长度.
+        //current length.
         final float length = PointF.length(diff.x, diff.y);
-        //当前角度.
+        //current angle.
         final double angle = Math.atan2(diff.x, diff.y);
 
         final Matrix d = new Matrix();
 
         d.setRectToRect(DeponderHelper.hitRectF(ro.itemView()), new RectF(center.x - length / 2, center.y - rRect.height() * scale / 2, center.x + length / 2, center.y + rRect.height() * scale / 2), Matrix.ScaleToFit.FILL);
 
-        //设置角度.
+        //set the angle.
         d.postRotate(Math.round(90 - angle / Math.PI * 180), center.x, center.y);
 
         ro.vArr().forEach(o -> {
@@ -524,6 +568,33 @@ public abstract class Deponder<P, R> implements DeponderControl<P, R>, BindAdapt
         final float scale;
         final Map<String, RO> map;
         final Collection<NT> poClt;
+
+    }
+
+    static class DataDif<T> {
+
+        final Collection<T> removeClt;
+        final Collection<T> bindClt;
+        final Collection<T> createClt;
+        final Collection<T> reuseClt;
+
+        public DataDif(Collection<T> removeClt, Collection<T> bindClt, Collection<T> createClt, Collection<T> reuseClt) {
+            this.removeClt = removeClt;
+            this.bindClt = bindClt;
+            this.createClt = createClt;
+            this.reuseClt = reuseClt;
+        }
+    }
+
+    static class DataPool<P, PO> {
+
+        final public List<P> difClt = new ArrayList<>();
+        final public List<P> reuseClt = new ArrayList<>();
+        final public List<P> createClt = new ArrayList<>();
+
+        final public List<PO> cacheClt = new ArrayList<>();
+
+        final public Map<String, PO> clt = new HashMap<>();
 
     }
 }
