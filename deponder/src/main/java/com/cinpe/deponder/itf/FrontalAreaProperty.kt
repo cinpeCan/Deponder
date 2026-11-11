@@ -1,4 +1,4 @@
-package com.cinpe.deponder.itf;
+package com.cinpe.deponder.itf
 
 /**
  * @Description: 迎风面积
@@ -12,7 +12,6 @@ public interface FrontalAreaProperty {
     /**
      * @return 迎风面积.(对角线长度)(直径)
      */
-    @Deprecated
-    float frontalArea();
-
+    @Deprecated("Frontal area is deprecated and unused.")
+    public fun frontalArea(): Float
 }

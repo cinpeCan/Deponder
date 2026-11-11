@@ -1,11 +1,7 @@
-package com.cinpe.deponder.option;
+package com.cinpe.deponder.option
 
-import android.graphics.Matrix;
-
-import androidx.annotation.NonNull;
-
-import com.cinpe.deponder.itf.FrontalAreaProperty;
-import com.cinpe.deponder.itf.QualityProperty;
+import com.cinpe.deponder.itf.FrontalAreaProperty
+import com.cinpe.deponder.itf.QualityProperty
 
 /**
  * @Description: 行星 Planet wapper   .
@@ -13,31 +9,22 @@ import com.cinpe.deponder.itf.QualityProperty;
  * @E-Mail: cinpeCan@outlook.com
  * @CreateDate: 2021/12/22
  */
-public interface PlanetOption extends BaseOption,QualityProperty, FrontalAreaProperty {
+public interface PlanetOption : BaseOption, QualityProperty, FrontalAreaProperty {
 
-    @Override
-    float quality();
+    override fun quality(): Float
 
     /**
      * 迎风面积.(弃用)
      * Frontal area.(Deprecated)
      */
-    @Override
-    @Deprecated
-    float frontalArea();
+    @Deprecated("Frontal area is deprecated and unused.")
+    override fun frontalArea(): Float
 
     /**
      * 斥力的辐射范围.(px)
      * Radiation range of repulsion.(px)
      */
-    float mInternalPressure();
-
-    /**
-     * 当前速度矢量.
-     * current velocity vector.
-     */
-    @NonNull
-    Matrix speed();
+    public fun mInternalPressure(): Float
 
     /**
      * 弹性系数.
@@ -45,6 +32,5 @@ public interface PlanetOption extends BaseOption,QualityProperty, FrontalAreaPro
      * Elasticity coefficient.
      * When another planet approaches, the calculation of the force is simplified to the one-dimensional integral of the distance and the elastic coefficient.
      */
-    float elasticityCoefficient();
-
+    public fun elasticityCoefficient(): Float
 }

@@ -1,8 +1,4 @@
-package com.cinpe.deponder.option;
-
-import androidx.annotation.NonNull;
-
-import java.util.List;
+package com.cinpe.deponder.option
 
 /**
  * @Description: 橡皮筋(因变对象)
@@ -11,33 +7,30 @@ import java.util.List;
  * @CreateDate: 2021/12/22
  * @Version: 0.01
  */
-public interface RubberOption extends BaseOption {
+public interface RubberOption : BaseOption {
 
     /**
      * the start Planet id.
      */
-    @NonNull
-    String sId();
+    public fun sId(): String
 
     /**
      * the end Planet id.
      */
-    @NonNull
-    String eId();
+    public fun eId(): String
 
     /**
      * 弹性系数.
      */
-    float elasticityCoefficient();
+    public fun elasticityCoefficient(): Float
 
     /**
      * 自然长度(px).
      */
-    int naturalLength();
+    public fun naturalLength(): Int
 
     /**
      * 可拉伸的矢量View. 例如9.png
      */
-    List<BaseOption> vArr();
-
+    public fun vArr(): List<BaseOption>
 }

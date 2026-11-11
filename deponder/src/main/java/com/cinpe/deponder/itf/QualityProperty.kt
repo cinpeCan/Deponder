@@ -1,4 +1,4 @@
-package com.cinpe.deponder.itf;
+package com.cinpe.deponder.itf
 
 /**
  * @Description: 质量
@@ -12,6 +12,5 @@ public interface QualityProperty {
     /**
      * @return 质量
      */
-    float quality();
-
+    public fun quality(): Float
 }

@@ -6,168 +6,211 @@
   <a href="README_zh.md">
     <b>中文说明</b>
   </a>
-</p> 
+</p>
 
-An Android's physical-like relationship graph animation SDK.  
+An Android physical-like relationship graph animation SDK, powered by Kotlin & Coroutines while maintaining 100% Java source compatibility.
 
 In Deponder's physics-like animation, the displacement of an object is calculated as the integral of the force applied to each frame over time.
 
 #### Set the following values to change the effect of the animation
 
-- The mass of the planet (planetOption), the radiation range of the gravitational force (or repulsion), the coefficient of the gravitational (or repulsive) force
-- The natural length of the rubber (rubberOption), the elastic coefficient
-- The air friction coefficient of the environment (rootOption), the radiation range of the four-wall force, the coefficient of the four-wall force
-- Scale (scale), effective for all planets (planetOption) and rubber (rubberOption)
+- The mass of the planet (`planetOption`), the radiation range of the gravitational force (or repulsion), the coefficient of the gravitational (or repulsive) force
+- The natural length of the rubber (`rubberOption`), the elastic coefficient
+- The air friction coefficient of the environment (`rootOption`), the radiation range of the four-wall force, the coefficient of the four-wall force
+- Scale (`scale`), effective for all planets (`planetOption`) and rubbers (`rubberOption`)
 
 
 ### Features
 
-- Calculate and change the View position through a matrix to avoid multiple triggering of View.invalidate() when moving, scaling, rotating, and flipping at the same time.
-- In the animation, the actual position of the planet does not change, and it will not actively trigger onMeasure(), onLayout(), onDraw().
-- Although the actual position of the planet has not changed, the touch event will be automatically shifted to the clicked planet in the vision for processing.
-- Occupy the animation() interface of planetOption
+- Driven by Android `Choreographer` VSYNC and hardware-accelerated `View` properties (`translationX/Y`, `scaleX/Y`, `rotation`) without `invalidate()` redraw overhead.
+- Preserves layout bounds during animation without triggering `onMeasure()`, `onLayout()`, or `onDraw()`.
+- Native `ViewGroup` matrix touch routing dispatches click and drag gestures directly to translated/scaled planets.
+- Leaves `View.startAnimation()` and `ViewGroup.setTouchDelegate()` free for custom animations and touch handling.
 
 
 ### Setting up the dependency
 
-Example for Gradle:
+Kotlin DSL (`build.gradle.kts`):
 
-```groovy
-repositories {
-  mavenCentral()
+```kotlin
+dependencies {
+    implementation("io.github.cinpecan:deponder:0.4.0")
 }
 ```
+
+Groovy (`build.gradle`):
+
 ```groovy
 dependencies {
-  implementation "io.github.cinpecan:deponder:0.3.1@aar"
+    implementation "io.github.cinpecan:deponder:0.4.0"
 }
 ```
 
 
-### Start using
+### Start using (Kotlin DSL)
 
+Deponder provides a concise Kotlin DSL to build controllers without subclassing:
 
-1. Create a Deponder object:
-```java
-DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, [YOUR GROUPVIEW]);
+```kotlin
+// Optional: custom environment settings (or pass rootView directly to deponder(...))
+val rootOption = simpleRoot {
+    itemView = rootGroupView
+    initScale = 1f
+    maxScale = 1.5f
+    minScale = 0.5f
+    mRootDensity = 0.0006f
+    mInternalPressure = 300f
+}
+
+// Create a Deponder controller with lambdas — no subclassing required
+val control = deponder<NodeItem, LinkItem>(lifecycleOwner, rootOption) {
+    planetId { it.id }
+    rubberPairId { Pair(it.fromId, it.toId) }
+
+    createPlanet { parent, node ->
+        simplePlanet {
+            itemView = inflateNodeView(parent, node)
+            id = node.id
+            quality = 2.293f
+            mInternalPressure = 220f
+            elasticityCoefficient = 1.33f
+        }
+    }
+
+    bindPlanet { holder, node ->
+        updateNodeView(holder.itemView(), node)
+        holder.copy { id = node.id }
+    }
+
+    createRubber { parent, link ->
+        simpleRubber {
+            itemView = inflateEdgeView(parent)
+            sId = link.fromId
+            eId = link.toId
+            elasticityCoefficient = 1.68f
+            naturalLength = 300
+        }
+    }
+
+    // Optional diff callback (defaults to Objects.equals)
+    areContentsTheSameByP { oldItem, newItem -> oldItem == newItem }
+}
+
+// Submit data at any time
+control.submitPlanet(nodeList)
+control.submitRubber(linkList)
+control.submitScale(1f)
 ```
 
->or custom environment settings
 
-```java
-RootOption rootOption =SimpleRootOption.builder()
-            .itemView([YOUR GROUPVIEW])
-            //Initialize the scaling value (not necessary, default 1f)
-            .initScale(...)
-            //Maximum zoom value (not necessary, default 1.5f)
-            .maxScale(...)
-            //Minimum zoom value (not necessary, default 0.5f)
-            .minScale(...)
-            //Air damping (not necessary, default 0.0006f)
-            .mRootDensity(...)
-            //The influence range of the environment walls on the planetary force (not necessary, default 300)
-            .mInternalPressure(...)
-            //The elastic coefficient of the force of the four walls of the environment on the planet (not necessary, default 1.44f)
-            .elasticityCoefficientStart(...)
-            .elasticityCoefficientTop(...)
-            .elasticityCoefficientEnd(...)
-            .elasticityCoefficientBot(...)
-            .build());
-            
-DeponderControl<PlanetOption, RubberOption> deponder = new Deponder<>(LifecycleOwner, rootOption);
-```
+### Start using (Java)
 
-2. Declare some planetOption object.
-```java
-PlanetOption planetA=SimplePlanet.builder()
-            //[YOUR CHILD VIEW] under [YOUR GROUPVIEW], and want this view to be controlled by Deponder. (required)
-            .itemView([YOUR CHILD VIEW])
-            //Unique identifier (not necessary, default String.valueOf([YOUR CHILD VIEW].hashCode())
-            .id(...)
-            //quality (not necessary, default 2.293f)
-            .quality(...)
-            //The influence range of the interaction force between planets (not necessary, default 220)
-            .mInternalPressure(...)
-            //The elastic coefficient of the interaction force between planets (not necessary, default 1.33f)
-            .elasticityCoefficient(...)
-            .build();
-```
-It is also possible to declare more... then put into a collection.
-```java
-PlanetOption planetB = SimplePlanet.builder().(...).build();
-...
-List<PlanetOption> listPlanet=new ArrayList<>();
-listPlanet.add(planetA);
-listPlanet.add(planetB);
-...
-```
+All Java APIs (`new Deponder<>(...)`, `SimplePlanet.builder()`, `SimpleRubber.builder()`, `SimpleRoot.builder()`, `DeponderHelper`) remain fully supported:
 
-3. Declare a rubber(rubberOption) object.
+1. Create a `Deponder` object by subclassing `Deponder<P, R>`:
 ```java
-RubberOption rubberA=SimpleRubber.builder()
-                //The id values of the two planet objects. Their combination should be unique. (required)
-                .sId(planetA.id())
-                .eId(planetB.id())
-                //The view that the connection object is expected to display, such as a line segment 
-                //(usually a View with a rectangle with a background color and a width and height greater than 0)
-                .itemView(...)
-                //The elastic coefficient of the rubber (not necessary, default 1.68f)
-                .elasticityCoefficient(...)
-                //The natural length of the eraser (not necessary, default 300)
-                .naturalLength(...)
+SimpleRootOption rootOption = SimpleRoot.builder()
+        .itemView(rootGroupView)
+        // Initial scaling value (optional, default 1f)
+        .initScale(1f)
+        // Maximum zoom value (optional, default 1.5f)
+        .maxScale(1.5f)
+        // Minimum zoom value (optional, default 0.5f)
+        .minScale(0.5f)
+        // Air damping (optional, default 0.0006f)
+        .mRootDensity(0.0006f)
+        // Influence range of the environment walls on planetary force (optional, default 300)
+        .mInternalPressure(300f)
+        // Elastic coefficient of the four walls (optional, default 1.44f)
+        .elasticityCoefficientStart(1.44f)
+        .elasticityCoefficientTop(1.44f)
+        .elasticityCoefficientEnd(1.44f)
+        .elasticityCoefficientBot(1.44f)
+        .build();
+
+DeponderControl<NodeItem, LinkItem> deponder = new Deponder<NodeItem, LinkItem>(lifecycleOwner, rootOption) {
+    @Override
+    public String planetId(NodeItem item) {
+        return item.getId();
+    }
+
+    @Override
+    public Pair<String, String> rubberPairId(LinkItem link) {
+        return Pair.create(link.getFromId(), link.getToId());
+    }
+
+    @NonNull
+    @Override
+    public SimplePlanet createPlanet(@NonNull ViewGroup parent, NodeItem item) {
+        return SimplePlanet.builder()
+                // Child View to be controlled by Deponder (required)
+                .itemView(inflateNodeView(parent, item))
+                // Unique identifier matching planetId(item)
+                .id(item.getId())
+                // Mass (optional, default 2.293f)
+                .quality(2.293f)
+                // Influence range of interaction force between planets (optional, default 220)
+                .mInternalPressure(220f)
+                // Elastic coefficient between planets (optional, default 1.33f)
+                .elasticityCoefficient(1.33f)
                 .build();
+    }
+
+    @NonNull
+    @Override
+    public SimpleRubber createRubber(@NonNull ViewGroup parent, LinkItem link) {
+        return SimpleRubber.builder()
+                // Endpoint planet IDs; their combination must be unique (required)
+                .sId(link.getFromId())
+                .eId(link.getToId())
+                // View displayed for the connection (required)
+                .itemView(inflateEdgeView(parent))
+                // Elastic coefficient of the rubber (optional, default 1.68f)
+                .elasticityCoefficient(1.68f)
+                // Natural length of the rubber (optional, default 300)
+                .naturalLength(300)
+                .build();
+    }
+};
 ```
-It is also possible to declare more... also into a collection.
+> You can also use `new Deponder<NodeItem, LinkItem>(lifecycleOwner, rootGroupView) { ... }` to use default environment parameters.
+
+2. Submit planets, rubbers, and optional scale at any time:
 ```java
-RubberOption rubberB = SimpleRubber.builder().(...).build();
-...
-List<RubberOption> listRubber=new ArrayList<>();
-listRubber.add(rubberA);
-...
-```
-4. Commit them at the end, of course, committing an empty collection is also expected, after that you can also submit a new planet collection or rubber collection at any time.
-```java
-deponder.submitPlanet(listPlanet);(It is necessary to start the animation for the first time)
-deponder.submitRubber(listRubber);(It is necessary to start the animation for the first time)
-```
-Submit the desired scaling, which can be useful when there are too many or too few Planets, and then you can always submit a new scaling.
-```java
-deponder.submitScale(1);(Not necessary, defaults to 1f)
+deponder.submitPlanet(listPlanet);
+deponder.submitRubber(listRubber);
+deponder.submitScale(1f); // Optional, defaults to initScale (1f)
 ```
 
->Well, now they are starting to move.
-
-If you want to drag planets, you can customize the gesture listener, or use the simple drag gesture listener provided by Deponder.
+3. Planet drag gesture listener (automatically bound for managed planets, or usable standalone):
 ```java
 DeponderHelper.bindDefTouchPlanet(planetA);
-DeponderHelper.bindDefTouchPlanet(planetB);
 ```
+
 
 ### More
 
-- elasticityCoefficient, when it is positive, it shows repulsion. If you need gravity, you can set it to negative.
-
-- The mInternalPressure (range of influence of the force) in PlanetOption is set large enough to make the planet completely evenly distributed in space.
-
-- The spring's telescopic animation is to stretch the spring-wrapped View (or ViewGroup). If your rubble has child Views that need to maintain the width and height (for example, the deformation of TextView, ImageView, etc. will affect the look and feel),
-  You can add tag: "UN_RUBBER_RUBBER" (@string/un_rubber) in this subview to keep its aspect ratio constant.
-  E.g：
+- `elasticityCoefficient`: when positive, it acts as repulsion; set it to negative if you want attraction/gravity.
+- Setting `mInternalPressure` (range of influence of the force) in `PlanetOption` large enough makes planets distribute evenly across the space.
+- The rubber's telescopic animation stretches the wrapped `View` (or `ViewGroup`). If your rubber has child `View`s that must maintain their aspect ratio (such as `TextView` or `ImageView`), add the tag `"UN_RUBBER_RUBBER"` (`@string/un_rubber` / `DeponderHelper.TAG_OF_UN_RUBBER`) on that child `View`:
+  ```java
+  view.setTag("UN_RUBBER_RUBBER");
   ```
-  view.addtag("UN_RUBBER_RUBBER")
-  ```
-  or add it in the xml layout of the child view
-  ```
+  or in XML:
+  ```xml
   <View
-  ...
-  android:tag="UN_RUBBER_RUBBER"
-  ...
-  />
-  
+      ...
+      android:tag="UN_RUBBER_RUBBER"
+      ... />
   ```
-  
-- If you want the animation to become static as soon as possible, you can try to increase the elastic coefficient and reduce the planet quality.
+- If you want the animation to settle into equilibrium faster, try increasing the elastic coefficient and reducing the planet `quality` (mass).
+- Deponder works with any `ViewGroup` layout container.
 
-- Deponder doesn't care what layout you're using, it all applies.
+
+### Release Notes (0.4.0)
+
+- **Kotlin & Coroutines**: Rewritten in Kotlin with Coroutines and a built-in Kotlin DSL; public integration APIs remain unchanged for seamless upgrades (`minSdk 21`, `JVM 11`).
+- **Lightweight dependencies**: Removed transitive dependencies on RxJava3 and Guava, retaining only AndroidX Lifecycle / Annotation and Kotlin Coroutines.
 
 
 ### Effect example
@@ -189,15 +232,12 @@ DeponderHelper.bindDefTouchPlanet(planetB);
     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
     See the License for the specific language governing permissions and
     limitations under the License.
-    
-    Deponder baseUrl:https://github.com/cinpeCan/DemoDeponder
-    
-    Deponder Subcomponents:
-    
-    The following components are provided under the Apache License. See project link for details.
-    The text of each license is the standard Apache 2.0 license.
-    
-    io.reactivex.rxjava3:rxandroid from https://github.com/ReactiveX/RxJava Apache-2.0 License
-    com.google.guava from https://github.com/google/guava Apache-2.0 License
-    com.google.auto.value from https://github.com/google/auto Apache-2.0 License
 
+    Deponder baseUrl: https://github.com/cinpeCan/Deponder
+
+    Deponder Subcomponents:
+
+    The following components are provided under the Apache License 2.0. See project links for details.
+
+    org.jetbrains.kotlinx:kotlinx-coroutines-android from https://github.com/Kotlin/kotlinx.coroutines Apache-2.0 License
+    androidx.lifecycle / androidx.annotation from https://source.android.com/ Apache-2.0 License
