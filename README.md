@@ -3,241 +3,144 @@
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.cinpecan/deponder.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22io.github.cinpecan%22%20AND%20a:%22deponder%22)
 
 <p align="start">
-  <a href="README_zh.md">
-    <b>中文说明</b>
-  </a>
+  <a href="README_zh.md"><b>中文说明</b></a>
 </p>
 
-An Android physical-like relationship graph animation SDK, powered by Kotlin & Coroutines while maintaining 100% Java source compatibility.
+A **Multiplatform Physics Interaction SDK** for **Android Views** and **Compose Multiplatform** (Android, iOS, Desktop, Web/Wasm).
 
-In Deponder's physics-like animation, the displacement of an object is calculated as the integral of the force applied to each frame over time.
+Decouple force-directed physics from layout containers via lightweight Compose `Modifier`s and Android `View` extensions. Add attraction-repulsion fields, spring links, and smooth dragging directly to standard UI components without wrapper layouts or view-tree mutations — ideal for knowledge graphs, topology views, interactive tag clouds, and floating cards.
 
-#### Set the following values to change the effect of the animation
+![Deponder demo](https://s4.ax1x.com/2022/02/25/bAEZwj.gif)
 
-- The mass of the planet (`planetOption`), the radiation range of the gravitational force (or repulsion), the coefficient of the gravitational (or repulsive) force
-- The natural length of the rubber (`rubberOption`), the elastic coefficient
-- The air friction coefficient of the environment (`rootOption`), the radiation range of the four-wall force, the coefficient of the four-wall force
-- Scale (`scale`), effective for all planets (`planetOption`) and rubbers (`rubberOption`)
+## Key Features
 
+- **Unified Cross-Stack API**: Identical 5-part mental model and `dp`-based physics configuration across Compose Multiplatform and Android Views, with full Java interop.
+- **Low-Intrusive & Gesture-Safe**: Preserves standard `.clickable {}`, `OnClickListener`, and ripple feedback via `touchSlop` gating and root-space coordinate projection; elevates dragged items via `zIndex` / `translationZ` without reordering child views or mutating `clipChildren` / `clipToBounds`.
+- **Automatic Contour Clearance & Built-in Spring Links**: Trims link endpoints against node bounds automatically so neither built-in nor custom link views get buried beneath cards; includes ready-to-use `DeponderDefaultRubber` (Compose) and `DeponderRubberView` (Android View / XML) with arrowheads and floating labels.
+- **Frame-Rate-Independent Physics Kernel (`deponder-core`)**:
+  - **Consistent Motion Across 60Hz–240Hz**: Adaptive `1/120s` sub-stepping keeps simulation speed consistent across display refresh rates, paired with deterministic symmetry breaking for stacked or collinear nodes.
+  - **Idle 0% CPU & 3-Tier Hybrid Quadtree**: Dual velocity/acceleration sleep thresholds drop CPU usage to 0% at rest with instant drag wakeup, scaling automatically across node counts (`< 64` direct array, `64–255` single-thread quadtree, `256+` parallel snapshot evaluation on `Dispatchers.Default`).
+  - **Layer-Only Frame Updates**: Drives displacement and deformation via Compose `Modifier.Node` graphics layers and Android `View` layer transforms without triggering per-frame relayout or recomposition.
+- **Minimal Transitive Footprint**: `deponder-core` depends only on `kotlin-stdlib` and `kotlinx-coroutines-core`; `deponder-compose` depends strictly on `deponder-core`, `compose-runtime`, and `compose-ui` (**zero `compose-foundation` or Material dependency**); `deponder` exposes only `deponder-core` and `lifecycle-common`.
 
-### Features
+## Core Concepts at a Glance
 
-- Driven by Android `Choreographer` VSYNC and hardware-accelerated `View` properties (`translationX/Y`, `scaleX/Y`, `rotation`) without `invalidate()` redraw overhead.
-- Preserves layout bounds during animation without triggering `onMeasure()`, `onLayout()`, or `onDraw()`.
-- Native `ViewGroup` matrix touch routing dispatches click and drag gestures directly to translated/scaled planets.
-- Leaves `View.startAnimation()` and `ViewGroup.setTouchDelegate()` free for custom animations and touch handling.
+| Role | Compose API | Android View API | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Root Field** | `Modifier.deponderRoot` | `viewGroup.deponderRoot` | Establishes the physics coordinate space and frame loop on a container |
+| **Node (Planet)** | `Modifier.deponderPlanet` | `view.deponderPlanet` | Registers a UI component as a physics body with mass, repulsion radius, or pinning |
+| **Spring Link (Rubber)** | `Modifier.deponderRubber` | `view.deponderRubber` | Connects two node IDs with configurable spring attraction (or use built-in default rubbers) |
+| **Link Transform (Stretch)** | `Modifier.deponderStretch` | `view.deponderStretch` | Stretches and rotates a custom link component dynamically between two nodes |
+| **Drag Gesture (Drag)** | `Modifier.deponderDrag` | `view.deponderDrag` | Adds opt-in, click-safe physics dragging to a node |
 
+## Artifacts & Setup
 
-### Setting up the dependency
+| Artifact | Target UI Stack | Platforms |
+| :--- | :--- | :--- |
+| `io.github.cinpecan:deponder-compose:0.5.0` | Jetpack Compose & Compose Multiplatform | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
+| `io.github.cinpecan:deponder:0.5.0` | Traditional Android `View` / `ViewGroup` | Android (`minSdk 23`, JVM 17) |
+| `io.github.cinpecan:deponder-core:0.5.0` | UI-agnostic KMP physics kernel (custom `Canvas` / headless graphs) | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
+| `io.github.cinpecan:deponder-bom:0.5.0` | Version alignment BOM (optional for hybrid projects) | All |
 
-Kotlin DSL (`build.gradle.kts`):
+**Compose Multiplatform (`commonMain`) or Pure Jetpack Compose:**
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder:0.4.0")
+    implementation("io.github.cinpecan:deponder-compose:0.5.0")
 }
 ```
 
-Groovy (`build.gradle`):
-
-```groovy
-dependencies {
-    implementation "io.github.cinpecan:deponder:0.4.0"
-}
-```
-
-
-### Start using (Kotlin DSL)
-
-Deponder provides a concise Kotlin DSL to build controllers without subclassing:
+**Traditional Android View:**
 
 ```kotlin
-// Optional: custom environment settings (or pass rootView directly to deponder(...))
-val rootOption = simpleRoot {
-    itemView = rootGroupView
-    initScale = 1f
-    maxScale = 1.5f
-    minScale = 0.5f
-    mRootDensity = 0.0006f
-    mInternalPressure = 300f
+dependencies {
+    implementation("io.github.cinpecan:deponder:0.5.0")
+}
+```
+
+**Hybrid Android View + Compose Project (with BOM):**
+
+```kotlin
+dependencies {
+    implementation(platform("io.github.cinpecan:deponder-bom:0.5.0"))
+    implementation("io.github.cinpecan:deponder")
+    implementation("io.github.cinpecan:deponder-compose")
+}
+```
+
+## Quick Start: Compose Multiplatform
+
+> Host `Modifier.deponderRoot` on an unconstrained container such as `Box`. In Compose, `deponderPlanet` and `deponderRubber` can be declared at any static nesting depth inside `deponderRoot`.
+
+```kotlin
+val state = rememberDeponderState(
+    RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced)
+)
+
+Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
+    // 1. Ready-to-use default spring link (for custom link UIs, combine Modifier.deponderRubber + Modifier.deponderStretch)
+    links.forEach { link ->
+        DeponderDefaultRubber(
+            startId = link.fromId,
+            endId = link.toId,
+            label = link.relation,
+            arrowMode = DeponderArrowMode.BOTH,
+            physics = RubberPhysics(naturalLengthDp = 120f),
+        )
+    }
+
+    // 2. Any standard Composable — layer-only updates with zero recomposition during physics frames
+    nodes.forEach { node ->
+        NodeCardComposable(
+            node = node,
+            modifier = Modifier
+                .deponderPlanet(
+                    id = node.id,
+                    physics = PlanetPhysics(repulsionRadiusDp = 90f, pinned = node.isAnchor),
+                )
+                .deponderDrag()
+                .clickable { onNodeClicked(node) },
+        )
+    }
 }
 
-// Create a Deponder controller with lambdas — no subclassing required
-val control = deponder<NodeItem, LinkItem>(lifecycleOwner, rootOption) {
-    planetId { it.id }
-    rubberPairId { Pair(it.fromId, it.toId) }
-
-    createPlanet { parent, node ->
-        simplePlanet {
-            itemView = inflateNodeView(parent, node)
-            id = node.id
-            quality = 2.293f
-            mInternalPressure = 220f
-            elasticityCoefficient = 1.33f
-        }
-    }
-
-    bindPlanet { holder, node ->
-        updateNodeView(holder.itemView(), node)
-        holder.copy { id = node.id }
-    }
-
-    createRubber { parent, link ->
-        simpleRubber {
-            itemView = inflateEdgeView(parent)
-            sId = link.fromId
-            eId = link.toId
-            elasticityCoefficient = 1.68f
-            naturalLength = 300
-        }
-    }
-
-    // Optional diff callback (defaults to Objects.equals)
-    areContentsTheSameByP { oldItem, newItem -> oldItem == newItem }
-}
-
-// Submit data at any time
-control.submitPlanet(nodeList)
-control.submitRubber(linkList)
-control.submitScale(1f)
+// Runtime control: state.submitScale(1.2f), state.submitRubberElasticity(2.4f), state.setPinned(id, true)
 ```
 
+## Quick Start: Android View (Kotlin & Java)
 
-### Start using (Java)
+> Host `deponderRoot` on an unconstrained `ViewGroup` such as `FrameLayout`, `ConstraintLayout`, or `CoordinatorLayout` (`deponderPlanet` and `deponderRubber` views must be **direct children** of `deponderRoot`).
 
-All Java APIs (`new Deponder<>(...)`, `SimplePlanet.builder()`, `SimpleRubber.builder()`, `SimpleRoot.builder()`, `DeponderHelper`) remain fully supported:
+```kotlin
+val controller = rootFrameLayout.deponderRoot(
+    lifecycleOwner = this,
+    physics = RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced),
+)
 
-1. Create a `Deponder` object by subclassing `Deponder<P, R>`:
-```java
-SimpleRootOption rootOption = SimpleRoot.builder()
-        .itemView(rootGroupView)
-        // Initial scaling value (optional, default 1f)
-        .initScale(1f)
-        // Maximum zoom value (optional, default 1.5f)
-        .maxScale(1.5f)
-        // Minimum zoom value (optional, default 0.5f)
-        .minScale(0.5f)
-        // Air damping (optional, default 0.0006f)
-        .mRootDensity(0.0006f)
-        // Influence range of the environment walls on planetary force (optional, default 300)
-        .mInternalPressure(300f)
-        // Elastic coefficient of the four walls (optional, default 1.44f)
-        .elasticityCoefficientStart(1.44f)
-        .elasticityCoefficientTop(1.44f)
-        .elasticityCoefficientEnd(1.44f)
-        .elasticityCoefficientBot(1.44f)
-        .build();
+// Ready-to-use default spring View (also supports XML <com.cinpe.deponder.DeponderRubberView>;
+// for custom compound link Views, combine view.deponderRubber(...) with view.deponderStretch() or @string/deponder_stretch)
+val rubberView = DeponderRubberView(this)
+    .withLabel("depends on")
+    .withArrowMode(DeponderArrowMode.END)
+rootFrameLayout.addView(rubberView)
+rubberView.deponderRubber("core", "ui", RubberPhysics(naturalLengthDp = 120f))
 
-DeponderControl<NodeItem, LinkItem> deponder = new Deponder<NodeItem, LinkItem>(lifecycleOwner, rootOption) {
-    @Override
-    public String planetId(NodeItem item) {
-        return item.getId();
-    }
+// Configure force fields and dragging on direct-child Views while keeping setOnClickListener intact
+cardCore.deponderPlanet("core", PlanetPhysics(pinned = true))
+cardUi.deponderPlanet("ui")
+cardUi.deponderDrag()
+cardUi.setOnClickListener { showDetail("ui") }
 
-    @Override
-    public Pair<String, String> rubberPairId(LinkItem link) {
-        return Pair.create(link.getFromId(), link.getToId());
-    }
-
-    @NonNull
-    @Override
-    public SimplePlanet createPlanet(@NonNull ViewGroup parent, NodeItem item) {
-        return SimplePlanet.builder()
-                // Child View to be controlled by Deponder (required)
-                .itemView(inflateNodeView(parent, item))
-                // Unique identifier matching planetId(item)
-                .id(item.getId())
-                // Mass (optional, default 2.293f)
-                .quality(2.293f)
-                // Influence range of interaction force between planets (optional, default 220)
-                .mInternalPressure(220f)
-                // Elastic coefficient between planets (optional, default 1.33f)
-                .elasticityCoefficient(1.33f)
-                .build();
-    }
-
-    @NonNull
-    @Override
-    public SimpleRubber createRubber(@NonNull ViewGroup parent, LinkItem link) {
-        return SimpleRubber.builder()
-                // Endpoint planet IDs; their combination must be unique (required)
-                .sId(link.getFromId())
-                .eId(link.getToId())
-                // View displayed for the connection (required)
-                .itemView(inflateEdgeView(parent))
-                // Elastic coefficient of the rubber (optional, default 1.68f)
-                .elasticityCoefficient(1.68f)
-                // Natural length of the rubber (optional, default 300)
-                .naturalLength(300)
-                .build();
-    }
-};
-```
-> You can also use `new Deponder<NodeItem, LinkItem>(lifecycleOwner, rootGroupView) { ... }` to use default environment parameters.
-
-2. Submit planets, rubbers, and optional scale at any time:
-```java
-deponder.submitPlanet(listPlanet);
-deponder.submitRubber(listRubber);
-deponder.submitScale(1f); // Optional, defaults to initScale (1f)
+// Runtime control: controller.submitScale(1.2f), controller.submitRubberElasticity(2.4f), controller.cancel()
 ```
 
-3. Planet drag gesture listener (automatically bound for managed planets, or usable standalone):
-```java
-DeponderHelper.bindDefTouchPlanet(planetA);
+> Java callers can use static & fluent helpers on `DeponderViews` (`deponderRoot`, `deponderPlanet`, `deponderRubber`, `deponderStretch`, `deponderDrag`) and `new DeponderRubberView(context).withLabel(...)`.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
+
+```text
+Copyright (c) 2022-present, Cinpecan and Deponder Contributors.
+Licensed under the Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
 ```
-
-
-### More
-
-- `elasticityCoefficient`: when positive, it acts as repulsion; set it to negative if you want attraction/gravity.
-- Setting `mInternalPressure` (range of influence of the force) in `PlanetOption` large enough makes planets distribute evenly across the space.
-- The rubber's telescopic animation stretches the wrapped `View` (or `ViewGroup`). If your rubber has child `View`s that must maintain their aspect ratio (such as `TextView` or `ImageView`), add the tag `"UN_RUBBER_RUBBER"` (`@string/un_rubber` / `DeponderHelper.TAG_OF_UN_RUBBER`) on that child `View`:
-  ```java
-  view.setTag("UN_RUBBER_RUBBER");
-  ```
-  or in XML:
-  ```xml
-  <View
-      ...
-      android:tag="UN_RUBBER_RUBBER"
-      ... />
-  ```
-- If you want the animation to settle into equilibrium faster, try increasing the elastic coefficient and reducing the planet `quality` (mass).
-- Deponder works with any `ViewGroup` layout container.
-
-
-### Release Notes (0.4.0)
-
-- **Kotlin & Coroutines**: Rewritten in Kotlin with Coroutines and a built-in Kotlin DSL; public integration APIs remain unchanged for seamless upgrades (`minSdk 21`, `JVM 11`).
-- **Lightweight dependencies**: Removed transitive dependencies on RxJava3 and Guava, retaining only AndroidX Lifecycle / Annotation and Kotlin Coroutines.
-
-
-### Effect example
-
-![Image](https://s4.ax1x.com/2022/02/25/bAEZwj.gif)
-
-## NOTICE
-
-    Copyright (c) 2022-present, Cinpecan and Deponder Contributors.
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-    Deponder baseUrl: https://github.com/cinpeCan/Deponder
-
-    Deponder Subcomponents:
-
-    The following components are provided under the Apache License 2.0. See project links for details.
-
-    org.jetbrains.kotlinx:kotlinx-coroutines-android from https://github.com/Kotlin/kotlinx.coroutines Apache-2.0 License
-    androidx.lifecycle / androidx.annotation from https://source.android.com/ Apache-2.0 License

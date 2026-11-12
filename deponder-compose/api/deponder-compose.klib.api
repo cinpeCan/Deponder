@@ -1,0 +1,73 @@
+// Klib ABI Dump
+// Targets: [iosArm64, iosSimulatorArm64, wasmJs]
+// Rendering settings:
+// - Signature version: 2
+// - Show manifest properties: true
+// - Show declarations: true
+
+// Library unique name: <io.github.cinpecan:deponder-compose>
+final class com.cinpe.deponder.compose/DeponderRubberStyle { // com.cinpe.deponder.compose/DeponderRubberStyle|null[0]
+    final val arrowSize // com.cinpe.deponder.compose/DeponderRubberStyle.arrowSize|{}arrowSize[0]
+        final fun <get-arrowSize>(): androidx.compose.ui.unit/Dp // com.cinpe.deponder.compose/DeponderRubberStyle.arrowSize.<get-arrowSize>|<get-arrowSize>(){}[0]
+    final val labelBackgroundColor // com.cinpe.deponder.compose/DeponderRubberStyle.labelBackgroundColor|{}labelBackgroundColor[0]
+        final fun <get-labelBackgroundColor>(): androidx.compose.ui.graphics/Color // com.cinpe.deponder.compose/DeponderRubberStyle.labelBackgroundColor.<get-labelBackgroundColor>|<get-labelBackgroundColor>(){}[0]
+    final val labelColor // com.cinpe.deponder.compose/DeponderRubberStyle.labelColor|{}labelColor[0]
+        final fun <get-labelColor>(): androidx.compose.ui.graphics/Color // com.cinpe.deponder.compose/DeponderRubberStyle.labelColor.<get-labelColor>|<get-labelColor>(){}[0]
+    final val labelTextSize // com.cinpe.deponder.compose/DeponderRubberStyle.labelTextSize|{}labelTextSize[0]
+        final fun <get-labelTextSize>(): androidx.compose.ui.unit/TextUnit // com.cinpe.deponder.compose/DeponderRubberStyle.labelTextSize.<get-labelTextSize>|<get-labelTextSize>(){}[0]
+    final val lineColor // com.cinpe.deponder.compose/DeponderRubberStyle.lineColor|{}lineColor[0]
+        final fun <get-lineColor>(): androidx.compose.ui.graphics/Color // com.cinpe.deponder.compose/DeponderRubberStyle.lineColor.<get-lineColor>|<get-lineColor>(){}[0]
+    final val lineThickness // com.cinpe.deponder.compose/DeponderRubberStyle.lineThickness|{}lineThickness[0]
+        final fun <get-lineThickness>(): androidx.compose.ui.unit/Dp // com.cinpe.deponder.compose/DeponderRubberStyle.lineThickness.<get-lineThickness>|<get-lineThickness>(){}[0]
+
+    final fun equals(kotlin/Any?): kotlin/Boolean // com.cinpe.deponder.compose/DeponderRubberStyle.equals|equals(kotlin.Any?){}[0]
+    final fun hashCode(): kotlin/Int // com.cinpe.deponder.compose/DeponderRubberStyle.hashCode|hashCode(){}[0]
+    final fun toString(): kotlin/String // com.cinpe.deponder.compose/DeponderRubberStyle.toString|toString(){}[0]
+
+    final object Companion { // com.cinpe.deponder.compose/DeponderRubberStyle.Companion|null[0]
+        final val Default // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.Default|{}Default[0]
+            final fun <get-Default>(): com.cinpe.deponder.compose/DeponderRubberStyle // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.Default.<get-Default>|<get-Default>(){}[0]
+        final val DefaultLabelBackgroundColor // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.DefaultLabelBackgroundColor|{}DefaultLabelBackgroundColor[0]
+            final fun <get-DefaultLabelBackgroundColor>(): androidx.compose.ui.graphics/Color // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.DefaultLabelBackgroundColor.<get-DefaultLabelBackgroundColor>|<get-DefaultLabelBackgroundColor>(){}[0]
+        final val DefaultLabelColor // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.DefaultLabelColor|{}DefaultLabelColor[0]
+            final fun <get-DefaultLabelColor>(): androidx.compose.ui.graphics/Color // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.DefaultLabelColor.<get-DefaultLabelColor>|<get-DefaultLabelColor>(){}[0]
+        final val DefaultLineColor // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.DefaultLineColor|{}DefaultLineColor[0]
+            final fun <get-DefaultLineColor>(): androidx.compose.ui.graphics/Color // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.DefaultLineColor.<get-DefaultLineColor>|<get-DefaultLineColor>(){}[0]
+
+        final fun of(androidx.compose.ui.graphics/Color = ..., androidx.compose.ui.unit/Dp = ..., androidx.compose.ui.unit/Dp = ..., androidx.compose.ui.graphics/Color = ..., androidx.compose.ui.unit/TextUnit = ..., androidx.compose.ui.graphics/Color = ...): com.cinpe.deponder.compose/DeponderRubberStyle // com.cinpe.deponder.compose/DeponderRubberStyle.Companion.of|of(androidx.compose.ui.graphics.Color;androidx.compose.ui.unit.Dp;androidx.compose.ui.unit.Dp;androidx.compose.ui.graphics.Color;androidx.compose.ui.unit.TextUnit;androidx.compose.ui.graphics.Color){}[0]
+    }
+}
+
+final class com.cinpe.deponder.compose/DeponderState { // com.cinpe.deponder.compose/DeponderState|null[0]
+    constructor <init>(com.cinpe.deponder.core/RootPhysics = ...) // com.cinpe.deponder.compose/DeponderState.<init>|<init>(com.cinpe.deponder.core.RootPhysics){}[0]
+
+    final var isAwake // com.cinpe.deponder.compose/DeponderState.isAwake|{}isAwake[0]
+        final fun <get-isAwake>(): kotlin/Boolean // com.cinpe.deponder.compose/DeponderState.isAwake.<get-isAwake>|<get-isAwake>(){}[0]
+    final var physics // com.cinpe.deponder.compose/DeponderState.physics|{}physics[0]
+        final fun <get-physics>(): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.compose/DeponderState.physics.<get-physics>|<get-physics>(){}[0]
+    final var scale // com.cinpe.deponder.compose/DeponderState.scale|{}scale[0]
+        final fun <get-scale>(): kotlin/Float // com.cinpe.deponder.compose/DeponderState.scale.<get-scale>|<get-scale>(){}[0]
+
+    final fun bringToFront(kotlin/String) // com.cinpe.deponder.compose/DeponderState.bringToFront|bringToFront(kotlin.String){}[0]
+    final fun dragBy(kotlin/String, kotlin/Float, kotlin/Float) // com.cinpe.deponder.compose/DeponderState.dragBy|dragBy(kotlin.String;kotlin.Float;kotlin.Float){}[0]
+    final fun moveTo(kotlin/String, kotlin/Float, kotlin/Float) // com.cinpe.deponder.compose/DeponderState.moveTo|moveTo(kotlin.String;kotlin.Float;kotlin.Float){}[0]
+    final fun reheat() // com.cinpe.deponder.compose/DeponderState.reheat|reheat(){}[0]
+    final fun setPinned(kotlin/String, kotlin/Boolean) // com.cinpe.deponder.compose/DeponderState.setPinned|setPinned(kotlin.String;kotlin.Boolean){}[0]
+    final fun setPressed(kotlin/String, kotlin/Boolean) // com.cinpe.deponder.compose/DeponderState.setPressed|setPressed(kotlin.String;kotlin.Boolean){}[0]
+    final fun submitRubberElasticity(kotlin/Float) // com.cinpe.deponder.compose/DeponderState.submitRubberElasticity|submitRubberElasticity(kotlin.Float){}[0]
+    final fun submitScale(kotlin/Float) // com.cinpe.deponder.compose/DeponderState.submitScale|submitScale(kotlin.Float){}[0]
+    final fun updatePhysics(com.cinpe.deponder.core/RootPhysics) // com.cinpe.deponder.compose/DeponderState.updatePhysics|updatePhysics(com.cinpe.deponder.core.RootPhysics){}[0]
+}
+
+final val com.cinpe.deponder.compose/com_cinpe_deponder_compose_DeponderRubberStyle$stableprop // com.cinpe.deponder.compose/com_cinpe_deponder_compose_DeponderRubberStyle$stableprop|#static{}com_cinpe_deponder_compose_DeponderRubberStyle$stableprop[0]
+final val com.cinpe.deponder.compose/com_cinpe_deponder_compose_DeponderState$stableprop // com.cinpe.deponder.compose/com_cinpe_deponder_compose_DeponderState$stableprop|#static{}com_cinpe_deponder_compose_DeponderState$stableprop[0]
+
+final fun (androidx.compose.ui/Modifier).com.cinpe.deponder.compose/deponderDrag(kotlin/Boolean = ..., kotlin/Boolean = ...): androidx.compose.ui/Modifier // com.cinpe.deponder.compose/deponderDrag|deponderDrag@androidx.compose.ui.Modifier(kotlin.Boolean;kotlin.Boolean){}[0]
+final fun (androidx.compose.ui/Modifier).com.cinpe.deponder.compose/deponderPlanet(kotlin/String, com.cinpe.deponder.core/PlanetPhysics = ...): androidx.compose.ui/Modifier // com.cinpe.deponder.compose/deponderPlanet|deponderPlanet@androidx.compose.ui.Modifier(kotlin.String;com.cinpe.deponder.core.PlanetPhysics){}[0]
+final fun (androidx.compose.ui/Modifier).com.cinpe.deponder.compose/deponderRoot(com.cinpe.deponder.compose/DeponderState): androidx.compose.ui/Modifier // com.cinpe.deponder.compose/deponderRoot|deponderRoot@androidx.compose.ui.Modifier(com.cinpe.deponder.compose.DeponderState){}[0]
+final fun (androidx.compose.ui/Modifier).com.cinpe.deponder.compose/deponderRubber(kotlin/String, kotlin/String, com.cinpe.deponder.core/RubberPhysics = ...): androidx.compose.ui/Modifier // com.cinpe.deponder.compose/deponderRubber|deponderRubber@androidx.compose.ui.Modifier(kotlin.String;kotlin.String;com.cinpe.deponder.core.RubberPhysics){}[0]
+final fun (androidx.compose.ui/Modifier).com.cinpe.deponder.compose/deponderStretch(kotlin/Boolean = ...): androidx.compose.ui/Modifier // com.cinpe.deponder.compose/deponderStretch|deponderStretch@androidx.compose.ui.Modifier(kotlin.Boolean){}[0]
+final fun com.cinpe.deponder.compose/DeponderDefaultRubber(kotlin/String, kotlin/String, androidx.compose.ui/Modifier?, com.cinpe.deponder.core/RubberPhysics?, kotlin/String?, com.cinpe.deponder.core/DeponderArrowMode?, com.cinpe.deponder.compose/DeponderRubberStyle?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int) // com.cinpe.deponder.compose/DeponderDefaultRubber|DeponderDefaultRubber(kotlin.String;kotlin.String;androidx.compose.ui.Modifier?;com.cinpe.deponder.core.RubberPhysics?;kotlin.String?;com.cinpe.deponder.core.DeponderArrowMode?;com.cinpe.deponder.compose.DeponderRubberStyle?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]
+final fun com.cinpe.deponder.compose/com_cinpe_deponder_compose_DeponderRubberStyle$stableprop_getter(): kotlin/Int // com.cinpe.deponder.compose/com_cinpe_deponder_compose_DeponderRubberStyle$stableprop_getter|com_cinpe_deponder_compose_DeponderRubberStyle$stableprop_getter(){}[0]
+final fun com.cinpe.deponder.compose/com_cinpe_deponder_compose_DeponderState$stableprop_getter(): kotlin/Int // com.cinpe.deponder.compose/com_cinpe_deponder_compose_DeponderState$stableprop_getter|com_cinpe_deponder_compose_DeponderState$stableprop_getter(){}[0]
+final fun com.cinpe.deponder.compose/rememberDeponderState(com.cinpe.deponder.core/RootPhysics?, androidx.compose.runtime/Composer?, kotlin/Int, kotlin/Int): com.cinpe.deponder.compose/DeponderState // com.cinpe.deponder.compose/rememberDeponderState|rememberDeponderState(com.cinpe.deponder.core.RootPhysics?;androidx.compose.runtime.Composer?;kotlin.Int;kotlin.Int){}[0]

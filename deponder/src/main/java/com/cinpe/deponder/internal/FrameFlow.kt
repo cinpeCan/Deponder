@@ -1,33 +1,25 @@
 package com.cinpe.deponder.internal
 
 import android.view.Choreographer
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
 /**
- * Emits [Choreographer] VSYNC `frameTimeNanos` on each display frame while collected.
+ * Suspends until the next display VSYNC frame and returns the unboxed `frameTimeNanos` primitive [Long].
  *
- * Schedules the next VSYNC callback only after the collector finishes processing the current frame,
- * naturally preventing frame backlog without channel buffering overhead.
+ * Unlike `Flow<Long>`, direct `suspend` invocation avoids `FlowCollector<Long>` autoboxing and
+ * `SafeCollector` overhead on 60–144Hz animation hot paths.
  */
-internal fun choreographerFrameFlow(): Flow<Long> = flow {
-    val choreographer = Choreographer.getInstance()
-    while (currentCoroutineContext().isActive) {
-        val frameTimeNanos = suspendCancellableCoroutine<Long> { cont ->
-            val callback = Choreographer.FrameCallback { frameTime ->
-                if (cont.isActive) {
-                    cont.resume(frameTime)
-                }
-            }
-            choreographer.postFrameCallback(callback)
-            cont.invokeOnCancellation {
-                choreographer.removeFrameCallback(callback)
+internal suspend fun awaitChoreographerFrameNanos(): Long =
+    suspendCancellableCoroutine { cont ->
+        val choreographer = Choreographer.getInstance()
+        val callback = Choreographer.FrameCallback { frameTimeNanos ->
+            if (cont.isActive) {
+                cont.resume(frameTimeNanos)
             }
         }
-        emit(frameTimeNanos)
+        choreographer.postFrameCallback(callback)
+        cont.invokeOnCancellation {
+            choreographer.removeFrameCallback(callback)
+        }
     }
-}

@@ -1,306 +1,81 @@
-public abstract interface class com/cinpe/deponder/BindAdapter {
-	public fun areContentsTheSameByP (Ljava/lang/Object;Ljava/lang/Object;)Z
-	public fun areContentsTheSameByR (Ljava/lang/Object;Ljava/lang/Object;)Z
-	public fun bindPlanet (Lcom/cinpe/deponder/model/SimplePlanet;Ljava/lang/Object;)Lcom/cinpe/deponder/model/SimplePlanet;
-	public fun bindRubber (Lcom/cinpe/deponder/model/SimpleRubber;Ljava/lang/Object;)Lcom/cinpe/deponder/model/SimpleRubber;
-	public abstract fun createPlanet (Landroid/view/ViewGroup;Ljava/lang/Object;)Lcom/cinpe/deponder/model/SimplePlanet;
-	public abstract fun createRubber (Landroid/view/ViewGroup;Ljava/lang/Object;)Lcom/cinpe/deponder/model/SimpleRubber;
-	public abstract fun planetId (Ljava/lang/Object;)Ljava/lang/String;
-	public fun rubberId (Ljava/lang/Object;)Ljava/lang/String;
-	public abstract fun rubberPairId (Ljava/lang/Object;)Landroid/util/Pair;
-	public fun typePlanet (Ljava/lang/Object;)I
-	public fun typeRubber (Ljava/lang/Object;)I
-}
-
-public abstract class com/cinpe/deponder/Deponder : com/cinpe/deponder/BindAdapter, com/cinpe/deponder/control/DeponderControl {
-	public fun <init> (Landroidx/lifecycle/LifecycleOwner;Landroid/view/ViewGroup;)V
-	public fun <init> (Landroidx/lifecycle/LifecycleOwner;Lcom/cinpe/deponder/option/SimpleRootOption;)V
-	public fun cancel ()V
-	public final fun submitPlanet (Ljava/util/Collection;)V
-	public final fun submitRubber (Ljava/util/Collection;)V
+public final class com/cinpe/deponder/DeponderController {
+	public final fun bringToFront (Ljava/lang/String;)V
+	public final fun cancel ()V
+	public final fun dragBy (Ljava/lang/String;FF)V
+	public final fun getPhysics ()Lcom/cinpe/deponder/core/RootPhysics;
+	public final fun getRootView ()Landroid/view/ViewGroup;
+	public final fun getScale ()F
+	public final fun isAwake ()Z
+	public final fun isCancelled ()Z
+	public final fun moveTo (Ljava/lang/String;FF)V
+	public final fun reheat ()V
+	public final fun setPinned (Ljava/lang/String;Z)V
+	public final fun setPressed (Ljava/lang/String;Z)V
+	public final fun submitRubberElasticity (F)V
 	public final fun submitScale (F)V
+	public final fun updatePhysics (Lcom/cinpe/deponder/core/RootPhysics;)V
 }
 
-public final class com/cinpe/deponder/DeponderBuilder {
-	public final fun areContentsTheSameByP (Lkotlin/jvm/functions/Function2;)V
-	public final fun areContentsTheSameByR (Lkotlin/jvm/functions/Function2;)V
-	public final fun bindPlanet (Lkotlin/jvm/functions/Function2;)V
-	public final fun bindRubber (Lkotlin/jvm/functions/Function2;)V
-	public final fun createPlanet (Lkotlin/jvm/functions/Function2;)V
-	public final fun createRubber (Lkotlin/jvm/functions/Function2;)V
-	public final fun planetId (Lkotlin/jvm/functions/Function1;)V
-	public final fun rubberPairId (Lkotlin/jvm/functions/Function1;)V
-	public final fun typePlanet (Lkotlin/jvm/functions/Function1;)V
-	public final fun typeRubber (Lkotlin/jvm/functions/Function1;)V
+public final class com/cinpe/deponder/DeponderRubberView : android/widget/FrameLayout {
+	public static final field Companion Lcom/cinpe/deponder/DeponderRubberView$Companion;
+	public static final field DEFAULT_LABEL_BG_COLOR I
+	public static final field DEFAULT_LABEL_COLOR I
+	public static final field DEFAULT_LINE_COLOR I
+	public fun <init> (Landroid/content/Context;)V
+	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;)V
+	public fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;I)V
+	public synthetic fun <init> (Landroid/content/Context;Landroid/util/AttributeSet;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getArrowMode ()Lcom/cinpe/deponder/core/DeponderArrowMode;
+	public final fun getArrowSizeDp ()F
+	public final fun getLabel ()Ljava/lang/String;
+	public final fun getLabelBackgroundColor ()I
+	public final fun getLabelColor ()I
+	public final fun getLabelTextSizeSp ()F
+	public final fun getLineColor ()I
+	public final fun getLineThicknessDp ()F
+	protected fun onLayout (ZIIII)V
+	protected fun onMeasure (II)V
+	public final fun setArrowMode (Lcom/cinpe/deponder/core/DeponderArrowMode;)V
+	public final fun setArrowSizeDp (F)V
+	public final fun setLabel (Ljava/lang/String;)V
+	public final fun setLabelBackgroundColor (I)V
+	public final fun setLabelColor (I)V
+	public final fun setLabelTextSizeSp (F)V
+	public final fun setLineColor (I)V
+	public final fun setLineThicknessDp (F)V
+	public final fun withArrowMode (Lcom/cinpe/deponder/core/DeponderArrowMode;)Lcom/cinpe/deponder/DeponderRubberView;
+	public final fun withLabel (Ljava/lang/String;)Lcom/cinpe/deponder/DeponderRubberView;
+	public final fun withLabelStyle (I)Lcom/cinpe/deponder/DeponderRubberView;
+	public final fun withLabelStyle (IF)Lcom/cinpe/deponder/DeponderRubberView;
+	public final fun withLabelStyle (IFI)Lcom/cinpe/deponder/DeponderRubberView;
+	public static synthetic fun withLabelStyle$default (Lcom/cinpe/deponder/DeponderRubberView;IFIILjava/lang/Object;)Lcom/cinpe/deponder/DeponderRubberView;
+	public final fun withLineStyle (I)Lcom/cinpe/deponder/DeponderRubberView;
+	public final fun withLineStyle (IF)Lcom/cinpe/deponder/DeponderRubberView;
+	public static synthetic fun withLineStyle$default (Lcom/cinpe/deponder/DeponderRubberView;IFILjava/lang/Object;)Lcom/cinpe/deponder/DeponderRubberView;
 }
 
-public final class com/cinpe/deponder/DeponderDsl {
-	public static final synthetic fun copy (Lcom/cinpe/deponder/model/SimplePlanet;Lkotlin/jvm/functions/Function1;)Lcom/cinpe/deponder/model/SimplePlanet;
-	public static final synthetic fun copy (Lcom/cinpe/deponder/model/SimpleRubber;Lkotlin/jvm/functions/Function1;)Lcom/cinpe/deponder/model/SimpleRubber;
-	public static final synthetic fun deponder (Landroidx/lifecycle/LifecycleOwner;Landroid/view/ViewGroup;Lkotlin/jvm/functions/Function1;)Lcom/cinpe/deponder/control/DeponderControl;
-	public static final synthetic fun deponder (Landroidx/lifecycle/LifecycleOwner;Lcom/cinpe/deponder/option/SimpleRootOption;Lkotlin/jvm/functions/Function1;)Lcom/cinpe/deponder/control/DeponderControl;
-	public static final synthetic fun simpleOption (Lkotlin/jvm/functions/Function1;)Lcom/cinpe/deponder/model/SimpleOption;
-	public static final synthetic fun simplePlanet (Lkotlin/jvm/functions/Function1;)Lcom/cinpe/deponder/model/SimplePlanet;
-	public static final synthetic fun simpleRoot (Lkotlin/jvm/functions/Function1;)Lcom/cinpe/deponder/model/SimpleRoot;
-	public static final synthetic fun simpleRubber (Lkotlin/jvm/functions/Function1;)Lcom/cinpe/deponder/model/SimpleRubber;
+public final class com/cinpe/deponder/DeponderRubberView$Companion {
 }
 
-public abstract interface annotation class com/cinpe/deponder/DeponderDslMarker : java/lang/annotation/Annotation {
-}
-
-public final class com/cinpe/deponder/DeponderHelper {
-	public static final field DEFAULT_ELASTICITY_COEFFICIENT F
-	public static final field DEFAULT_INIT_SCALE F
-	public static final field DEFAULT_Internal_Pressure I
-	public static final field DEFAULT_Internal_Pressure_BOTTOM F
-	public static final field DEFAULT_Internal_Pressure_END F
-	public static final field DEFAULT_Internal_Pressure_START F
-	public static final field DEFAULT_Internal_Pressure_TOP F
-	public static final field DEFAULT_MAX_SCALE F
-	public static final field DEFAULT_MIN_SCALE F
-	public static final field DEFAULT_PLANET_INTERNAL_PRESSURE I
-	public static final field DEFAULT_QUALITY_PROPERTY F
-	public static final field DEFAULT_ROOT_DENSITY F
-	public static final field DEFAULT_RUBBER_ELASTICITY_COEFFICIENT F
-	public static final field DEFAULT_RUBBER_NATURAL_LENGTH I
-	public static final field INCREMENTAL_SCALE F
-	public static final field INSTANCE Lcom/cinpe/deponder/DeponderHelper;
-	public static final field MIN_ACCELERATION F
-	public static final field TAG Ljava/lang/String;
-	public static final field TAG_OF_UN_RUBBER Ljava/lang/String;
-	public static final fun bindDefTouchPlanet (Lcom/cinpe/deponder/option/PlanetOption;)V
-	public static final fun concatId (Landroid/util/Pair;)Ljava/lang/String;
-	public static final fun concatId (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-}
-
-public class com/cinpe/deponder/DeponderHelper$TouchHelper : android/view/GestureDetector$SimpleOnGestureListener, android/view/View$OnTouchListener {
-	public fun <init> (Lcom/cinpe/deponder/option/PlanetOption;)V
-	public fun onDown (Landroid/view/MotionEvent;)Z
-	public fun onScroll (Landroid/view/MotionEvent;Landroid/view/MotionEvent;FF)Z
-	public fun onSingleTapUp (Landroid/view/MotionEvent;)Z
-	public fun onTouch (Landroid/view/View;Landroid/view/MotionEvent;)Z
-}
-
-public abstract interface class com/cinpe/deponder/control/DeponderControl {
-	public abstract fun cancel ()V
-	public abstract fun submitPlanet (Ljava/util/Collection;)V
-	public abstract fun submitRubber (Ljava/util/Collection;)V
-	public abstract fun submitScale (F)V
-}
-
-public abstract interface class com/cinpe/deponder/itf/FrontalAreaProperty {
-	public abstract fun frontalArea ()F
-}
-
-public abstract interface class com/cinpe/deponder/itf/QualityProperty {
-	public abstract fun quality ()F
-}
-
-public final class com/cinpe/deponder/model/SimpleOption : com/cinpe/deponder/option/BaseOption {
-	public static final field Companion Lcom/cinpe/deponder/model/SimpleOption$Companion;
-	public synthetic fun <init> (Landroid/view/View;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public static final fun builder ()Lcom/cinpe/deponder/model/SimpleOption$Builder;
-	public static final fun create (Landroid/view/View;)Lcom/cinpe/deponder/model/SimpleOption;
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun id ()Ljava/lang/String;
-	public fun itemView ()Landroid/view/View;
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/cinpe/deponder/model/SimpleOption$Builder {
-	public final fun build ()Lcom/cinpe/deponder/model/SimpleOption;
-	public final synthetic fun getItemView ()Landroid/view/View;
-	public final fun itemView (Landroid/view/View;)Lcom/cinpe/deponder/model/SimpleOption$Builder;
-	public final synthetic fun setItemView (Landroid/view/View;)V
-}
-
-public final class com/cinpe/deponder/model/SimpleOption$Companion {
-	public final fun builder ()Lcom/cinpe/deponder/model/SimpleOption$Builder;
-	public final fun create (Landroid/view/View;)Lcom/cinpe/deponder/model/SimpleOption;
-}
-
-public final class com/cinpe/deponder/model/SimplePlanet : com/cinpe/deponder/option/PlanetOption {
-	public static final field Companion Lcom/cinpe/deponder/model/SimplePlanet$Companion;
-	public synthetic fun <init> (Landroid/view/View;Ljava/lang/String;FFFFLkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public static final fun builder ()Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public static final fun create (Landroid/view/View;Ljava/lang/String;FFFF)Lcom/cinpe/deponder/model/SimplePlanet;
-	public fun elasticityCoefficient ()F
-	public fun equals (Ljava/lang/Object;)Z
-	public fun frontalArea ()F
-	public fun hashCode ()I
-	public fun id ()Ljava/lang/String;
-	public fun itemView ()Landroid/view/View;
-	public fun mInternalPressure ()F
-	public fun quality ()F
-	public final fun toBuilder ()Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/cinpe/deponder/model/SimplePlanet$Builder {
-	public final fun build ()Lcom/cinpe/deponder/model/SimplePlanet;
-	public final fun elasticityCoefficient (F)Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public final fun frontalArea (F)Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public final synthetic fun getElasticityCoefficient ()F
-	public final synthetic fun getFrontalArea ()F
-	public final synthetic fun getId ()Ljava/lang/String;
-	public final synthetic fun getItemView ()Landroid/view/View;
-	public final synthetic fun getMInternalPressure ()F
-	public final synthetic fun getQuality ()F
-	public final fun id (Ljava/lang/String;)Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public final fun itemView (Landroid/view/View;)Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public final fun mInternalPressure (F)Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public final fun quality (F)Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public final synthetic fun setElasticityCoefficient (F)V
-	public final synthetic fun setFrontalArea (F)V
-	public final synthetic fun setId (Ljava/lang/String;)V
-	public final synthetic fun setItemView (Landroid/view/View;)V
-	public final synthetic fun setMInternalPressure (F)V
-	public final synthetic fun setQuality (F)V
-}
-
-public final class com/cinpe/deponder/model/SimplePlanet$Companion {
-	public final fun builder ()Lcom/cinpe/deponder/model/SimplePlanet$Builder;
-	public final fun create (Landroid/view/View;Ljava/lang/String;FFFF)Lcom/cinpe/deponder/model/SimplePlanet;
-}
-
-public final class com/cinpe/deponder/model/SimpleRoot : com/cinpe/deponder/option/SimpleRootOption {
-	public static final field Companion Lcom/cinpe/deponder/model/SimpleRoot$Companion;
-	public synthetic fun <init> (Landroid/view/ViewGroup;FFFFFFFFFJLkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public static final fun builder ()Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public static final fun create (Landroid/view/ViewGroup;FFFFFFFFFJ)Lcom/cinpe/deponder/model/SimpleRoot;
-	public fun elasticityCoefficientBot ()F
-	public fun elasticityCoefficientEnd ()F
-	public fun elasticityCoefficientStart ()F
-	public fun elasticityCoefficientTop ()F
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun id ()Ljava/lang/String;
-	public fun initScale ()F
-	public synthetic fun itemView ()Landroid/view/View;
-	public fun itemView ()Landroid/view/ViewGroup;
-	public fun mInternalPressure ()F
-	public fun mRootDensity ()F
-	public fun maxScale ()F
-	public fun minInterval ()J
-	public fun minScale ()F
-	public fun toString ()Ljava/lang/String;
-}
-
-public final class com/cinpe/deponder/model/SimpleRoot$Builder {
-	public final fun build ()Lcom/cinpe/deponder/model/SimpleRoot;
-	public final fun elasticityCoefficientBot (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun elasticityCoefficientEnd (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun elasticityCoefficientStart (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun elasticityCoefficientTop (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final synthetic fun getElasticityCoefficientBot ()F
-	public final synthetic fun getElasticityCoefficientEnd ()F
-	public final synthetic fun getElasticityCoefficientStart ()F
-	public final synthetic fun getElasticityCoefficientTop ()F
-	public final synthetic fun getInitScale ()F
-	public final synthetic fun getItemView ()Landroid/view/ViewGroup;
-	public final synthetic fun getMInternalPressure ()F
-	public final synthetic fun getMRootDensity ()F
-	public final synthetic fun getMaxScale ()F
-	public final synthetic fun getMinInterval ()J
-	public final synthetic fun getMinScale ()F
-	public final fun initScale (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun itemView (Landroid/view/ViewGroup;)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun mInternalPressure (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun mRootDensity (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun maxScale (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun minInterval (J)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun minScale (F)Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final synthetic fun setElasticityCoefficientBot (F)V
-	public final synthetic fun setElasticityCoefficientEnd (F)V
-	public final synthetic fun setElasticityCoefficientStart (F)V
-	public final synthetic fun setElasticityCoefficientTop (F)V
-	public final synthetic fun setInitScale (F)V
-	public final synthetic fun setItemView (Landroid/view/ViewGroup;)V
-	public final synthetic fun setMInternalPressure (F)V
-	public final synthetic fun setMRootDensity (F)V
-	public final synthetic fun setMaxScale (F)V
-	public final synthetic fun setMinInterval (J)V
-	public final synthetic fun setMinScale (F)V
-}
-
-public final class com/cinpe/deponder/model/SimpleRoot$Companion {
-	public final fun builder ()Lcom/cinpe/deponder/model/SimpleRoot$Builder;
-	public final fun create (Landroid/view/ViewGroup;FFFFFFFFFJ)Lcom/cinpe/deponder/model/SimpleRoot;
-}
-
-public final class com/cinpe/deponder/model/SimpleRubber : com/cinpe/deponder/option/RubberOption {
-	public static final field Companion Lcom/cinpe/deponder/model/SimpleRubber$Companion;
-	public static final fun builder ()Lcom/cinpe/deponder/model/SimpleRubber$Builder;
-	public static final fun create (Landroid/view/View;Ljava/lang/String;Ljava/lang/String;FI)Lcom/cinpe/deponder/model/SimpleRubber;
-	public fun eId ()Ljava/lang/String;
-	public fun elasticityCoefficient ()F
-	public fun equals (Ljava/lang/Object;)Z
-	public fun hashCode ()I
-	public fun id ()Ljava/lang/String;
-	public fun itemView ()Landroid/view/View;
-	public fun naturalLength ()I
-	public fun sId ()Ljava/lang/String;
-	public final fun toBuilder ()Lcom/cinpe/deponder/model/SimpleRubber$Builder;
-	public fun toString ()Ljava/lang/String;
-	public fun vArr ()Ljava/util/List;
-}
-
-public final class com/cinpe/deponder/model/SimpleRubber$Builder {
-	public final fun build ()Lcom/cinpe/deponder/model/SimpleRubber;
-	public final fun eId (Ljava/lang/String;)Lcom/cinpe/deponder/model/SimpleRubber$Builder;
-	public final fun elasticityCoefficient (F)Lcom/cinpe/deponder/model/SimpleRubber$Builder;
-	public final synthetic fun getEId ()Ljava/lang/String;
-	public final synthetic fun getElasticityCoefficient ()F
-	public final synthetic fun getItemView ()Landroid/view/View;
-	public final synthetic fun getNaturalLength ()I
-	public final synthetic fun getSId ()Ljava/lang/String;
-	public final fun itemView (Landroid/view/View;)Lcom/cinpe/deponder/model/SimpleRubber$Builder;
-	public final fun naturalLength (I)Lcom/cinpe/deponder/model/SimpleRubber$Builder;
-	public final fun sId (Ljava/lang/String;)Lcom/cinpe/deponder/model/SimpleRubber$Builder;
-	public final synthetic fun setEId (Ljava/lang/String;)V
-	public final synthetic fun setElasticityCoefficient (F)V
-	public final synthetic fun setItemView (Landroid/view/View;)V
-	public final synthetic fun setNaturalLength (I)V
-	public final synthetic fun setSId (Ljava/lang/String;)V
-}
-
-public final class com/cinpe/deponder/model/SimpleRubber$Companion {
-	public final fun builder ()Lcom/cinpe/deponder/model/SimpleRubber$Builder;
-	public final fun create (Landroid/view/View;Ljava/lang/String;Ljava/lang/String;FI)Lcom/cinpe/deponder/model/SimpleRubber;
-}
-
-public abstract interface class com/cinpe/deponder/option/BaseOption {
-	public abstract fun id ()Ljava/lang/String;
-	public abstract fun itemView ()Landroid/view/View;
-}
-
-public abstract interface class com/cinpe/deponder/option/PlanetOption : com/cinpe/deponder/itf/FrontalAreaProperty, com/cinpe/deponder/itf/QualityProperty, com/cinpe/deponder/option/BaseOption {
-	public abstract fun elasticityCoefficient ()F
-	public abstract fun frontalArea ()F
-	public abstract fun mInternalPressure ()F
-	public abstract fun quality ()F
-}
-
-public abstract interface class com/cinpe/deponder/option/RubberOption : com/cinpe/deponder/option/BaseOption {
-	public abstract fun eId ()Ljava/lang/String;
-	public abstract fun elasticityCoefficient ()F
-	public abstract fun naturalLength ()I
-	public abstract fun sId ()Ljava/lang/String;
-	public abstract fun vArr ()Ljava/util/List;
-}
-
-public abstract interface class com/cinpe/deponder/option/SimpleRootOption : com/cinpe/deponder/option/BaseOption {
-	public abstract fun elasticityCoefficientBot ()F
-	public abstract fun elasticityCoefficientEnd ()F
-	public abstract fun elasticityCoefficientStart ()F
-	public abstract fun elasticityCoefficientTop ()F
-	public abstract fun initScale ()F
-	public abstract fun itemView ()Landroid/view/ViewGroup;
-	public abstract fun mInternalPressure ()F
-	public abstract fun mRootDensity ()F
-	public abstract fun maxScale ()F
-	public abstract fun minInterval ()J
-	public abstract fun minScale ()F
+public final class com/cinpe/deponder/DeponderViews {
+	public static final fun clearDeponderPlanet (Landroid/view/View;)V
+	public static final fun clearDeponderRubber (Landroid/view/View;)V
+	public static final fun deponderDrag (Landroid/view/View;)V
+	public static final fun deponderDrag (Landroid/view/View;Z)V
+	public static final fun deponderDrag (Landroid/view/View;ZZ)V
+	public static synthetic fun deponderDrag$default (Landroid/view/View;ZZILjava/lang/Object;)V
+	public static final fun deponderPlanet (Landroid/view/View;Ljava/lang/String;)V
+	public static final fun deponderPlanet (Landroid/view/View;Ljava/lang/String;Lcom/cinpe/deponder/core/PlanetPhysics;)V
+	public static synthetic fun deponderPlanet$default (Landroid/view/View;Ljava/lang/String;Lcom/cinpe/deponder/core/PlanetPhysics;ILjava/lang/Object;)V
+	public static final fun deponderRoot (Landroid/view/ViewGroup;)Lcom/cinpe/deponder/DeponderController;
+	public static final fun deponderRoot (Landroid/view/ViewGroup;Landroidx/lifecycle/LifecycleOwner;)Lcom/cinpe/deponder/DeponderController;
+	public static final fun deponderRoot (Landroid/view/ViewGroup;Landroidx/lifecycle/LifecycleOwner;Lcom/cinpe/deponder/core/RootPhysics;)Lcom/cinpe/deponder/DeponderController;
+	public static synthetic fun deponderRoot$default (Landroid/view/ViewGroup;Landroidx/lifecycle/LifecycleOwner;Lcom/cinpe/deponder/core/RootPhysics;ILjava/lang/Object;)Lcom/cinpe/deponder/DeponderController;
+	public static final fun deponderRubber (Landroid/view/View;Ljava/lang/String;Ljava/lang/String;)V
+	public static final fun deponderRubber (Landroid/view/View;Ljava/lang/String;Ljava/lang/String;Lcom/cinpe/deponder/core/RubberPhysics;)V
+	public static synthetic fun deponderRubber$default (Landroid/view/View;Ljava/lang/String;Ljava/lang/String;Lcom/cinpe/deponder/core/RubberPhysics;ILjava/lang/Object;)V
+	public static final fun deponderStretch (Landroid/view/View;)V
+	public static final fun deponderStretch (Landroid/view/View;Z)V
+	public static synthetic fun deponderStretch$default (Landroid/view/View;ZILjava/lang/Object;)V
 }
 

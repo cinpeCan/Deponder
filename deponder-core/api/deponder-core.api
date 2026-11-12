@@ -1,0 +1,416 @@
+public final class com/cinpe/deponder/core/DeponderArrowMode : java/lang/Enum {
+	public static final field BOTH Lcom/cinpe/deponder/core/DeponderArrowMode;
+	public static final field END Lcom/cinpe/deponder/core/DeponderArrowMode;
+	public static final field NONE Lcom/cinpe/deponder/core/DeponderArrowMode;
+	public static final field START Lcom/cinpe/deponder/core/DeponderArrowMode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cinpe/deponder/core/DeponderArrowMode;
+	public static fun values ()[Lcom/cinpe/deponder/core/DeponderArrowMode;
+}
+
+public final class com/cinpe/deponder/core/DeponderDefaults {
+	public static final field INFINITE_RANGE F
+	public static final field INSTANCE Lcom/cinpe/deponder/core/DeponderDefaults;
+}
+
+public final class com/cinpe/deponder/core/DeponderDefaults$Planet {
+	public static final field DEGREE_RADIUS_INCREMENT_DP F
+	public static final field ELASTICITY F
+	public static final field INFINITE_CHARGE_STRENGTH F
+	public static final field INSTANCE Lcom/cinpe/deponder/core/DeponderDefaults$Planet;
+	public static final field MASS F
+	public static final field REPULSION_RADIUS_DP F
+}
+
+public final class com/cinpe/deponder/core/DeponderDefaults$Preset {
+	public fun <init> (FFFFFFF)V
+	public final fun component1 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()F
+	public final fun component5 ()F
+	public final fun component6 ()F
+	public final fun component7 ()F
+	public final fun copy (FFFFFFF)Lcom/cinpe/deponder/core/DeponderDefaults$Preset;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;FFFFFFFILjava/lang/Object;)Lcom/cinpe/deponder/core/DeponderDefaults$Preset;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAirDamping ()F
+	public final fun getAlphaDecay ()F
+	public final fun getPlanetElasticity ()F
+	public final fun getPlanetRepulsionDp ()F
+	public final fun getRubberElasticity ()F
+	public final fun getRubberNaturalLengthDp ()F
+	public final fun getWallRepulsionDp ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cinpe/deponder/core/DeponderDefaults$Presets {
+	public static final field INSTANCE Lcom/cinpe/deponder/core/DeponderDefaults$Presets;
+	public final fun getBalanced ()Lcom/cinpe/deponder/core/DeponderDefaults$Preset;
+	public final fun getCrisp ()Lcom/cinpe/deponder/core/DeponderDefaults$Preset;
+	public final fun getGalaxyInfinite ()Lcom/cinpe/deponder/core/DeponderDefaults$Preset;
+}
+
+public final class com/cinpe/deponder/core/DeponderDefaults$Root {
+	public static final field AIR_DAMPING F
+	public static final field COOLING_ENABLED Z
+	public static final field INIT_SCALE F
+	public static final field INSTANCE Lcom/cinpe/deponder/core/DeponderDefaults$Root;
+	public static final field MAX_SCALE F
+	public static final field MIN_SCALE F
+	public static final field WALL_ELASTICITY_BOTTOM F
+	public static final field WALL_ELASTICITY_END F
+	public static final field WALL_ELASTICITY_START F
+	public static final field WALL_ELASTICITY_TOP F
+	public static final field WALL_REPULSION_DP F
+}
+
+public final class com/cinpe/deponder/core/DeponderDefaults$Rubber {
+	public static final field DEFAULT_ARROW_SIZE_DP F
+	public static final field DEFAULT_ENDPOINT_GAP_DP F
+	public static final field DEFAULT_LABEL_OFFSET_DP F
+	public static final field DEFAULT_LABEL_TEXT_SIZE_SP F
+	public static final field DEFAULT_THICKNESS_DP F
+	public static final field ELASTICITY F
+	public static final field INSTANCE Lcom/cinpe/deponder/core/DeponderDefaults$Rubber;
+	public static final field NATURAL_LENGTH_DP F
+}
+
+public final class com/cinpe/deponder/core/DeponderDefaults$Simulation {
+	public static final field ALPHA_DECAY F
+	public static final field ALPHA_MIN F
+	public static final field BARNES_HUT_THETA F
+	public static final field COINCIDENT_EPSILON_SQ F
+	public static final field COINCIDENT_PERTURBATION_RADIUS_PX F
+	public static final field COULOMB_SOFTENING_SQ F
+	public static final field INITIAL_ALPHA F
+	public static final field INSTANCE Lcom/cinpe/deponder/core/DeponderDefaults$Simulation;
+	public static final field INTERACTION_ALPHA F
+	public static final field MAX_DT_SECONDS F
+	public static final field MAX_SUBSTEPS I
+	public static final field MAX_SUBSTEP_DT_SECONDS F
+	public static final field PARALLEL_DISPATCH_THRESHOLD I
+	public static final field PARALLEL_WORKER_CHUNKS I
+	public static final field QUADTREE_NODE_THRESHOLD I
+	public static final field REFERENCE_DT_SECONDS F
+	public static final field REST_ACCEL_PX_PER_SEC_SQ F
+	public static final field REST_SPEED_PX_PER_SEC F
+	public static final field SETTLE_DURATION_SECONDS F
+}
+
+public final class com/cinpe/deponder/core/EdgeKey {
+	public static final field Companion Lcom/cinpe/deponder/core/EdgeKey$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEncoded ()Ljava/lang/String;
+	public final fun getFirst ()Ljava/lang/String;
+	public final fun getSecond ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cinpe/deponder/core/EdgeKey$Companion {
+	public final fun encode (Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+}
+
+public final class com/cinpe/deponder/core/EnvironmentSpec {
+	public fun <init> ()V
+	public fun <init> (FFFFFFFFFFFZFFFFF)V
+	public synthetic fun <init> (FFFFFFFFFFFZFFFFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()F
+	public final fun component10 ()F
+	public final fun component11 ()F
+	public final fun component12 ()Z
+	public final fun component13 ()F
+	public final fun component14 ()F
+	public final fun component15 ()F
+	public final fun component16 ()F
+	public final fun component17 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()F
+	public final fun component5 ()F
+	public final fun component6 ()F
+	public final fun component7 ()F
+	public final fun component8 ()F
+	public final fun component9 ()F
+	public final fun copy (FFFFFFFFFFFZFFFFF)Lcom/cinpe/deponder/core/EnvironmentSpec;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/EnvironmentSpec;FFFFFFFFFFFZFFFFFILjava/lang/Object;)Lcom/cinpe/deponder/core/EnvironmentSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAirDamping ()F
+	public final fun getAlphaDecay ()F
+	public final fun getAlphaMin ()F
+	public final fun getCoolingEnabled ()Z
+	public final fun getDegreeRadiusIncrementPx ()F
+	public final fun getInfiniteChargeStrength ()F
+	public final fun getInitScale ()F
+	public final fun getMaxScale ()F
+	public final fun getMinScale ()F
+	public final fun getRestAccelPxPerSecSq ()F
+	public final fun getRestSpeedPxPerSec ()F
+	public final fun getSettleDurationSeconds ()F
+	public final fun getWallElasticityBottom ()F
+	public final fun getWallElasticityEnd ()F
+	public final fun getWallElasticityStart ()F
+	public final fun getWallElasticityTop ()F
+	public final fun getWallRepulsionPx ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cinpe/deponder/core/NodePair {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lcom/cinpe/deponder/core/NodePair;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/NodePair;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lcom/cinpe/deponder/core/NodePair;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getEndId ()Ljava/lang/String;
+	public final fun getStartId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cinpe/deponder/core/PlanetBody {
+	public final fun getDegree ()I
+	public final fun getDx ()F
+	public final fun getDy ()F
+	public final fun getHalfHeightPx ()F
+	public final fun getHalfWidthPx ()F
+	public final fun getSpec ()Lcom/cinpe/deponder/core/PlanetSpec;
+	public final fun getVx ()F
+	public final fun getVy ()F
+	public final fun getX ()F
+	public final fun getY ()F
+	public final fun isPressed ()Z
+	public final fun setSpec (Lcom/cinpe/deponder/core/PlanetSpec;)V
+}
+
+public final class com/cinpe/deponder/core/PlanetPhysics {
+	public static final field Companion Lcom/cinpe/deponder/core/PlanetPhysics$Companion;
+	public fun <init> ()V
+	public fun <init> (FFFZ)V
+	public synthetic fun <init> (FFFZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()Z
+	public final fun copy (FFFZ)Lcom/cinpe/deponder/core/PlanetPhysics;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/PlanetPhysics;FFFZILjava/lang/Object;)Lcom/cinpe/deponder/core/PlanetPhysics;
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/PlanetPhysics;
+	public static final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;Z)Lcom/cinpe/deponder/core/PlanetPhysics;
+	public final fun getElasticity ()F
+	public final fun getMass ()F
+	public final fun getPinned ()Z
+	public final fun getRepulsionRadiusDp ()F
+	public fun hashCode ()I
+	public final fun toPlanetSpec (Ljava/lang/String;F)Lcom/cinpe/deponder/core/PlanetSpec;
+	public fun toString ()Ljava/lang/String;
+	public final fun withElasticity (F)Lcom/cinpe/deponder/core/PlanetPhysics;
+	public final fun withMass (F)Lcom/cinpe/deponder/core/PlanetPhysics;
+	public final fun withPinned (Z)Lcom/cinpe/deponder/core/PlanetPhysics;
+	public final fun withRepulsionRadiusDp (F)Lcom/cinpe/deponder/core/PlanetPhysics;
+}
+
+public final class com/cinpe/deponder/core/PlanetPhysics$Companion {
+	public final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/PlanetPhysics;
+	public final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;Z)Lcom/cinpe/deponder/core/PlanetPhysics;
+}
+
+public final class com/cinpe/deponder/core/PlanetSpec {
+	public fun <init> (Ljava/lang/String;FFFZ)V
+	public synthetic fun <init> (Ljava/lang/String;FFFZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()F
+	public final fun component5 ()Z
+	public final fun copy (Ljava/lang/String;FFFZ)Lcom/cinpe/deponder/core/PlanetSpec;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/PlanetSpec;Ljava/lang/String;FFFZILjava/lang/Object;)Lcom/cinpe/deponder/core/PlanetSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getElasticity ()F
+	public final fun getId ()Ljava/lang/String;
+	public final fun getMass ()F
+	public final fun getPinned ()Z
+	public final fun getRepulsionRadiusPx ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cinpe/deponder/core/RootPhysics {
+	public static final field Companion Lcom/cinpe/deponder/core/RootPhysics$Companion;
+	public fun <init> ()V
+	public fun <init> (FFFFFFFFFZF)V
+	public synthetic fun <init> (FFFFFFFFFZFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()F
+	public final fun component10 ()Z
+	public final fun component11 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun component4 ()F
+	public final fun component5 ()F
+	public final fun component6 ()F
+	public final fun component7 ()F
+	public final fun component8 ()F
+	public final fun component9 ()F
+	public final fun copy (FFFFFFFFFZF)Lcom/cinpe/deponder/core/RootPhysics;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/RootPhysics;FFFFFFFFFZFILjava/lang/Object;)Lcom/cinpe/deponder/core/RootPhysics;
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/RootPhysics;
+	public final fun getAirDamping ()F
+	public final fun getAlphaDecay ()F
+	public final fun getCoolingEnabled ()Z
+	public final fun getInitScale ()F
+	public final fun getMaxScale ()F
+	public final fun getMinScale ()F
+	public final fun getWallElasticityBottom ()F
+	public final fun getWallElasticityEnd ()F
+	public final fun getWallElasticityStart ()F
+	public final fun getWallElasticityTop ()F
+	public final fun getWallRepulsionDp ()F
+	public fun hashCode ()I
+	public final fun toEnvironmentSpec (F)Lcom/cinpe/deponder/core/EnvironmentSpec;
+	public fun toString ()Ljava/lang/String;
+	public final fun withAirDamping (F)Lcom/cinpe/deponder/core/RootPhysics;
+	public final fun withCooling (ZF)Lcom/cinpe/deponder/core/RootPhysics;
+	public static synthetic fun withCooling$default (Lcom/cinpe/deponder/core/RootPhysics;ZFILjava/lang/Object;)Lcom/cinpe/deponder/core/RootPhysics;
+	public final fun withScaleBounds (FFF)Lcom/cinpe/deponder/core/RootPhysics;
+	public final fun withWallRepulsionDp (F)Lcom/cinpe/deponder/core/RootPhysics;
+}
+
+public final class com/cinpe/deponder/core/RootPhysics$Companion {
+	public final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/RootPhysics;
+}
+
+public final class com/cinpe/deponder/core/RubberPhysics {
+	public static final field Companion Lcom/cinpe/deponder/core/RubberPhysics$Companion;
+	public fun <init> ()V
+	public fun <init> (FFF)V
+	public synthetic fun <init> (FFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()F
+	public final fun component2 ()F
+	public final fun component3 ()F
+	public final fun copy (FFF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/RubberPhysics;FFFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPhysics;
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun getElasticity ()F
+	public final fun getEndpointGapDp ()F
+	public final fun getNaturalLengthDp ()F
+	public fun hashCode ()I
+	public final fun toRubberSpec (Ljava/lang/String;Ljava/lang/String;F)Lcom/cinpe/deponder/core/RubberSpec;
+	public fun toString ()Ljava/lang/String;
+	public final fun withElasticity (F)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun withEndpointGapDp (F)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun withNaturalLengthDp (F)Lcom/cinpe/deponder/core/RubberPhysics;
+}
+
+public final class com/cinpe/deponder/core/RubberPhysics$Companion {
+	public final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/RubberPhysics;
+}
+
+public final class com/cinpe/deponder/core/RubberPose {
+	public final fun getCenterDistance ()F
+	public final fun getCenterX ()F
+	public final fun getCenterY ()F
+	public final fun getDirty ()Z
+	public final fun getLength ()F
+	public final fun getRotationDeg ()F
+	public final fun getScale ()F
+	public final fun getSpec ()Lcom/cinpe/deponder/core/RubberSpec;
+	public final fun isActive ()Z
+	public final fun setSpec (Lcom/cinpe/deponder/core/RubberSpec;)V
+}
+
+public final class com/cinpe/deponder/core/RubberSpec {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;FFF)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;FFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()F
+	public final fun component4 ()F
+	public final fun component5 ()F
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;FFF)Lcom/cinpe/deponder/core/RubberSpec;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/RubberSpec;Ljava/lang/String;Ljava/lang/String;FFFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberSpec;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getElasticity ()F
+	public final fun getEndId ()Ljava/lang/String;
+	public final fun getEndpointGapPx ()F
+	public final fun getKey ()Lcom/cinpe/deponder/core/EdgeKey;
+	public final fun getNaturalLengthPx ()F
+	public final fun getStartId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cinpe/deponder/core/SimulationWorld {
+	public static final field Companion Lcom/cinpe/deponder/core/SimulationWorld$Companion;
+	public fun <init> ()V
+	public fun <init> (Lcom/cinpe/deponder/core/EnvironmentSpec;)V
+	public synthetic fun <init> (Lcom/cinpe/deponder/core/EnvironmentSpec;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bodyOf (Ljava/lang/String;)Lcom/cinpe/deponder/core/PlanetBody;
+	public final fun getAlpha ()F
+	public final fun getBodies ()Ljava/util/List;
+	public final fun getEnvironment ()Lcom/cinpe/deponder/core/EnvironmentSpec;
+	public final fun getRubbers ()Ljava/util/List;
+	public final fun getViewportHeightPx ()F
+	public final fun getViewportWidthPx ()F
+	public final fun offsetBodyPosition (Ljava/lang/String;FFF)V
+	public static synthetic fun offsetBodyPosition$default (Lcom/cinpe/deponder/core/SimulationWorld;Ljava/lang/String;FFFILjava/lang/Object;)V
+	public final fun refreshRubberPoses (F)V
+	public final fun reheat (F)V
+	public static synthetic fun reheat$default (Lcom/cinpe/deponder/core/SimulationWorld;FILjava/lang/Object;)V
+	public final fun removePlanet (Ljava/lang/String;F)Z
+	public static synthetic fun removePlanet$default (Lcom/cinpe/deponder/core/SimulationWorld;Ljava/lang/String;FILjava/lang/Object;)Z
+	public final fun removeRubber (Lcom/cinpe/deponder/core/EdgeKey;F)Z
+	public static synthetic fun removeRubber$default (Lcom/cinpe/deponder/core/SimulationWorld;Lcom/cinpe/deponder/core/EdgeKey;FILjava/lang/Object;)Z
+	public final fun rubberOf (Lcom/cinpe/deponder/core/EdgeKey;)Lcom/cinpe/deponder/core/RubberPose;
+	public final fun setBodyPinned (Ljava/lang/String;Z)V
+	public final fun setBodyPosition (Ljava/lang/String;FFF)V
+	public static synthetic fun setBodyPosition$default (Lcom/cinpe/deponder/core/SimulationWorld;Ljava/lang/String;FFFILjava/lang/Object;)V
+	public final fun setBodyPressed (Ljava/lang/String;Z)V
+	public final fun setBodySize (Ljava/lang/String;FFF)V
+	public static synthetic fun setBodySize$default (Lcom/cinpe/deponder/core/SimulationWorld;Ljava/lang/String;FFFILjava/lang/Object;)V
+	public final fun step (FFLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun syncTopology (Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;)V
+	public final fun updateAllRubbersElasticity (F)V
+	public final fun updateEnvironment (Lcom/cinpe/deponder/core/EnvironmentSpec;Z)V
+	public static synthetic fun updateEnvironment$default (Lcom/cinpe/deponder/core/SimulationWorld;Lcom/cinpe/deponder/core/EnvironmentSpec;ZILjava/lang/Object;)V
+	public final fun updateViewport (FF)V
+	public final fun upsertPlanet (Lcom/cinpe/deponder/core/PlanetSpec;FFF)V
+	public static synthetic fun upsertPlanet$default (Lcom/cinpe/deponder/core/SimulationWorld;Lcom/cinpe/deponder/core/PlanetSpec;FFFILjava/lang/Object;)V
+	public final fun upsertRubber (Lcom/cinpe/deponder/core/RubberSpec;F)Lcom/cinpe/deponder/core/RubberPose;
+	public static synthetic fun upsertRubber$default (Lcom/cinpe/deponder/core/SimulationWorld;Lcom/cinpe/deponder/core/RubberSpec;FILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPose;
+}
+
+public final class com/cinpe/deponder/core/SimulationWorld$Companion {
+	public final fun computeWallForce-Gg0Dryc (FFFFFLcom/cinpe/deponder/core/EnvironmentSpec;)J
+}
+
+public final class com/cinpe/deponder/core/Vec2 {
+	public static final field Companion Lcom/cinpe/deponder/core/Vec2$Companion;
+	public static final synthetic fun box-impl (J)Lcom/cinpe/deponder/core/Vec2;
+	public static fun constructor-impl (FF)J
+	public static fun constructor-impl (J)J
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (JLjava/lang/Object;)Z
+	public static final fun equals-impl0 (JJ)Z
+	public final fun getPacked ()J
+	public static final fun getX-impl (J)F
+	public static final fun getY-impl (J)F
+	public fun hashCode ()I
+	public static fun hashCode-impl (J)I
+	public static final fun minus-upeMAqY (JJ)J
+	public static final fun plus-upeMAqY (JJ)J
+	public static final fun times-_r4c-ds (JF)J
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (J)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()J
+}
+
+public final class com/cinpe/deponder/core/Vec2$Companion {
+	public final fun getZero-cSGX2h4 ()J
+}
+

@@ -1,0 +1,62 @@
+public final class com/cinpe/deponder/compose/DeponderDefaultRubberKt {
+	public static final fun DeponderDefaultRubber (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/cinpe/deponder/core/RubberPhysics;Ljava/lang/String;Lcom/cinpe/deponder/core/DeponderArrowMode;Lcom/cinpe/deponder/compose/DeponderRubberStyle;Landroidx/compose/runtime/Composer;II)V
+}
+
+public final class com/cinpe/deponder/compose/DeponderModifiersKt {
+	public static final fun deponderDrag (Landroidx/compose/ui/Modifier;ZZ)Landroidx/compose/ui/Modifier;
+	public static synthetic fun deponderDrag$default (Landroidx/compose/ui/Modifier;ZZILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+	public static final fun deponderPlanet (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/cinpe/deponder/core/PlanetPhysics;)Landroidx/compose/ui/Modifier;
+	public static synthetic fun deponderPlanet$default (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/cinpe/deponder/core/PlanetPhysics;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+	public static final fun deponderRoot (Landroidx/compose/ui/Modifier;Lcom/cinpe/deponder/compose/DeponderState;)Landroidx/compose/ui/Modifier;
+	public static final fun deponderRubber (Landroidx/compose/ui/Modifier;Ljava/lang/String;Ljava/lang/String;Lcom/cinpe/deponder/core/RubberPhysics;)Landroidx/compose/ui/Modifier;
+	public static synthetic fun deponderRubber$default (Landroidx/compose/ui/Modifier;Ljava/lang/String;Ljava/lang/String;Lcom/cinpe/deponder/core/RubberPhysics;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+	public static final fun deponderStretch (Landroidx/compose/ui/Modifier;Z)Landroidx/compose/ui/Modifier;
+	public static synthetic fun deponderStretch$default (Landroidx/compose/ui/Modifier;ZILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+}
+
+public final class com/cinpe/deponder/compose/DeponderRubberStyle {
+	public static final field $stable I
+	public static final field Companion Lcom/cinpe/deponder/compose/DeponderRubberStyle$Companion;
+	public final fun arrowSizeDp ()F
+	public fun equals (Ljava/lang/Object;)Z
+	public fun hashCode ()I
+	public final fun labelBackgroundColorArgb ()J
+	public final fun labelColorArgb ()J
+	public final fun labelTextSizePacked ()J
+	public final fun lineColorArgb ()J
+	public final fun lineThicknessDp ()F
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class com/cinpe/deponder/compose/DeponderRubberStyle$Companion {
+	public final fun create (JFFJJJ)Lcom/cinpe/deponder/compose/DeponderRubberStyle;
+	public static synthetic fun create$default (Lcom/cinpe/deponder/compose/DeponderRubberStyle$Companion;JFFJJJILjava/lang/Object;)Lcom/cinpe/deponder/compose/DeponderRubberStyle;
+	public final fun defaultLabelBackgroundColorArgb ()J
+	public final fun defaultLabelColorArgb ()J
+	public final fun defaultLineColorArgb ()J
+	public final fun getDefault ()Lcom/cinpe/deponder/compose/DeponderRubberStyle;
+}
+
+public final class com/cinpe/deponder/compose/DeponderState {
+	public static final field $stable I
+	public fun <init> ()V
+	public fun <init> (Lcom/cinpe/deponder/core/RootPhysics;)V
+	public synthetic fun <init> (Lcom/cinpe/deponder/core/RootPhysics;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun bringToFront (Ljava/lang/String;)V
+	public final fun dragBy (Ljava/lang/String;FF)V
+	public final fun getPhysics ()Lcom/cinpe/deponder/core/RootPhysics;
+	public final fun getScale ()F
+	public final fun isAwake ()Z
+	public final fun moveTo (Ljava/lang/String;FF)V
+	public final fun reheat ()V
+	public final fun setPinned (Ljava/lang/String;Z)V
+	public final fun setPressed (Ljava/lang/String;Z)V
+	public final fun submitRubberElasticity (F)V
+	public final fun submitScale (F)V
+	public final fun updatePhysics (Lcom/cinpe/deponder/core/RootPhysics;)V
+}
+
+public final class com/cinpe/deponder/compose/DeponderStateKt {
+	public static final fun rememberDeponderState (Lcom/cinpe/deponder/core/RootPhysics;Landroidx/compose/runtime/Composer;II)Lcom/cinpe/deponder/compose/DeponderState;
+}
+

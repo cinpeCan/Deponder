@@ -1,4 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="un_rubber">UN_RUBBER_RUBBER</string>
+    <!-- Public XML tag value to opt a Rubber view or an inner child view into endpoint stretching. -->
+    <string name="deponder_stretch" translatable="false">deponder_stretch</string>
+
+    <!-- Private keyed View.setTag(int, Object) IDs (never touches View.getTag()/setTag(Object)). -->
+    <item name="deponder_root_controller_tag" type="id" />
+    <item name="deponder_planet_binding_tag" type="id" />
+    <item name="deponder_rubber_binding_tag" type="id" />
+    <item name="deponder_stretch_state_tag" type="id" />
+    <item name="deponder_drag_binding_tag" type="id" />
+
+    <!-- Optional XML attributes for built-in ready-to-use DeponderRubberView. -->
+    <declare-styleable name="DeponderRubberView">
+        <attr name="deponderStartId" format="string" />
+        <attr name="deponderEndId" format="string" />
+        <attr name="deponderElasticity" format="float" />
+        <attr name="deponderNaturalLength" format="dimension" />
+        <attr name="deponderLabel" format="string" />
+        <attr name="deponderArrowMode" format="enum">
+            <enum name="none" value="0" />
+            <enum name="end" value="1" />
+            <enum name="start" value="2" />
+            <enum name="both" value="3" />
+        </attr>
+        <attr name="deponderLineColor" format="color" />
+        <attr name="deponderLineThickness" format="dimension" />
+        <attr name="deponderArrowSize" format="dimension" />
+        <attr name="deponderLabelColor" format="color" />
+        <attr name="deponderLabelTextSize" format="dimension" />
+        <attr name="deponderLabelBackgroundColor" format="color" />
+    </declare-styleable>
 </resources>

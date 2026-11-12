@@ -8,14 +8,4 @@ local.properties
 captures/
 .externalNativeBuild/
 .cxx/
-
-# Local test/demo module (not pushed to public repository)
-/app/
-
-# Maven Central publishing script & signing secrets (never push to cloud)
-**/publisher.gradle
-**/publish.gradle
-*.gpg
-*.jks
-*.keystore
-publish-secret.properties
+gradle/gradle-daemon-jvm.properties

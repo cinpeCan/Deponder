@@ -2,236 +2,145 @@
 
 [![Maven Central](https://img.shields.io/maven-central/v/io.github.cinpecan/deponder.svg?label=Maven%20Central)](https://search.maven.org/search?q=g:%22io.github.cinpecan%22%20AND%20a:%22deponder%22)
 
-一个 Android 原生仿物理特性的关系图谱动画 SDK（基于 Kotlin 与 Coroutines/Flow 构建，同时 100% 保持 Java 源码兼容）。
+<p align="start">
+  <a href="README.md"><b>English</b></a>
+</p>
 
-在 Deponder 仿物理特性的动画中，对象的位移是根据施加到每一帧的受力分析与时间积分计算的。
+面向 **Android 原生 View** 与 **Compose Multiplatform（Android / iOS / Desktop / Web Wasm）** 的**跨平台物理交互 SDK**。
 
-#### 开发者可以通过设置以下值来改变动画的效果
+通过轻量级 `Modifier` 与 `View` 扩展将物理能力与布局容器解耦，无需包裹专属父容器或改动视图树结构，即可让任意现有业务组件获得引力、斥力、弹簧连线与物理拖拽交互（适用于知识图谱、关系拓扑、浮动标签云与可交互卡片等场景）。
 
-- 行星（`planetOption`）的质量、引力（或斥力）的辐射范围、引力（或斥力）的系数
-- 橡皮（`rubberOption`）的自然长度、弹性系数
-- 环境（`rootOption`）的空气摩擦、四壁作用力的辐射范围、四壁作用力的系数
-- 缩放（`scale`），对所有散点（`planetOption`）和连线（`rubberOption`）生效
+![Deponder 演示](https://s4.ax1x.com/2022/02/25/bAEZwj.gif)
 
+## 核心特性
 
-### 动画特点
+- **双端统一的接入模型**：在 Compose 与 Android View 上提供语义完全对称的 5 个接入接口与统一的 `dp` 物理参数体系，跨技术栈迁移零额外心智负担。
+- **低侵入容器解耦与手势共存**：通过 `touchSlop` 门限与根容器坐标投影区分点击与拖拽，完整保留组件原有的 `.clickable {}`、`OnClickListener` 与水波纹反馈；拖拽置顶仅调整 `zIndex` / `translationZ`，不改变子视图层级顺序，也不修改宿主的 `clipChildren` / `clipToBounds`。
+- **连线边缘自动避让与默认弹簧组件**：物理内核自动按两端节点的几何轮廓裁剪连线起止点，避免连线与箭头被节点卡片遮挡；内置开箱即用的 `DeponderDefaultRubber`（Compose）与 `DeponderRubberView`（Android View / XML），支持单双向箭头与线体上方透明悬浮标签。
+- **帧率无关的高性能内核（`deponder-core`）**：
+  - **跨屏恒速积分**：采用自适应 `1/120s` 子步积分，在 60Hz–240Hz 屏幕上保持一致的物理运动节奏，并对重叠或共线节点做确定性对称破缺。
+  - **静止零开销与三级四叉树加速**：结合速度与加速度双阈值全局休眠（静止态 0% CPU 占用，微幅拖拽即时唤醒），按节点规模自动切换计算策略（64 以内直接遍历、64–255 单线程四叉树、256 及以上切入 `Dispatchers.Default` 并行快照计算）。
+  - **仅图层级渲染更新**：通过 Compose `Modifier.Node` 图层变换与 View 硬件属性更新位移与形变，避免逐帧触发重新布局（Relayout）与重组（Recomposition）。
+- **精简外部传递依赖**：`deponder-core` 仅依赖 `kotlin-stdlib` 与 `kotlinx-coroutines-core`；`deponder-compose` 仅依赖 `deponder-core`、`compose-runtime` 与 `compose-ui`（**零 `compose-foundation` 与 Material 依赖**）；`deponder` 仅暴露 `deponder-core` 与 `lifecycle-common`。
 
-- 基于 Android 原生 `Choreographer` 帧同步驱动硬件加速属性变换（`translationX/Y`、`scaleX/Y`、`rotation`），无 `invalidate()` 重绘开销
-- 动画过程中不改变子 `View` 的布局边界，不触发 `onMeasure`、`onLayout`、`onDraw`
-- 依托 `ViewGroup` 原生矩阵触摸分发，平移与缩放后的 planet 可直接响应点击与拖拽手势
-- 不占用 `View.startAnimation()` 与 `ViewGroup.setTouchDelegate()`，业务层可自由叠加自定义动画与触摸逻辑
+## 核心概念速览
 
+| 接入能力 | Compose 接口 | Android View 接口 | 作用说明 |
+| :--- | :--- | :--- | :--- |
+| **物理场域（Root）** | `Modifier.deponderRoot` | `viewGroup.deponderRoot` | 在外层容器建立物理坐标系与帧循环调度 |
+| **物理节点（Planet）** | `Modifier.deponderPlanet` | `view.deponderPlanet` | 将业务组件注册为具备质量、引斥力半径或锚定状态的节点 |
+| **弹簧连线（Rubber）** | `Modifier.deponderRubber` | `view.deponderRubber` | 绑定两个节点 ID，建立胡克定律弹簧牵引关系（亦可直接使用内置默认连线组件） |
+| **连线形变（Stretch）** | `Modifier.deponderStretch` | `view.deponderStretch` | 在自定义连线组件上跟随两端节点间距同步拉伸与旋转 |
+| **拖拽交互（Drag）** | `Modifier.deponderDrag` | `view.deponderDrag` | 为节点按需启用与点击事件无冲突的物理拖拽手势 |
 
-### 依赖
+## 依赖配置
 
-Kotlin DSL (`build.gradle.kts`):
+| Maven 构件 | 适用 UI 体系 | 支持平台 |
+| :--- | :--- | :--- |
+| `io.github.cinpecan:deponder-compose:0.5.0` | Jetpack Compose 与 Compose Multiplatform | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
+| `io.github.cinpecan:deponder:0.5.0` | 传统 Android `View` / `ViewGroup` | Android（`minSdk 23`, JVM 17） |
+| `io.github.cinpecan:deponder-core:0.5.0` | 纯 KMP 无 UI 物理计算内核（适合自绘 `Canvas` 或无头图布局） | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
+| `io.github.cinpecan:deponder-bom:0.5.0` | 版本对齐清单（混合工程可选） | 全平台 |
+
+**Compose Multiplatform（`commonMain`）或纯 Jetpack Compose 项目：**
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder:0.4.0")
+    implementation("io.github.cinpecan:deponder-compose:0.5.0")
 }
 ```
 
-Groovy (`build.gradle`):
-
-```groovy
-dependencies {
-    implementation "io.github.cinpecan:deponder:0.4.0"
-}
-```
-
-
-### 开始使用（Kotlin DSL）
-
-Deponder 内置了简洁的 Kotlin DSL，无需编写子类即可构建控制器：
+**传统 Android View 项目：**
 
 ```kotlin
-// 可选：自定义空间环境参数（也可直接将 rootGroupView 传给 deponder(...)）
-val rootOption = simpleRoot {
-    itemView = rootGroupView
-    initScale = 1f
-    maxScale = 1.5f
-    minScale = 0.5f
-    mRootDensity = 0.0006f
-    mInternalPressure = 300f
+dependencies {
+    implementation("io.github.cinpecan:deponder:0.5.0")
+}
+```
+
+**Android View + Compose 混合项目（共用同一份 `deponder-core` 内核）：**
+
+```kotlin
+dependencies {
+    implementation(platform("io.github.cinpecan:deponder-bom:0.5.0"))
+    implementation("io.github.cinpecan:deponder")
+    implementation("io.github.cinpecan:deponder-compose")
+}
+```
+
+## 快速上手：Compose Multiplatform
+
+> 将 `Modifier.deponderRoot` 挂载在 `Box` 等无强排布约束的容器上。Compose 端支持任意静态嵌套深度（例如在底层 `Box` 声明 `DeponderDefaultRubber`，在上层容器内声明 `deponderPlanet`）。
+
+```kotlin
+val state = rememberDeponderState(
+    RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced)
+)
+
+Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
+    // 1. 开箱即用的默认弹簧连线（支持单/双向箭头与悬浮文字；自定义连线可组合 deponderRubber + deponderStretch）
+    links.forEach { link ->
+        DeponderDefaultRubber(
+            startId = link.fromId,
+            endId = link.toId,
+            label = link.relation,
+            arrowMode = DeponderArrowMode.BOTH,
+            physics = RubberPhysics(naturalLengthDp = 120f),
+        )
+    }
+
+    // 2. 任意现有业务 Composable —— 物理运动全程仅更新图形层，零重组开销
+    nodes.forEach { node ->
+        NodeCardComposable(
+            node = node,
+            modifier = Modifier
+                .deponderPlanet(
+                    id = node.id,
+                    physics = PlanetPhysics(repulsionRadiusDp = 90f, pinned = node.isAnchor),
+                )
+                .deponderDrag()
+                .clickable { onNodeClicked(node) },
+        )
+    }
 }
 
-// 通过 lambda 构建控制器，无需编写子类
-val control = deponder<NodeItem, LinkItem>(lifecycleOwner, rootOption) {
-    planetId { it.id }
-    rubberPairId { Pair(it.fromId, it.toId) }
-
-    createPlanet { parent, node ->
-        simplePlanet {
-            itemView = inflateNodeView(parent, node)
-            id = node.id
-            quality = 2.293f
-            mInternalPressure = 220f
-            elasticityCoefficient = 1.33f
-        }
-    }
-
-    bindPlanet { holder, node ->
-        updateNodeView(holder.itemView(), node)
-        holder.copy { id = node.id }
-    }
-
-    createRubber { parent, link ->
-        simpleRubber {
-            itemView = inflateEdgeView(parent)
-            sId = link.fromId
-            eId = link.toId
-            elasticityCoefficient = 1.68f
-            naturalLength = 300
-        }
-    }
-
-    // 可选：自定义内容比对（默认使用 Objects.equals）
-    areContentsTheSameByP { oldItem, newItem -> oldItem == newItem }
-}
-
-// 随时提交或更新数据集合与缩放比例
-control.submitPlanet(nodeList)
-control.submitRubber(linkList)
-control.submitScale(1f)
+// 运行时动态控制：state.submitScale(1.2f)、state.submitRubberElasticity(2.4f)、state.setPinned(id, true)
 ```
 
+## 快速上手：Android View（Kotlin & Java）
 
-### 开始使用（Java）
+> 将 `deponderRoot` 挂载在 `FrameLayout`、`ConstraintLayout` 或 `CoordinatorLayout` 等容器上（Android View 端要求 `deponderPlanet` 与 `deponderRubber` 为 `deponderRoot` 的**直接子 View**）。
 
-原有 Java 调用方式（`new Deponder<>(...)`、`SimplePlanet.builder()`、`SimpleRubber.builder()`、`SimpleRoot.builder()`、`DeponderHelper`）完全保持不变：
+```kotlin
+val controller = rootFrameLayout.deponderRoot(
+    lifecycleOwner = this,
+    physics = RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced),
+)
 
-1. 继承 `Deponder<P, R>` 创建控制器对象：
-```java
-SimpleRootOption rootOption = SimpleRoot.builder()
-        .itemView(rootGroupView)
-        // 初始化缩放值（非必要，默认 1f）
-        .initScale(1f)
-        // 最大缩放值（非必要，默认 1.5f）
-        .maxScale(1.5f)
-        // 最小缩放值（非必要，默认 0.5f）
-        .minScale(0.5f)
-        // 空气阻尼（非必要，默认 0.0006f）
-        .mRootDensity(0.0006f)
-        // 环境四壁对行星作用力的影响范围（非必要，默认 300）
-        .mInternalPressure(300f)
-        // 环境四壁对行星作用力的弹性系数（非必要，默认 1.44f）
-        .elasticityCoefficientStart(1.44f)
-        .elasticityCoefficientTop(1.44f)
-        .elasticityCoefficientEnd(1.44f)
-        .elasticityCoefficientBot(1.44f)
-        .build();
+// 开箱即用的默认弹簧 View（亦支持 XML <com.cinpe.deponder.DeponderRubberView>；
+// 自定义复合连线布局可组合 view.deponderRubber(...) 与 view.deponderStretch() / @string/deponder_stretch）
+val rubberView = DeponderRubberView(this)
+    .withLabel("依赖")
+    .withArrowMode(DeponderArrowMode.END)
+rootFrameLayout.addView(rubberView)
+rubberView.deponderRubber("core", "ui", RubberPhysics(naturalLengthDp = 120f))
 
-DeponderControl<NodeItem, LinkItem> deponder = new Deponder<NodeItem, LinkItem>(lifecycleOwner, rootOption) {
-    @Override
-    public String planetId(NodeItem item) {
-        return item.getId();
-    }
+// 为现有直接子 View 配置物理力场与拖拽，完整保留原有 setOnClickListener
+cardCore.deponderPlanet("core", PlanetPhysics(pinned = true))
+cardUi.deponderPlanet("ui")
+cardUi.deponderDrag()
+cardUi.setOnClickListener { showDetail("ui") }
 
-    @Override
-    public Pair<String, String> rubberPairId(LinkItem link) {
-        return Pair.create(link.getFromId(), link.getToId());
-    }
-
-    @NonNull
-    @Override
-    public SimplePlanet createPlanet(@NonNull ViewGroup parent, NodeItem item) {
-        return SimplePlanet.builder()
-                // 在 rootGroupView 下由 Deponder 控制的子 View（必要）
-                .itemView(inflateNodeView(parent, item))
-                // 唯一标识，与 planetId(item) 一致
-                .id(item.getId())
-                // 质量（非必要，默认 2.293f）
-                .quality(2.293f)
-                // 行星间相互作用力的影响范围（非必要，默认 220）
-                .mInternalPressure(220f)
-                // 行星间相互作用力的弹性系数（非必要，默认 1.33f）
-                .elasticityCoefficient(1.33f)
-                .build();
-    }
-
-    @NonNull
-    @Override
-    public SimpleRubber createRubber(@NonNull ViewGroup parent, LinkItem link) {
-        return SimpleRubber.builder()
-                // 两个散点对象的 id 值，组合应唯一（必要）
-                .sId(link.getFromId())
-                .eId(link.getToId())
-                // 期望连线对象展示的 View（必要）
-                .itemView(inflateEdgeView(parent))
-                // 弹簧的弹性系数（非必要，默认 1.68f）
-                .elasticityCoefficient(1.68f)
-                // 弹簧的自然长度（非必要，默认 300）
-                .naturalLength(300)
-                .build();
-    }
-};
-```
-> 也可以使用 `new Deponder<NodeItem, LinkItem>(lifecycleOwner, rootGroupView) { ... }` 直接采用默认空间配置。
-
-2. 提交散点集合、连线集合以及缩放比例（后续可随时再次提交新集合）：
-```java
-deponder.submitPlanet(listPlanet);
-deponder.submitRubber(listRubber);
-deponder.submitScale(1f); // 非必须，默认为 initScale（1f）
+// 运行时动态控制：controller.submitScale(1.2f)、controller.submitRubberElasticity(2.4f)、controller.cancel()
 ```
 
-3. 拖拽手势监听（受 `Deponder` 管理的 planet 已自动绑定，也可单独调用）：
-```java
-DeponderHelper.bindDefTouchPlanet(planetA);
+> Java 调用方可通过 `DeponderViews.deponderRoot(...)`、`deponderPlanet(...)`、`deponderRubber(...)`、`deponderStretch(...)`、`deponderDrag(...)` 及 `new DeponderRubberView(context).withLabel(...)` 直接调用。
+
+## 开源协议
+
+本项目基于 Apache License 2.0 协议开源，完整条款见 [LICENSE](LICENSE)。
+
+```text
+Copyright (c) 2022-present, Cinpecan and Deponder Contributors.
+Licensed under the Apache License, Version 2.0: https://www.apache.org/licenses/LICENSE-2.0
 ```
-
-
-### 更进一步
-
-- `elasticityCoefficient` 弹性系数：为正数时表现的是斥力，如果需要引力可以设为负数。
-- `PlanetOption` 中 `mInternalPressure`（力的影响范围）设置得足够大，可以使 planet 均匀地分布在空间中。
-- 橡皮（rubber）的伸缩动画是将弹簧包装的 `View`（或 `ViewGroup`）进行拉伸；如果你的 rubber 内有需要保持宽高比的子 `View`（如 `TextView`、`ImageView` 等形变会影响观感），可以在该子 `View` 中添加 tag `"UN_RUBBER_RUBBER"`（`@string/un_rubber` / `DeponderHelper.TAG_OF_UN_RUBBER`）以保持宽高比恒定：
-  ```java
-  view.setTag("UN_RUBBER_RUBBER");
-  ```
-  或在子 View 的 XML 布局中添加：
-  ```xml
-  <View
-      ...
-      android:tag="UN_RUBBER_RUBBER"
-      ... />
-  ```
-- 如果希望动画尽快趋于静态，可以尝试增大弹性系数并降低 planet 质量（`quality`）。
-- Deponder 并不关心你使用的是何种布局容器，全部适用。
-
-
-### 0.4.0 更新说明
-
-- **Kotlin 与协程架构**：全面升级为 Kotlin 与 Coroutines 实现，内置 Kotlin DSL；外部接入接口保持不变，原有业务代码可直接平滑升级（环境要求：`minSdk 21`、`JVM 11`）。
-- **轻量级依赖**：移除 RxJava3、Guava 等第三方传递依赖，仅保留 AndroidX Lifecycle / Annotation 与 Kotlin Coroutines。
-
-
-### 效果示例
-
-![Image](https://s4.ax1x.com/2022/02/25/bAEZwj.gif)
-
-## NOTICE
-
-    Copyright (c) 2022-present, Cinpecan and Deponder Contributors.
-
-    Licensed under the Apache License, Version 2.0 (the "License");
-    you may not use this file except in compliance with the License.
-    You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-    Unless required by applicable law or agreed to in writing, software
-    distributed under the License is distributed on an "AS IS" BASIS,
-    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-    See the License for the specific language governing permissions and
-    limitations under the License.
-
-    Deponder baseUrl: https://github.com/cinpeCan/Deponder
-
-    Deponder Subcomponents:
-
-    The following components are provided under the Apache License 2.0. See project links for details.
-
-    org.jetbrains.kotlinx:kotlinx-coroutines-android from https://github.com/Kotlin/kotlinx.coroutines Apache-2.0 License
-    androidx.lifecycle / androidx.annotation from https://source.android.com/ Apache-2.0 License
