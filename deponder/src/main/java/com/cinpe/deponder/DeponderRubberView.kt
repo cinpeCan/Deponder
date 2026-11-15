@@ -14,6 +14,7 @@ import android.widget.FrameLayout
 import androidx.annotation.ColorInt
 import com.cinpe.deponder.core.DeponderArrowMode
 import com.cinpe.deponder.core.DeponderDefaults
+import com.cinpe.deponder.core.DeponderRubberInsets
 import com.cinpe.deponder.core.RubberPhysics
 import com.cinpe.deponder.core.RubberPose
 import kotlin.math.ceil
@@ -25,9 +26,9 @@ import kotlin.math.roundToInt
  *
  * Designed specifically for Android's hardware `RenderNode` pipeline even when the parent
  * `deponderRoot` container retains Android's default `clipChildren = true`:
- * - `RubberViewBinding` scales this view's outer `RenderNode` horizontally across the full visible
- *   span (`outerScaleX = pose.length / width`), so `[0, width]` maps to the entire link span without
- *   any parent bounds truncation.
+ * - `RubberViewBinding` scales this view's outer `RenderNode` horizontally across the resolved
+ *   [insets] span (`outerScaleX = spanLengthPx / width`), so `[0, width]` maps to the entire link
+ *   span without any parent bounds truncation.
  * - Internally, directional arrowheads (`NONE`, `END`, `START`, `BOTH`) and the floating [label]
  *   apply `invRatio = effectiveScale / outerScaleX` so they render on screen at exact undistorted
  *   `(effectiveScale, effectiveScale)` proportions inside `[0, width] x [0, height]`.
@@ -48,6 +49,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
 
     private var _label: String? = null
     private var _arrowMode: DeponderArrowMode = DeponderArrowMode.NONE
+    private var _insets: DeponderRubberInsets = DeponderRubberInsets.Default
 
     @ColorInt
     private var _lineColor: Int = DEFAULT_LINE_COLOR
@@ -70,6 +72,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
     private val labelView: FloatingLabelView
 
     private var lastPose: RubberPose? = null
+    private var lastSpanLengthPx: Float = 0f
     private var lastEffectiveScale: Float = 1f
     private var lastOuterScaleX: Float = 1f
 
@@ -94,6 +97,48 @@ public class DeponderRubberView @JvmOverloads public constructor(
             }
         }
 
+    /**
+     * Endpoint safe-area clearance ([DeponderRubberInsets.Default] contour avoidance by default,
+     * [DeponderRubberInsets.fixed] for explicit clearance distances, or [DeponderRubberInsets.None]
+     * for continuous center-to-center lines). Center-anchored ([DeponderRubberInsets.Mode.NONE])
+     * endpoints automatically omit directional arrowheads.
+     */
+    public var insets: DeponderRubberInsets
+        get() = _insets
+        set(value) {
+            if (_insets != value) {
+                val hadArrows = hasEffectiveStartArrow() || hasEffectiveEndArrow()
+                _insets = value
+                val hasArrowsNow = hasEffectiveStartArrow() || hasEffectiveEndArrow()
+                if (hadArrows != hasArrowsNow) {
+                    requestLayout()
+                }
+                val rubberBinding = getTag(R.id.deponder_rubber_binding_tag) as? RubberViewBinding
+                if (rubberBinding != null) {
+                    rubberBinding.updateInsetsOnly(value)
+                } else {
+                    applySubViewTransforms(lastPose, lastSpanLengthPx, lastEffectiveScale, lastOuterScaleX)
+                }
+            }
+        }
+
+    internal fun syncInsetsFromBinding(value: DeponderRubberInsets) {
+        if (_insets != value) {
+            val hadArrows = hasEffectiveStartArrow() || hasEffectiveEndArrow()
+            _insets = value
+            val hasArrowsNow = hasEffectiveStartArrow() || hasEffectiveEndArrow()
+            if (hadArrows != hasArrowsNow) {
+                requestLayout()
+            }
+        }
+    }
+
+    private fun hasEffectiveStartArrow(): Boolean =
+        (_arrowMode == DeponderArrowMode.START || _arrowMode == DeponderArrowMode.BOTH) && _insets.hasStartSafeArea
+
+    private fun hasEffectiveEndArrow(): Boolean =
+        (_arrowMode == DeponderArrowMode.END || _arrowMode == DeponderArrowMode.BOTH) && _insets.hasEndSafeArea
+
     /** ARGB color of the spring line and directional arrowheads. */
     @get:ColorInt
     public var lineColor: Int
@@ -102,7 +147,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
             if (_lineColor != value) {
                 _lineColor = value
                 syncLineColors()
-                applySubViewTransforms(lastPose, lastEffectiveScale, lastOuterScaleX)
+                applySubViewTransforms(lastPose, lastSpanLengthPx, lastEffectiveScale, lastOuterScaleX)
             }
         }
 
@@ -188,6 +233,26 @@ public class DeponderRubberView @JvmOverloads public constructor(
                     )
                     xmlNaturalLengthDp = (naturalPx / density).coerceAtLeast(0f)
                 }
+                val gapDp = if (a.hasValue(R.styleable.DeponderRubberView_deponderInsetGap)) {
+                    val gapPx = a.getDimension(
+                        R.styleable.DeponderRubberView_deponderInsetGap,
+                        DeponderDefaults.Rubber.DEFAULT_ENDPOINT_GAP_DP * density,
+                    )
+                    gapPx / density
+                } else {
+                    DeponderDefaults.Rubber.DEFAULT_ENDPOINT_GAP_DP
+                }
+                _insets = if (a.getType(R.styleable.DeponderRubberView_deponderInsets) == TypedValue.TYPE_DIMENSION) {
+                    val fixedPx = a.getDimension(R.styleable.DeponderRubberView_deponderInsets, 0f)
+                    DeponderRubberInsets.fixed((fixedPx / density).coerceAtLeast(0f))
+                } else {
+                    when (a.getInt(R.styleable.DeponderRubberView_deponderInsets, 0)) {
+                        1 -> DeponderRubberInsets.None
+                        2 -> DeponderRubberInsets.startOnly(gapDp)
+                        3 -> DeponderRubberInsets.endOnly(gapDp)
+                        else -> DeponderRubberInsets.contour(gapDp)
+                    }
+                }
                 _label = a.getString(R.styleable.DeponderRubberView_deponderLabel)?.takeIf { it.isNotEmpty() }
                 _arrowMode = when (a.getInt(R.styleable.DeponderRubberView_deponderArrowMode, 0)) {
                     1 -> DeponderArrowMode.END
@@ -246,6 +311,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
                     elasticity = xmlElasticity,
                     naturalLengthDp = xmlNaturalLengthDp,
                 ),
+                insets = _insets,
             )
         }
     }
@@ -258,6 +324,11 @@ public class DeponderRubberView @JvmOverloads public constructor(
     /** Fluent Java/Kotlin helper to configure directional [DeponderArrowMode]. */
     public fun withArrowMode(arrowMode: DeponderArrowMode): DeponderRubberView = apply {
         this.arrowMode = arrowMode
+    }
+
+    /** Fluent Java/Kotlin helper to configure endpoint [DeponderRubberInsets]. */
+    public fun withInsets(insets: DeponderRubberInsets): DeponderRubberView = apply {
+        this.insets = insets
     }
 
     /** Fluent Java/Kotlin helper to configure line color and thickness in `dp`. */
@@ -287,14 +358,18 @@ public class DeponderRubberView @JvmOverloads public constructor(
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
         val pillW = labelView.measuredLabelWidthPx
         val pillH = labelView.measuredLabelHeightPx
-        val arrowH = if (_arrowMode != DeponderArrowMode.NONE) ceil(_arrowSizePx * ARROW_HEIGHT_RATIO).toInt() else 0
+        val hasStart = hasEffectiveStartArrow()
+        val hasEnd = hasEffectiveEndArrow()
+        val arrowH = if (hasStart || hasEnd) ceil(_arrowSizePx * ARROW_HEIGHT_RATIO).toInt() else 0
+        val activeArrowsW = (if (hasStart) ceil(_arrowSizePx).toInt() else 0) +
+            (if (hasEnd) ceil(_arrowSizePx).toInt() else 0)
         val vertMargin = 2f * density
         val symmetricTopClearance = if (pillH > 0) {
             ceil(_lineThicknessPx + (labelOffsetPx + pillH + vertMargin) * 2f).toInt()
         } else {
             0
         }
-        val desiredW = max(stemBaseWidthPx, max(pillW, ceil(_arrowSizePx * 2f).toInt()))
+        val desiredW = max(stemBaseWidthPx, max(pillW, activeArrowsW))
         val desiredH = max(
             max(1, ceil(_lineThicknessPx + vertMargin * 2f).toInt()),
             max(ceil(arrowH + vertMargin * 2f).toInt(), symmetricTopClearance),
@@ -308,29 +383,38 @@ public class DeponderRubberView @JvmOverloads public constructor(
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
         super.onLayout(changed, left, top, right, bottom)
         val pose = lastPose
-        if (pose != null && pose.isActive && pose.length > 0f && width > 0) {
-            val recomputedOuterScaleX = if (lastEffectiveScale > 0f) pose.length / width.toFloat() else 0f
+        if (pose != null && pose.isActive && lastSpanLengthPx > 0f && width > 0) {
+            val recomputedOuterScaleX = if (lastEffectiveScale > 0f) lastSpanLengthPx / width.toFloat() else 0f
             lastOuterScaleX = recomputedOuterScaleX
             scaleX = recomputedOuterScaleX
         }
-        applySubViewTransforms(pose, lastEffectiveScale, lastOuterScaleX)
+        applySubViewTransforms(pose, lastSpanLengthPx, lastEffectiveScale, lastOuterScaleX)
     }
 
     internal fun nonStretchedContentWidthPx(): Int = labelView.measuredLabelWidthPx
 
+    internal val isStartArrowRendered: Boolean
+        get() = startArrowView.scaleX > 0f && startArrowView.scaleY > 0f
+
+    internal val isEndArrowRendered: Boolean
+        get() = endArrowView.scaleX > 0f && endArrowView.scaleY > 0f
+
     internal fun applyDefaultRubberPose(
         pose: RubberPose?,
+        spanLengthPx: Float,
         effectiveScale: Float,
         outerScaleX: Float,
     ) {
         lastPose = pose
+        lastSpanLengthPx = spanLengthPx
         lastEffectiveScale = effectiveScale
         lastOuterScaleX = outerScaleX
-        applySubViewTransforms(pose, effectiveScale, outerScaleX)
+        applySubViewTransforms(pose, spanLengthPx, effectiveScale, outerScaleX)
     }
 
     internal fun resetDefaultRubberPose() {
         lastPose = null
+        lastSpanLengthPx = 0f
         lastEffectiveScale = 1f
         lastOuterScaleX = 1f
         stemView.scaleX = 1f
@@ -363,10 +447,11 @@ public class DeponderRubberView @JvmOverloads public constructor(
 
     private fun applySubViewTransforms(
         pose: RubberPose?,
+        spanLengthPx: Float,
         effectiveScale: Float,
         outerScaleX: Float,
     ) {
-        if (pose == null || !pose.isActive || pose.length <= 0f || effectiveScale <= 1e-4f || outerScaleX <= 1e-6f) {
+        if (pose == null || !pose.isActive || spanLengthPx <= 0f || effectiveScale <= 1e-4f || outerScaleX <= 1e-6f) {
             stemView.scaleX = 0f
             stemView.translationX = 0f
             startArrowView.scaleX = 0f
@@ -378,15 +463,15 @@ public class DeponderRubberView @JvmOverloads public constructor(
             return
         }
 
-        // Convert screen-proportional local span (`pose.length / effectiveScale`) into this View's
+        // Convert screen-proportional local span (`spanLengthPx / effectiveScale`) into this View's
         // `[0, width]` pre-transform coordinate space (`invRatio = effectiveScale / outerScaleX`),
         // guaranteeing 100% of stem, arrows, and text stay strictly inside `[0, width]`!
         val invRatio = effectiveScale / outerScaleX
         updateFloatingLabelOffset(invRatio)
 
-        val localSpan = pose.length / effectiveScale
-        val hasStart = _arrowMode == DeponderArrowMode.START || _arrowMode == DeponderArrowMode.BOTH
-        val hasEnd = _arrowMode == DeponderArrowMode.END || _arrowMode == DeponderArrowMode.BOTH
+        val localSpan = spanLengthPx / effectiveScale
+        val hasStart = hasEffectiveStartArrow()
+        val hasEnd = hasEffectiveEndArrow()
         val arrowW = if (startArrowView.width > 0) startArrowView.width.toFloat() else ceil(_arrowSizePx)
         val arrowH = if (startArrowView.height > 0) {
             startArrowView.height.toFloat()
@@ -518,7 +603,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
         if (rubberBinding?.attachedController != null) {
             rubberBinding.refreshPoseFromController()
         } else {
-            applySubViewTransforms(lastPose, lastEffectiveScale, lastOuterScaleX)
+            applySubViewTransforms(lastPose, lastSpanLengthPx, lastEffectiveScale, lastOuterScaleX)
         }
     }
 

@@ -21,8 +21,8 @@ import kotlin.math.sqrt
  *
  * Implements:
  * - Strict pure point-mass force dynamics (center coordinates + mass + independent radiation field,
- *   zero rigid-body collision coupling) paired with visual ray-to-rounded-contour clearance on
- *   [RubberPose] so both built-in and custom developer rubbers terminate cleanly outside planet UI bounds.
+ *   zero rigid-body collision coupling) paired with real-time directional contour radii on
+ *   [RubberPose] so UI link layers can apply [DeponderRubberInsets] with zero relayout overhead.
  * - Deterministic golden-angle spiral symmetry breaking when stacked nodes start at identical `(x, y)` coordinates.
  * - Adaptive 3-tier execution:
  *   1. Small graphs (`N < 64`): direct symmetric array loop on current thread.
@@ -362,10 +362,13 @@ public class SimulationWorld(
             val pose = rubberList[i]
             val spec = pose.spec
             if (spec.startId == spec.endId) {
-                if (pose.isActive || pose.length != 0f) {
+                if (pose.isActive || pose.centerDistance != 0f) {
                     pose.isActive = false
-                    pose.length = 0f
                     pose.centerDistance = 0f
+                    pose.directionX = 0f
+                    pose.directionY = 0f
+                    pose.startContourPx = 0f
+                    pose.endContourPx = 0f
                     pose.dirty = true
                 }
                 continue
@@ -373,10 +376,13 @@ public class SimulationWorld(
             val sIdx = indexById[spec.startId]
             val eIdx = indexById[spec.endId]
             if (sIdx == null || eIdx == null) {
-                if (pose.isActive || pose.length != 0f) {
+                if (pose.isActive || pose.centerDistance != 0f) {
                     pose.isActive = false
-                    pose.length = 0f
                     pose.centerDistance = 0f
+                    pose.directionX = 0f
+                    pose.directionY = 0f
+                    pose.startContourPx = 0f
+                    pose.endContourPx = 0f
                     pose.dirty = true
                 }
                 continue
@@ -397,15 +403,13 @@ public class SimulationWorld(
     internal fun computeBodyContourClearance(
         halfWidthPx: Float,
         halfHeightPx: Float,
-        gapPx: Float,
         clampedScale: Float,
         ux: Float,
         uy: Float,
     ): Float {
         if (halfWidthPx <= 0f && halfHeightPx <= 0f) return 0f
-        val safeGap = max(0f, gapPx)
-        val w = max(1e-3f, (max(0f, halfWidthPx) + safeGap) * clampedScale)
-        val h = max(1e-3f, (max(0f, halfHeightPx) + safeGap) * clampedScale)
+        val w = max(1e-3f, max(0f, halfWidthPx) * clampedScale)
+        val h = max(1e-3f, max(0f, halfHeightPx) * clampedScale)
         val cornerR = min(w, h) * ROUNDED_CONTOUR_RATIO
         val coreX = w - cornerR
         val coreY = h - cornerR
@@ -440,68 +444,62 @@ public class SimulationWorld(
         val diffX = ex - sx
         val diffY = ey - sy
         val centerDist = sqrt(diffX * diffX + diffY * diffY)
+        val rawCx = (sx + ex) * 0.5f
+        val rawCy = (sy + ey) * 0.5f
 
         val rotDeg: Float
-        val visLen: Float
-        val visCx: Float
-        val visCy: Float
+        val ux: Float
+        val uy: Float
+        val sContourPx: Float
+        val eContourPx: Float
 
         if (centerDist > 1e-4f) {
             val angle = atan2(diffX.toDouble(), diffY.toDouble())
             rotDeg = (90.0 - angle * RAD_TO_DEG).toFloat()
             val invDist = 1f / centerDist
-            val ux = diffX * invDist
-            val uy = diffY * invDist
-            val gapPx = pose.spec.endpointGapPx
-            val sClearance = computeBodyContourClearance(
+            ux = diffX * invDist
+            uy = diffY * invDist
+            sContourPx = computeBodyContourClearance(
                 halfWidthPx = sBody.halfWidthPx,
                 halfHeightPx = sBody.halfHeightPx,
-                gapPx = gapPx,
                 clampedScale = clampedScale,
                 ux = ux,
                 uy = uy,
             )
-            val eClearance = computeBodyContourClearance(
+            eContourPx = computeBodyContourClearance(
                 halfWidthPx = eBody.halfWidthPx,
                 halfHeightPx = eBody.halfHeightPx,
-                gapPx = gapPx,
                 clampedScale = clampedScale,
                 ux = ux,
                 uy = uy,
             )
-            if (sClearance + eClearance < centerDist) {
-                visLen = centerDist - sClearance - eClearance
-                val sxVis = sx + ux * sClearance
-                val syVis = sy + uy * sClearance
-                val exVis = ex - ux * eClearance
-                val eyVis = ey - uy * eClearance
-                visCx = (sxVis + exVis) * 0.5f
-                visCy = (syVis + eyVis) * 0.5f
-            } else {
-                visLen = 0f
-                visCx = (sx + ex) * 0.5f
-                visCy = (sy + ey) * 0.5f
-            }
         } else {
             rotDeg = pose.rotationDeg
-            visLen = 0f
-            visCx = sx
-            visCy = sy
+            ux = 0f
+            uy = 0f
+            sContourPx = 0f
+            eContourPx = 0f
         }
 
         if (!pose.isActive ||
-            pose.centerX != visCx ||
-            pose.centerY != visCy ||
-            pose.length != visLen ||
+            pose.centerX != rawCx ||
+            pose.centerY != rawCy ||
             pose.centerDistance != centerDist ||
+            pose.directionX != ux ||
+            pose.directionY != uy ||
+            pose.startContourPx != sContourPx ||
+            pose.endContourPx != eContourPx ||
             pose.rotationDeg != rotDeg ||
             pose.scale != clampedScale
         ) {
             pose.isActive = true
-            pose.centerX = visCx
-            pose.centerY = visCy
-            pose.length = visLen
+            pose.centerX = rawCx
+            pose.centerY = rawCy
             pose.centerDistance = centerDist
+            pose.directionX = ux
+            pose.directionY = uy
+            pose.startContourPx = sContourPx
+            pose.endContourPx = eContourPx
             pose.rotationDeg = rotDeg
             pose.scale = clampedScale
             pose.dirty = true
@@ -612,16 +610,22 @@ public class SimulationWorld(
             val spec = pose.spec
             if (spec.startId == spec.endId) {
                 pose.isActive = false
-                pose.length = 0f
                 pose.centerDistance = 0f
+                pose.directionX = 0f
+                pose.directionY = 0f
+                pose.startContourPx = 0f
+                pose.endContourPx = 0f
                 continue
             }
             val sIdx = indexById[spec.startId]
             val eIdx = indexById[spec.endId]
             if (sIdx == null || eIdx == null) {
                 pose.isActive = false
-                pose.length = 0f
                 pose.centerDistance = 0f
+                pose.directionX = 0f
+                pose.directionY = 0f
+                pose.startContourPx = 0f
+                pose.endContourPx = 0f
                 continue
             }
             val sBody = bodyList[sIdx]

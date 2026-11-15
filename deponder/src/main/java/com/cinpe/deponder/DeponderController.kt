@@ -39,7 +39,7 @@ public class DeponderController internal constructor(
     public var physics: RootPhysics = initialPhysics
         private set
 
-    private val density: Float
+    internal val density: Float
         get() = rootView.resources.displayMetrics.density.coerceAtLeast(1e-3f)
 
     internal val xmlStretchToken: String = rootView.resources.getString(R.string.deponder_stretch)

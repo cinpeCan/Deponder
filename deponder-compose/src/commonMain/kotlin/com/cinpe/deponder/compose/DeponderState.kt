@@ -33,7 +33,8 @@ public class DeponderState(
 
     internal val world: SimulationWorld = SimulationWorld(physics.toEnvironmentSpec(density = 1f))
 
-    private var currentDensity: Float = 1f
+    internal var currentDensity: Float = 1f
+        private set
     private var attachedRootNode: DeponderRootNode? = null
 
     public var scale: Float by mutableFloatStateOf(
@@ -303,6 +304,7 @@ public class DeponderState(
             "Duplicate deponderRubber link between '${node.startId}' and '${node.endId}' (${key.encoded}) under the same deponderRoot."
         }
         activeRubbersByKey[key] = node
+        node.registeredState = this
         val spec = node.physics.toRubberSpec(node.startId, node.endId, currentDensity)
         val pose = world.upsertRubber(spec, scale)
         notifyFrameChanged()
@@ -342,6 +344,9 @@ public class DeponderState(
         val key = EdgeKey(node.startId, node.endId)
         if (activeRubbersByKey[key] === node) {
             activeRubbersByKey.remove(key)
+            if (node.registeredState === this) {
+                node.registeredState = null
+            }
             world.removeRubber(key, scale)
             notifyFrameChanged()
             wakeIfPopulated()

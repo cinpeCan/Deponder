@@ -1,5 +1,7 @@
 package com.cinpe.deponder.core
 
+import kotlin.math.max
+
 /**
  * Resolved pixel-space environment configuration consumed by [SimulationWorld].
  *
@@ -41,18 +43,16 @@ public data class PlanetSpec(
 )
 
 /**
- * Pure undirected spring link specification between [startId] and [endId] in resolved pixel units.
+ * Pure undirected Hooke spring link specification between [startId] and [endId] in resolved pixel units.
  *
  * Physics forces act symmetrically between the two point-mass centers, while [startId] -> [endId]
- * preserves the caller's visual orientation and [endpointGapPx] trims visual endpoints cleanly outside
- * each planet's measured contour.
+ * preserves the caller's visual orientation on [RubberPose].
  */
 public data class RubberSpec(
     public val startId: String,
     public val endId: String,
     public val elasticity: Float = DeponderDefaults.Rubber.ELASTICITY,
     public val naturalLengthPx: Float = DeponderDefaults.Rubber.NATURAL_LENGTH_DP,
-    public val endpointGapPx: Float = 0f,
 ) {
     public val key: EdgeKey = EdgeKey(startId, endId)
 }
@@ -88,11 +88,13 @@ public class PlanetBody internal constructor(
 }
 
 /**
- * Computed visual geometry for a single rubber link on the current frame.
+ * Raw center-to-center link geometry and real-time directional contour insets on the current frame.
  *
- * [centerX], [centerY], and [length] represent the visible span between the outer contours of
- * `startId` and `endId` (after subtracting directional planet radii + [RubberSpec.endpointGapPx]),
- * while [centerDistance] exposes the raw center-to-center distance.
+ * [centerX], [centerY], and [centerDistance] always represent the unclipped Edge-to-Edge span
+ * between `startId` and `endId` centers, while [startContourPx] and [endContourPx] report each
+ * endpoint planet's scaled directional contour radius along `(` [directionX] `,` [directionY] `)`.
+ * Call [resolvedLength], [resolvedCenterX], and [resolvedCenterY] to evaluate safe-area geometry
+ * for a given [DeponderRubberInsets] without heap allocations.
  */
 public class RubberPose internal constructor(
     public var spec: RubberSpec,
@@ -101,9 +103,15 @@ public class RubberPose internal constructor(
         internal set
     public var centerY: Float = 0f
         internal set
-    public var length: Float = 0f
-        internal set
     public var centerDistance: Float = 0f
+        internal set
+    public var directionX: Float = 0f
+        internal set
+    public var directionY: Float = 0f
+        internal set
+    public var startContourPx: Float = 0f
+        internal set
+    public var endContourPx: Float = 0f
         internal set
     public var rotationDeg: Float = 0f
         internal set
@@ -113,4 +121,84 @@ public class RubberPose internal constructor(
         internal set
     public var dirty: Boolean = true
         internal set
+
+    /**
+     * Computes the total pixel inset at the `startId` endpoint for [insets] and [density] (`px / dp`).
+     */
+    public fun resolvedStartInsetPx(insets: DeponderRubberInsets, density: Float): Float {
+        if (!isActive || centerDistance <= 1e-4f) return 0f
+        val safeDensity = max(1e-3f, density)
+        return when (insets.startMode) {
+            DeponderRubberInsets.Mode.NONE -> 0f
+            DeponderRubberInsets.Mode.CONTOUR -> {
+                if (startContourPx > 0f) {
+                    max(0f, startContourPx + insets.startValueDp * safeDensity * scale)
+                } else {
+                    0f
+                }
+            }
+            DeponderRubberInsets.Mode.FIXED -> max(0f, insets.startValueDp) * safeDensity * scale
+        }
+    }
+
+    /**
+     * Computes the total pixel inset at the `endId` endpoint for [insets] and [density] (`px / dp`).
+     */
+    public fun resolvedEndInsetPx(insets: DeponderRubberInsets, density: Float): Float {
+        if (!isActive || centerDistance <= 1e-4f) return 0f
+        val safeDensity = max(1e-3f, density)
+        return when (insets.endMode) {
+            DeponderRubberInsets.Mode.NONE -> 0f
+            DeponderRubberInsets.Mode.CONTOUR -> {
+                if (endContourPx > 0f) {
+                    max(0f, endContourPx + insets.endValueDp * safeDensity * scale)
+                } else {
+                    0f
+                }
+            }
+            DeponderRubberInsets.Mode.FIXED -> max(0f, insets.endValueDp) * safeDensity * scale
+        }
+    }
+
+    /**
+     * Evaluates the active pixel span length after applying [insets] at [density] (`px / dp`).
+     * Returns `0f` when the combined start and end insets meet or exceed [centerDistance].
+     */
+    public fun resolvedLength(insets: DeponderRubberInsets, density: Float): Float {
+        if (!isActive || centerDistance <= 1e-4f) return 0f
+        val sInset = resolvedStartInsetPx(insets, density)
+        val eInset = resolvedEndInsetPx(insets, density)
+        return max(0f, centerDistance - sInset - eInset)
+    }
+
+    /**
+     * Signed axial center shift along the link's local X-axis relative to `(` [centerX] `,` [centerY] `)`,
+     * proportionally clamped when combined insets exceed [centerDistance] so the resolved midpoint
+     * always stays within the `[startId, endId]` segment.
+     */
+    public fun localSpanOffsetX(insets: DeponderRubberInsets, density: Float): Float {
+        if (!isActive || centerDistance <= 1e-4f) return 0f
+        val sInset = resolvedStartInsetPx(insets, density)
+        val eInset = resolvedEndInsetPx(insets, density)
+        val totalInset = sInset + eInset
+        if (totalInset <= 0f) return 0f
+        val clampRatio = if (totalInset > centerDistance) centerDistance / totalInset else 1f
+        return (sInset - eInset) * clampRatio * 0.5f
+    }
+
+    /**
+     * Evaluates the resolved midpoint X in root pixel coordinates for [insets] at [density] (`px / dp`).
+     */
+    public fun resolvedCenterX(insets: DeponderRubberInsets, density: Float): Float {
+        if (!isActive || centerDistance <= 1e-4f) return centerX
+        return centerX + directionX * localSpanOffsetX(insets, density)
+    }
+
+    /**
+     * Evaluates the resolved midpoint Y in root pixel coordinates for [insets] at [density] (`px / dp`).
+     */
+    public fun resolvedCenterY(insets: DeponderRubberInsets, density: Float): Float {
+        if (!isActive || centerDistance <= 1e-4f) return centerY
+        return centerY + directionY * localSpanOffsetX(insets, density)
+    }
 }

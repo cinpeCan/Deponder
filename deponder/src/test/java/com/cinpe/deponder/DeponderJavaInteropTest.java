@@ -9,6 +9,7 @@ import android.view.View;
 import android.widget.FrameLayout;
 import com.cinpe.deponder.core.DeponderArrowMode;
 import com.cinpe.deponder.core.DeponderDefaults;
+import com.cinpe.deponder.core.DeponderRubberInsets;
 import com.cinpe.deponder.core.PlanetPhysics;
 import com.cinpe.deponder.core.RootPhysics;
 import com.cinpe.deponder.core.RubberPhysics;
@@ -49,6 +50,7 @@ public class DeponderJavaInteropTest {
         DeponderRubberView rubberView = new DeponderRubberView(activity)
                 .withLabel("depends on")
                 .withArrowMode(DeponderArrowMode.END)
+                .withInsets(DeponderRubberInsets.endOnly(4f))
                 .withLineStyle(Color.DKGRAY, 2.5f)
                 .withLabelStyle(Color.BLACK, 11f, Color.TRANSPARENT);
         root.addView(rubberView, new FrameLayout.LayoutParams(120, 28));
@@ -60,6 +62,13 @@ public class DeponderJavaInteropTest {
                 "java_b",
                 new RubberPhysics().withNaturalLengthDp(110f)
         );
+        assertEquals(DeponderRubberInsets.endOnly(4f), rubberView.getInsets());
+
+        rubberView.setInsets(DeponderRubberInsets.fixed(0f, 24f));
+        assertEquals(DeponderRubberInsets.fixed(0f, 24f), rubberView.getInsets());
+
+        rubberView.setInsets(DeponderRubberInsets.none());
+        assertEquals(DeponderRubberInsets.none(), rubberView.getInsets());
 
         controller.submitScale(1.4f);
         controller.submitRubberElasticity(3.0f);

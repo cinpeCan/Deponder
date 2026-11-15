@@ -11,6 +11,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import com.cinpe.deponder.core.DeponderArrowMode
+import com.cinpe.deponder.core.DeponderRubberInsets
 import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetPhysics
 import com.cinpe.deponder.core.RootPhysics
@@ -190,14 +191,15 @@ class DeponderOperatorsTest {
             customRubber.deponderRubber(
                 "a",
                 "b",
-                RubberPhysics(naturalLengthDp = 100f, endpointGapDp = 0f),
+                RubberPhysics(naturalLengthDp = 100f),
+                DeponderRubberInsets.contour(0f),
             )
             ctrl.applyCurrentPosesToViews()
 
             // Contour-cleared visible span: 300 - (20 * 1.2) - (20 * 1.2) = 252px!
             val pose = ctrl.world.rubberOf(EdgeKey("a", "b"))!!
             assertEquals(300f, pose.centerDistance, 1e-3f)
-            assertEquals(252f, pose.length, 1e-3f)
+            assertEquals(252f, pose.resolvedLength(DeponderRubberInsets.contour(0f), ctrl.density), 1e-3f)
 
             // Outer RenderNode spans full `252px` (`scaleX = 252 / 100 = 2.52`) so `root.clipChildren = true` never clips!
             assertEquals(-1f, customRubber.translationZ, 1e-4f)
@@ -223,7 +225,7 @@ class DeponderOperatorsTest {
     }
 
     @Test
-    fun customCompoundRubber_autoShrinksBadge_andSleepingLabelMutationRefreshesImmediately() {
+    fun customCompoundRubber_autoShrinksBadge_andSleepingLabelOrInsetsMutationRefreshesImmediately() {
         mountAttachedRoot { activity, root ->
             val ctrl = root.deponderRoot()
 
@@ -251,7 +253,7 @@ class DeponderOperatorsTest {
             stretchedLine.layout(0, 9, 200, 11)
             badgeLabel.layout(60, 1, 140, 19)
 
-            customCompound.deponderRubber("a", "b", RubberPhysics(endpointGapDp = 0f))
+            customCompound.deponderRubber("a", "b", RubberPhysics(), DeponderRubberInsets.contour(0f))
             ctrl.applyCurrentPosesToViews()
 
             assertEquals(0.2f, customCompound.scaleX, 1e-4f)
@@ -269,17 +271,19 @@ class DeponderOperatorsTest {
             val defaultRubber = DeponderRubberView(activity)
                 .withLabel("X")
                 .withArrowMode(DeponderArrowMode.BOTH)
+                .withInsets(DeponderRubberInsets.contour(0f))
             root.addView(defaultRubber, FrameLayout.LayoutParams(80, 40))
             defaultRubber.measure(
                 View.MeasureSpec.makeMeasureSpec(80, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(40, View.MeasureSpec.EXACTLY),
             )
             defaultRubber.layout(0, 0, 80, 40)
-            defaultRubber.deponderRubber("b", "c", RubberPhysics(endpointGapDp = 0f))
+            defaultRubber.deponderRubber("b", "c")
             ctrl.applyCurrentPosesToViews()
 
             assertEquals(Color.TRANSPARENT, defaultRubber.labelBackgroundColor)
             assertEquals(20f, defaultRubber.width * defaultRubber.scaleX, 1e-3f)
+            assertTrue(defaultRubber.isStartArrowRendered && defaultRubber.isEndArrowRendered)
             val initialScaleY = defaultRubber.scaleY
 
             // Mutate label to a very wide string without running another physics frame:
@@ -288,6 +292,25 @@ class DeponderOperatorsTest {
                 "Updating label while sleeping with fixed bounds must shrink effectiveScale (${defaultRubber.scaleY} < $initialScaleY)",
                 defaultRubber.scaleY < initialScaleY,
             )
+
+            // Switching to `fixed(0f, 15f)` suppresses start arrow on center-anchored end while rendering end arrow!
+            defaultRubber.insets = DeponderRubberInsets.fixed(startDp = 0f, endDp = 15f)
+            assertFalse(defaultRubber.isStartArrowRendered)
+            assertTrue(defaultRubber.isEndArrowRendered)
+
+            // Mutating `insets` to DeponderRubberInsets.None while sleeping spans full 60px center-to-center and omits both arrows!
+            defaultRubber.insets = DeponderRubberInsets.None
+            assertEquals(60f, defaultRubber.width * defaultRubber.scaleX, 1e-3f)
+            assertFalse(defaultRubber.isStartArrowRendered)
+            assertFalse(defaultRubber.isEndArrowRendered)
+
+            // XML `app:deponderInsets="24dp"` resolves directly to FIXED(24f)!
+            @Suppress("DEPRECATION")
+            val xmlAttrs = Robolectric.buildAttributeSet()
+                .addAttribute(R.attr.deponderInsets, "24dp")
+                .build()
+            val xmlFixedRubber = DeponderRubberView(activity, xmlAttrs)
+            assertEquals(DeponderRubberInsets.fixed(24f), xmlFixedRubber.insets)
 
             ctrl.submitRubberElasticity(4.2f)
             assertEquals(4.2f, ctrl.world.rubberOf(EdgeKey("a", "b"))!!.spec.elasticity, 1e-4f)
@@ -397,7 +420,7 @@ class DeponderOperatorsTest {
 
         // 2. Fast drag (<100ms TapTimeout) inside ScrollView -> cancels pending CheckForTap / pre-pressed ripple
         // so `planetA.isPressed` never sticks on even after advancing looper past TapTimeout!
-        val dragStart = SystemClock.uptimeMillis()
+        val dragStart = SystemClock.uptimeMillis() + 20
         val dragDown = MotionEvent.obtain(dragStart, dragStart, MotionEvent.ACTION_DOWN, 30f, 30f, 0)
         val dragMove = MotionEvent.obtain(dragStart, dragStart + 20, MotionEvent.ACTION_MOVE, 90f, 30f, 0)
         planetA.dispatchTouchEvent(dragDown)

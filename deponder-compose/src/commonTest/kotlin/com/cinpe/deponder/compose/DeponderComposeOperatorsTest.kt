@@ -3,7 +3,9 @@ package com.cinpe.deponder.compose
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.cinpe.deponder.core.DeponderArrowMode
 import com.cinpe.deponder.core.DeponderDefaults
+import com.cinpe.deponder.core.DeponderRubberInsets
 import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetPhysics
 import com.cinpe.deponder.core.RootPhysics
@@ -12,12 +14,13 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DeponderComposeOperatorsTest {
 
     @Test
-    fun deponderState_clampsScale_updatesPhysicsPreservingBodies_andDragsSmoothly() = runTest {
+    fun deponderState_clampsScale_updatesPhysicsPreservingBodies_andResolvesRubberInsets() = runTest {
         val state = DeponderState(
             RootPhysics(
                 initScale = 1.0f,
@@ -35,17 +38,26 @@ class DeponderComposeOperatorsTest {
         state.syncPlanetPlacement(pA, 200f, 300f)
         state.syncPlanetPlacement(pB, 400f, 300f)
 
-        val rAB = DeponderRubberNode("a", "b", RubberPhysics(naturalLengthDp = 80f))
+        val rAB = DeponderRubberNode("a", "b", RubberPhysics(naturalLengthDp = 80f), DeponderRubberInsets.Default)
         val pose = state.registerRubberNode(rAB)
         assertTrue(pose.isActive)
-        assertEquals(200f, pose.length, 1e-3f)
+        assertEquals(200f, rAB.currentSpanLengthPx(pose), 1e-3f)
 
-        // Updating planet measured sizes automatically clears planet contours from RubberPose.length!
+        // Updating planet measured sizes updates directional contour radii on RubberPose!
         state.updatePlanetMeasuredSize("a", widthPx = 40, heightPx = 40)
         state.updatePlanetMeasuredSize("b", widthPx = 40, heightPx = 40)
-        // With density = 2.0f, endpointGapDp = 4f -> gapPx = 8f -> each clearance = 20 + 8 = 28px -> 200 - 56 = 144px!
-        assertEquals(144f, pose.length, 1e-3f)
+        // With density = 2.0f, default gap = 4dp -> 8px -> each clearance = 20 + 8 = 28px -> 200 - 56 = 144px!
+        assertEquals(144f, rAB.currentSpanLengthPx(pose), 1e-3f)
         assertEquals(200f, pose.centerDistance, 1e-3f)
+
+        // Updating insets to None spans full 200px center-to-center; endOnly(4f) insets only `b` (200 - 28 = 172px);
+        // fixed(0f, 25f) at density = 2.0f insets `b` by 50px (200 - 50 = 150px).
+        rAB.update("a", "b", RubberPhysics(naturalLengthDp = 80f), DeponderRubberInsets.None)
+        assertEquals(200f, rAB.currentSpanLengthPx(pose), 1e-3f)
+        rAB.update("a", "b", RubberPhysics(naturalLengthDp = 80f), DeponderRubberInsets.endOnly(4f))
+        assertEquals(172f, rAB.currentSpanLengthPx(pose), 1e-3f)
+        rAB.update("a", "b", RubberPhysics(naturalLengthDp = 80f), DeponderRubberInsets.fixed(0f, 25f))
+        assertEquals(150f, rAB.currentSpanLengthPx(pose), 1e-3f)
 
         state.submitRubberElasticity(3.6f)
         assertEquals(3.6f, pose.spec.elasticity, 1e-4f)
@@ -81,8 +93,8 @@ class DeponderComposeOperatorsTest {
             state.registerPlanetNode(secondPlanet)
         }
 
-        val forwardRubber = DeponderRubberNode("n1", "n2", RubberPhysics())
-        val reverseRubber = DeponderRubberNode("n2", "n1", RubberPhysics())
+        val forwardRubber = DeponderRubberNode("n1", "n2", RubberPhysics(), DeponderRubberInsets.Default)
+        val reverseRubber = DeponderRubberNode("n2", "n1", RubberPhysics(), DeponderRubberInsets.Default)
         state.registerRubberNode(forwardRubber)
 
         // Undirected EdgeKey("n1", "n2") == EdgeKey("n2", "n1") must fail fast!
@@ -130,6 +142,14 @@ class DeponderComposeOperatorsTest {
             computeComposeArrowScale(localSpan = 10f, arrowLengthPx = 10f, hasStart = true, hasEnd = true),
             1e-4f,
         )
+
+        // Center-anchored endpoints (`Mode.NONE`) automatically omit built-in directional arrowheads!
+        assertFalse(isComposeStartArrowEnabled(DeponderArrowMode.BOTH, DeponderRubberInsets.None))
+        assertFalse(isComposeEndArrowEnabled(DeponderArrowMode.BOTH, DeponderRubberInsets.None))
+        assertFalse(isComposeStartArrowEnabled(DeponderArrowMode.BOTH, DeponderRubberInsets.endOnly()))
+        assertTrue(isComposeEndArrowEnabled(DeponderArrowMode.BOTH, DeponderRubberInsets.endOnly()))
+        assertFalse(isComposeStartArrowEnabled(DeponderArrowMode.BOTH, DeponderRubberInsets.fixed(0f, 24f)))
+        assertTrue(isComposeEndArrowEnabled(DeponderArrowMode.BOTH, DeponderRubberInsets.fixed(0f, 24f)))
 
         val s1 = DeponderRubberStyle.of(
             lineColor = Color(0xFF5C6BC0),

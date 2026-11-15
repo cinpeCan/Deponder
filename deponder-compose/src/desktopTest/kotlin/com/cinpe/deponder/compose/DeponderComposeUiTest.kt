@@ -7,6 +7,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -19,6 +22,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.runComposeUiTest
 import androidx.compose.ui.unit.dp
 import com.cinpe.deponder.core.DeponderArrowMode
+import com.cinpe.deponder.core.DeponderRubberInsets
 import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetPhysics
 import com.cinpe.deponder.core.RubberPhysics
@@ -49,7 +53,8 @@ class DeponderComposeUiTest {
                         endId = "p2",
                         label = "p1 -> p2",
                         arrowMode = DeponderArrowMode.BOTH,
-                        physics = RubberPhysics(naturalLengthDp = 120f, endpointGapDp = 0f),
+                        physics = RubberPhysics(naturalLengthDp = 120f),
+                        insets = DeponderRubberInsets.contour(0f),
                     )
 
                     // Order 1: .deponderPlanet("p1").deponderDrag()
@@ -83,8 +88,12 @@ class DeponderComposeUiTest {
             val body1Before = state.world.bodyOf("p1")!!
             val body2Before = state.world.bodyOf("p2")!!
             val poseBefore = state.world.rubberOf(EdgeKey("p1", "p2"))!!
+            val resolvedBefore = poseBefore.resolvedLength(
+                DeponderRubberInsets.contour(0f),
+                state.currentDensity,
+            )
             assertTrue(poseBefore.isActive)
-            assertTrue(poseBefore.length > 0f && poseBefore.length < poseBefore.centerDistance)
+            assertTrue(resolvedBefore > 0f && resolvedBefore < poseBefore.centerDistance)
 
             // 1. Tap below touchSlop preserves downstream .clickable {} on BOTH modifier orderings!
             onNodeWithTag("planet_p1").performTouchInput { click() }
@@ -127,6 +136,7 @@ class DeponderComposeUiTest {
     fun compoundRubberWithFillMaxWidthStretch_preservesExactBadgeShrinkWidth_andSupportsBothStretchOrders() =
         runComposeUiTest {
             val state = DeponderState()
+            var adInsets by mutableStateOf(DeponderRubberInsets.None)
 
             setContent {
                 Box(
@@ -150,6 +160,11 @@ class DeponderComposeUiTest {
                                 .size(20.dp)
                                 .deponderPlanet("c", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
                         )
+                        Box(
+                            modifier = Modifier
+                                .size(20.dp)
+                                .deponderPlanet("d", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
+                        )
                     }
 
                     // Upstream direct stretch: .deponderStretch().deponderRubber(...)
@@ -157,12 +172,12 @@ class DeponderComposeUiTest {
                         modifier = Modifier
                             .size(12.dp, 2.dp)
                             .deponderStretch()
-                            .deponderRubber("a", "b", RubberPhysics(endpointGapDp = 0f)),
+                            .deponderRubber("a", "b", RubberPhysics(), DeponderRubberInsets.contour(0f)),
                     )
 
                     // Compound Box rubber with fillMaxWidth() stretched stem + 80px non-stretched badge + nested grandchild
                     Box(
-                        modifier = Modifier.deponderRubber("b", "c", RubberPhysics(endpointGapDp = 0f)),
+                        modifier = Modifier.deponderRubber("b", "c", RubberPhysics(), DeponderRubberInsets.contour(0f)),
                         contentAlignment = Alignment.Center,
                     ) {
                         Box(
@@ -179,6 +194,14 @@ class DeponderComposeUiTest {
                         }
                     }
 
+                    // Default rubber on ("a", "d") with BOTH arrows: omits arrows on Mode.NONE endpoints!
+                    DeponderDefaultRubber(
+                        startId = "a",
+                        endId = "d",
+                        arrowMode = DeponderArrowMode.BOTH,
+                        insets = adInsets,
+                    )
+
                     // Fixed-width compound Box rubber (80px outer width > 20px stretched stem)
                     Layout(
                         content = {
@@ -186,7 +209,7 @@ class DeponderComposeUiTest {
                                 layout(20, 2) {}
                             }
                         },
-                        modifier = Modifier.deponderRubber("a", "c", RubberPhysics(endpointGapDp = 0f)),
+                        modifier = Modifier.deponderRubber("a", "c", RubberPhysics(), DeponderRubberInsets.contour(0f)),
                     ) { measurables, _ ->
                         val p = measurables.first().measure(androidx.compose.ui.unit.Constraints.fixed(20, 2))
                         layout(80, 18) { p.place(0, 8) }
@@ -207,17 +230,35 @@ class DeponderComposeUiTest {
 
             val rubberBc = state.activeRubbersByKey[EdgeKey("b", "c")]!!
             val poseBc = state.world.rubberOf(EdgeKey("b", "c"))!!
-            // Even with fillMaxWidth() on the stretched line inside a 400dp root, rubberBc wraps the 80px badge
-            // and shrinks cleanly to 40 / 80 = 0.5f!
+            // Even with fillMaxWidth() on the stretched line inside a 400dp root,
+            // rubberBc wraps the 80px badge and shrinks cleanly to 40 / 80 = 0.5f!
             assertEquals(80, rubberBc.measuredWidthPx)
             assertEquals(0.5f, rubberBc.computeEffectiveContainerScale(poseBc), 0.05f)
 
             state.moveTo("a", 200f, 220f)
             state.moveTo("c", 260f, 220f)
+            state.moveTo("d", 340f, 220f)
             waitForIdle()
             val rubberAc = state.activeRubbersByKey[EdgeKey("a", "c")]!!
             val poseAc = state.world.rubberOf(EdgeKey("a", "c"))!!
             assertEquals(0.5f, rubberAc.computeEffectiveContainerScale(poseAc), 0.05f)
+
+            val rubberAd = state.activeRubbersByKey[EdgeKey("a", "d")]!!
+            val poseAd = state.world.rubberOf(EdgeKey("a", "d"))!!
+            val noneWidth = rubberAd.measuredWidthPx
+            assertEquals(140f, rubberAd.currentSpanLengthPx(poseAd), 1e-3f)
+
+            // Switching to `fixed(0f, 15f)` enables only the end arrow and trims 15dp from `d`!
+            adInsets = DeponderRubberInsets.fixed(startDp = 0f, endDp = 15f)
+            waitForIdle()
+            val oneArrowWidth = rubberAd.measuredWidthPx
+            assertTrue(oneArrowWidth > noneWidth, "Single safe-area arrow ($oneArrowWidth) must exceed None stem ($noneWidth)")
+            assertEquals(140f - 15f * state.currentDensity, rubberAd.currentSpanLengthPx(poseAd), 1e-3f)
+
+            // Switching to `Default` enables both arrows!
+            adInsets = DeponderRubberInsets.Default
+            waitForIdle()
+            assertTrue(rubberAd.measuredWidthPx > oneArrowWidth)
         }
 
     @Test

@@ -8,6 +8,7 @@ import kotlin.math.hypot
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -38,14 +39,13 @@ class PhysicsKernelTest {
             .toPlanetSpec(id = "p1", density = 2.5f)
         assertEquals(225f, finitePlanet.repulsionRadiusPx, 1e-4f)
 
-        val rubberSpec = RubberPhysics(elasticity = 1.5f, naturalLengthDp = 120f, endpointGapDp = 5f)
+        val rubberSpec = RubberPhysics(elasticity = 1.5f, naturalLengthDp = 120f)
             .toRubberSpec(startId = "a", endId = "b", density = 2.0f)
         assertEquals(240f, rubberSpec.naturalLengthPx, 1e-4f)
-        assertEquals(10f, rubberSpec.endpointGapPx, 1e-4f)
     }
 
     @Test
-    fun planetContourClearance_trimsRubberPoseOutsideAsymmetricPlanetBounds_andPreventsOverlap() = runTest {
+    fun planetContourClearance_exposesRawMetrics_andResolvesContourFixedAndNoneInsets() = runTest {
         val world = SimulationWorld(EnvironmentSpec(wallRepulsionPx = 0f, airDamping = 4.0f))
         world.updateViewport(1000f, 1000f)
 
@@ -56,16 +56,64 @@ class PhysicsKernelTest {
         world.setBodySize("leaf", widthPx = 40f, heightPx = 40f)
 
         val pose = world.upsertRubber(
-            RubberSpec(startId = "hub", endId = "leaf", naturalLengthPx = 80f, endpointGapPx = 5f),
+            RubberSpec(startId = "hub", endId = "leaf", naturalLengthPx = 80f),
         )
-        // Center-to-center = 200px; hub clearance = 50 + 5 = 55px (sxVis = 155); leaf clearance = 20 + 5 = 25px (exVis = 275).
         assertEquals(200f, pose.centerDistance, 1e-3f)
-        assertEquals(120f, pose.length, 1e-3f) // 275 - 155 = 120px!
-        assertEquals(215f, pose.centerX, 1e-3f) // (155 + 275) / 2 = 215px!
+        assertEquals(200f, pose.centerX, 1e-3f)
+        assertEquals(50f, pose.startContourPx, 1e-3f)
+        assertEquals(20f, pose.endContourPx, 1e-3f)
+
+        // 1. Symmetric contour(5f): hub clearance = 55px (sxVis = 155), leaf clearance = 25px (exVis = 275).
+        val bothInsets = DeponderRubberInsets.contour(5f)
+        assertTrue(bothInsets.hasStartSafeArea && bothInsets.hasEndSafeArea)
+        assertEquals(120f, pose.resolvedLength(bothInsets, 1f), 1e-3f)
+        assertEquals(215f, pose.resolvedCenterX(bothInsets, 1f), 1e-3f)
+
+        // Negative contour gap trims inward (e.g. padded touch target) and clamps cleanly at 0px!
+        val inwardInsets = DeponderRubberInsets.contour(-10f)
+        assertEquals(150f, pose.resolvedLength(inwardInsets, 1f), 1e-3f) // (50 - 10) + (20 - 10) = 50 -> 200 - 50 = 150px
+        assertEquals(0f, pose.resolvedStartInsetPx(DeponderRubberInsets.contour(-80f), 1f), 1e-3f)
+
+        // 2. Asymmetric endOnly(5f): start anchored at hub center (100, NONE), end stops at 275 -> len = 175, cx = 187.5.
+        val endOnlyInsets = DeponderRubberInsets.endOnly(5f)
+        assertFalse(endOnlyInsets.hasStartSafeArea)
+        assertTrue(endOnlyInsets.hasEndSafeArea)
+        assertEquals(175f, pose.resolvedLength(endOnlyInsets, 1f), 1e-3f)
+        assertEquals(187.5f, pose.resolvedCenterX(endOnlyInsets, 1f), 1e-3f)
+
+        // 3. Explicit Fixed mode: bypasses contour estimation (`fixed(0f, 30f)` normalizes start to NONE!).
+        val asymFixed = DeponderRubberInsets.fixed(startDp = 0f, endDp = 30f)
+        assertEquals(DeponderRubberInsets.Mode.NONE, asymFixed.startMode)
+        assertEquals(DeponderRubberInsets.Mode.FIXED, asymFixed.endMode)
+        assertFalse(asymFixed.hasStartSafeArea)
+        assertTrue(asymFixed.hasEndSafeArea)
+        assertEquals(140f, pose.resolvedLength(asymFixed, density = 2f), 1e-3f) // 200 - (30 * 2) = 140px
+        assertEquals(DeponderRubberInsets.None, DeponderRubberInsets.fixed(0f))
+
+        // 4. Edge-to-edge None: spans full 200px @ cx = 200 and stays active (> 0px) even when bounds overlap!
+        assertFalse(DeponderRubberInsets.None.hasStartSafeArea || DeponderRubberInsets.None.hasEndSafeArea)
+        assertEquals(200f, pose.resolvedLength(DeponderRubberInsets.None, 1f), 1e-3f)
+        assertEquals(200f, pose.resolvedCenterX(DeponderRubberInsets.None, 1f), 1e-3f)
+
+        // Reject NaN / Infinity / negative Fixed values so resolved transforms can never produce NaN!
+        assertFailsWith<IllegalArgumentException> { DeponderRubberInsets.contour(Float.POSITIVE_INFINITY) }
+        assertFailsWith<IllegalArgumentException> { DeponderRubberInsets.contour(Float.NaN) }
+        assertFailsWith<IllegalArgumentException> { DeponderRubberInsets.fixed(-1f) }
+        assertFailsWith<IllegalArgumentException> { DeponderRubberInsets.fixed(Float.POSITIVE_INFINITY) }
 
         // Dynamic rubber elasticity update wakes simulation and updates spec cleanly.
         world.updateAllRubbersElasticity(4.5f)
         assertEquals(4.5f, pose.spec.elasticity, 1e-4f)
+
+        // Asymmetric overlap clamping: `hub` @ 100 (sInset = 55), `leaf` @ 130 (eInset = 25) -> centerDist = 30px < 80px.
+        // Resolved center must remain clamped strictly inside [100, 130] instead of overshooting past `leaf`!
+        world.setBodyPosition("leaf", 130f, 300f)
+        assertTrue(pose.isActive)
+        assertEquals(0f, pose.resolvedLength(bothInsets, 1f), 1e-3f)
+        val clampedCx = pose.resolvedCenterX(bothInsets, 1f)
+        assertTrue(clampedCx in 100f..130f, "Collapsed resolvedCenterX ($clampedCx) must stay within [100, 130]")
+        assertEquals(30f, pose.resolvedLength(DeponderRubberInsets.None, 1f), 1e-3f)
+        assertEquals(115f, pose.resolvedCenterX(DeponderRubberInsets.None, 1f), 1e-3f)
     }
 
     @Test

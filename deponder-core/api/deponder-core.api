@@ -99,6 +99,66 @@ public final class com/cinpe/deponder/core/DeponderDefaults$Simulation {
 	public static final field SETTLE_DURATION_SECONDS F
 }
 
+public final class com/cinpe/deponder/core/DeponderRubberInsets {
+	public static final field Companion Lcom/cinpe/deponder/core/DeponderRubberInsets$Companion;
+	public static final fun contour ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static final fun contour (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static final fun contour (FF)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static final fun endOnly ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static final fun endOnly (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fixed (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static final fun fixed (FF)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun getEndMode ()Lcom/cinpe/deponder/core/DeponderRubberInsets$Mode;
+	public final fun getEndValueDp ()F
+	public final fun getHasEndSafeArea ()Z
+	public final fun getHasStartSafeArea ()Z
+	public final fun getStartMode ()Lcom/cinpe/deponder/core/DeponderRubberInsets$Mode;
+	public final fun getStartValueDp ()F
+	public fun hashCode ()I
+	public static final fun none ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static final fun startOnly ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static final fun startOnly (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public fun toString ()Ljava/lang/String;
+	public final fun withEndContour ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun withEndContour (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static synthetic fun withEndContour$default (Lcom/cinpe/deponder/core/DeponderRubberInsets;FILjava/lang/Object;)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun withEndFixed (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun withEndNone ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun withStartContour ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun withStartContour (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static synthetic fun withStartContour$default (Lcom/cinpe/deponder/core/DeponderRubberInsets;FILjava/lang/Object;)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun withStartFixed (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun withStartNone ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+}
+
+public final class com/cinpe/deponder/core/DeponderRubberInsets$Companion {
+	public final fun contour ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun contour (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun contour (FF)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static synthetic fun contour$default (Lcom/cinpe/deponder/core/DeponderRubberInsets$Companion;FILjava/lang/Object;)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun endOnly ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun endOnly (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static synthetic fun endOnly$default (Lcom/cinpe/deponder/core/DeponderRubberInsets$Companion;FILjava/lang/Object;)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun fixed (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun fixed (FF)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun getDefault ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun getNone ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun none ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun startOnly ()Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public final fun startOnly (F)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+	public static synthetic fun startOnly$default (Lcom/cinpe/deponder/core/DeponderRubberInsets$Companion;FILjava/lang/Object;)Lcom/cinpe/deponder/core/DeponderRubberInsets;
+}
+
+public final class com/cinpe/deponder/core/DeponderRubberInsets$Mode : java/lang/Enum {
+	public static final field CONTOUR Lcom/cinpe/deponder/core/DeponderRubberInsets$Mode;
+	public static final field FIXED Lcom/cinpe/deponder/core/DeponderRubberInsets$Mode;
+	public static final field NONE Lcom/cinpe/deponder/core/DeponderRubberInsets$Mode;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lcom/cinpe/deponder/core/DeponderRubberInsets$Mode;
+	public static fun values ()[Lcom/cinpe/deponder/core/DeponderRubberInsets$Mode;
+}
+
 public final class com/cinpe/deponder/core/EdgeKey {
 	public static final field Companion Lcom/cinpe/deponder/core/EdgeKey$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
@@ -287,23 +347,20 @@ public final class com/cinpe/deponder/core/RootPhysics$Companion {
 public final class com/cinpe/deponder/core/RubberPhysics {
 	public static final field Companion Lcom/cinpe/deponder/core/RubberPhysics$Companion;
 	public fun <init> ()V
-	public fun <init> (FFF)V
-	public synthetic fun <init> (FFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (FF)V
+	public synthetic fun <init> (FFILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()F
 	public final fun component2 ()F
-	public final fun component3 ()F
-	public final fun copy (FFF)Lcom/cinpe/deponder/core/RubberPhysics;
-	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/RubberPhysics;FFFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun copy (FF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/RubberPhysics;FFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPhysics;
 	public fun equals (Ljava/lang/Object;)Z
 	public static final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/RubberPhysics;
 	public final fun getElasticity ()F
-	public final fun getEndpointGapDp ()F
 	public final fun getNaturalLengthDp ()F
 	public fun hashCode ()I
 	public final fun toRubberSpec (Ljava/lang/String;Ljava/lang/String;F)Lcom/cinpe/deponder/core/RubberSpec;
 	public fun toString ()Ljava/lang/String;
 	public final fun withElasticity (F)Lcom/cinpe/deponder/core/RubberPhysics;
-	public final fun withEndpointGapDp (F)Lcom/cinpe/deponder/core/RubberPhysics;
 	public final fun withNaturalLengthDp (F)Lcom/cinpe/deponder/core/RubberPhysics;
 }
 
@@ -315,29 +372,36 @@ public final class com/cinpe/deponder/core/RubberPose {
 	public final fun getCenterDistance ()F
 	public final fun getCenterX ()F
 	public final fun getCenterY ()F
+	public final fun getDirectionX ()F
+	public final fun getDirectionY ()F
 	public final fun getDirty ()Z
-	public final fun getLength ()F
+	public final fun getEndContourPx ()F
 	public final fun getRotationDeg ()F
 	public final fun getScale ()F
 	public final fun getSpec ()Lcom/cinpe/deponder/core/RubberSpec;
+	public final fun getStartContourPx ()F
 	public final fun isActive ()Z
+	public final fun localSpanOffsetX (Lcom/cinpe/deponder/core/DeponderRubberInsets;F)F
+	public final fun resolvedCenterX (Lcom/cinpe/deponder/core/DeponderRubberInsets;F)F
+	public final fun resolvedCenterY (Lcom/cinpe/deponder/core/DeponderRubberInsets;F)F
+	public final fun resolvedEndInsetPx (Lcom/cinpe/deponder/core/DeponderRubberInsets;F)F
+	public final fun resolvedLength (Lcom/cinpe/deponder/core/DeponderRubberInsets;F)F
+	public final fun resolvedStartInsetPx (Lcom/cinpe/deponder/core/DeponderRubberInsets;F)F
 	public final fun setSpec (Lcom/cinpe/deponder/core/RubberSpec;)V
 }
 
 public final class com/cinpe/deponder/core/RubberSpec {
-	public fun <init> (Ljava/lang/String;Ljava/lang/String;FFF)V
-	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;FFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;FF)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;FFILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/lang/String;
 	public final fun component3 ()F
 	public final fun component4 ()F
-	public final fun component5 ()F
-	public final fun copy (Ljava/lang/String;Ljava/lang/String;FFF)Lcom/cinpe/deponder/core/RubberSpec;
-	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/RubberSpec;Ljava/lang/String;Ljava/lang/String;FFFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberSpec;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;FF)Lcom/cinpe/deponder/core/RubberSpec;
+	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/RubberSpec;Ljava/lang/String;Ljava/lang/String;FFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberSpec;
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getElasticity ()F
 	public final fun getEndId ()Ljava/lang/String;
-	public final fun getEndpointGapPx ()F
 	public final fun getKey ()Lcom/cinpe/deponder/core/EdgeKey;
 	public final fun getNaturalLengthPx ()F
 	public final fun getStartId ()Ljava/lang/String;

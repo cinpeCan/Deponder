@@ -7,6 +7,7 @@ import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
 import androidx.lifecycle.LifecycleOwner
+import com.cinpe.deponder.core.DeponderRubberInsets
 import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetBody
 import com.cinpe.deponder.core.PlanetPhysics
@@ -79,23 +80,28 @@ public fun View.clearDeponderPlanet() {
  * Marks a direct child [View] of a [deponderRoot] container as an undirected spring link (`Rubber`)
  * connecting [startId] and [endId].
  *
- * Automatically clears both endpoint planets' UI contours so neither built-in nor custom developer
- * rubbers get occluded beneath planet views, and expands outer `RenderNode` bounds when inner
- * [deponderStretch] children are present so host containers with default `clipChildren = true` never
- * truncate stretched lines.
+ * Applies [insets] ([DeponderRubberInsets.Default] contour clearance by default, or
+ * [DeponderRubberInsets.None] for continuous center-to-center spans; defaults to [DeponderRubberView.insets]
+ * when called on a pre-configured [DeponderRubberView]) on hardware `RenderNode` properties with zero
+ * `requestLayout()` overhead, expanding outer bounds when inner [deponderStretch] children are present
+ * so host containers with default `clipChildren = true` never truncate stretched lines.
  */
 @JvmOverloads
 public fun View.deponderRubber(
     startId: String,
     endId: String,
     physics: RubberPhysics = RubberPhysics(),
+    insets: DeponderRubberInsets = if (this is DeponderRubberView) this.insets else DeponderRubberInsets.Default,
 ) {
     check(getTag(R.id.deponder_planet_binding_tag) == null) {
         "View cannot be bound as both deponderRubber('$startId', '$endId') and deponderPlanet simultaneously."
     }
+    if (this is DeponderRubberView) {
+        syncInsetsFromBinding(insets)
+    }
     val existing = getTag(R.id.deponder_rubber_binding_tag) as? RubberViewBinding
     if (existing != null) {
-        existing.update(startId, endId, physics)
+        existing.update(startId, endId, physics, insets)
         return
     }
     val binding = RubberViewBinding(
@@ -103,6 +109,7 @@ public fun View.deponderRubber(
         startId = startId,
         endId = endId,
         physics = physics,
+        insets = insets,
     )
     setTag(R.id.deponder_rubber_binding_tag, binding)
     binding.install()
@@ -305,6 +312,7 @@ internal class RubberViewBinding(
     var startId: String,
     var endId: String,
     var physics: RubberPhysics,
+    var insets: DeponderRubberInsets,
 ) {
     var attachedController: DeponderController? = null
         private set
@@ -348,13 +356,33 @@ internal class RubberViewBinding(
         controller.registerRubberBinding(this)
     }
 
-    fun update(newStartId: String, newEndId: String, newPhysics: RubberPhysics) {
+    fun update(
+        newStartId: String,
+        newEndId: String,
+        newPhysics: RubberPhysics,
+        newInsets: DeponderRubberInsets,
+    ) {
         val oldKey = EdgeKey(startId, endId)
-        if (startId == newStartId && endId == newEndId && physics == newPhysics) return
+        val topologyOrPhysicsChanged = startId != newStartId || endId != newEndId || physics != newPhysics
+        val insetsChanged = insets != newInsets
+        if (!topologyOrPhysicsChanged && !insetsChanged) return
         startId = newStartId
         endId = newEndId
         physics = newPhysics
-        attachedController?.rebindRubberEndpointsOrPhysics(this, oldKey)
+        insets = newInsets
+        val ctrl = attachedController ?: return
+        if (topologyOrPhysicsChanged) {
+            ctrl.rebindRubberEndpointsOrPhysics(this, oldKey)
+        } else {
+            refreshPoseFromController()
+        }
+    }
+
+    fun updateInsetsOnly(newInsets: DeponderRubberInsets) {
+        if (insets != newInsets) {
+            insets = newInsets
+            refreshPoseFromController()
+        }
     }
 
     fun refreshPoseFromController() {
@@ -363,51 +391,72 @@ internal class RubberViewBinding(
         applyRubberPose(pose)
     }
 
+    private fun currentDensityPxPerDp(): Float =
+        attachedController?.density ?: view.resources.displayMetrics.density.coerceAtLeast(1e-3f)
+
     private fun computeUnderLayerTranslationZ(): Float {
         val minPlanetZ = attachedController?.minPlanetVisualZOrZero() ?: 0f
         return minPlanetZ - view.elevation - 1f
     }
 
+    private fun hideRubberLayer(underTranslationZ: Float) {
+        view.alpha = 0f
+        view.scaleX = 0f
+        view.scaleY = 0f
+        view.translationX = 0f
+        view.translationY = 0f
+        view.rotation = 0f
+        view.translationZ = underTranslationZ
+        if (view is DeponderRubberView) {
+            view.applyDefaultRubberPose(pose = null, spanLengthPx = 0f, effectiveScale = 0f, outerScaleX = 0f)
+        }
+    }
+
     fun applyRubberPose(pose: RubberPose?) {
         val underTranslationZ = computeUnderLayerTranslationZ()
-        if (pose == null || !pose.isActive || pose.length <= 0f) {
-            view.alpha = 0f
-            view.scaleX = 0f
-            view.scaleY = 0f
-            view.translationX = 0f
-            view.translationY = 0f
-            view.rotation = 0f
-            view.translationZ = underTranslationZ
-            if (view is DeponderRubberView) {
-                view.applyDefaultRubberPose(pose = null, effectiveScale = 0f, outerScaleX = 0f)
-            }
+        if (pose == null || !pose.isActive || pose.centerDistance <= 1e-4f) {
+            hideRubberLayer(underTranslationZ)
+            return
+        }
+
+        val density = currentDensityPxPerDp()
+        val spanLen = pose.resolvedLength(insets, density)
+        if (spanLen <= 0f) {
+            hideRubberLayer(underTranslationZ)
             return
         }
 
         val w = view.width
         val h = view.height
-        view.alpha = 1f
-        view.translationZ = underTranslationZ
-        view.pivotX = w * 0.5f
-        view.pivotY = h * 0.5f
-        view.translationX = pose.centerX - (view.left + w * 0.5f)
-        view.translationY = pose.centerY - (view.top + h * 0.5f)
-        view.rotation = pose.rotationDeg
+        val cx = pose.resolvedCenterX(insets, density)
+        val cy = pose.resolvedCenterY(insets, density)
 
-        // Built-in DeponderRubberView: expand outer RenderNode across `pose.length` so default
+        // Built-in DeponderRubberView: expand outer RenderNode across `spanLen` so default
         // `rootView.clipChildren = true` never clips stretched lines or endpoint arrowheads!
         if (view is DeponderRubberView) {
             val nonStretchedW = view.nonStretchedContentWidthPx()
             val effectiveScale = computeRubberEffectiveScale(
-                lengthPx = pose.length,
+                lengthPx = spanLen,
                 nonStretchedWidthPx = nonStretchedW,
                 poseScale = pose.scale,
             )
-            val outerScaleX = if (w > 0 && effectiveScale > 0f) pose.length / w.toFloat() else 0f
+            if (effectiveScale <= 0f) {
+                hideRubberLayer(underTranslationZ)
+                return
+            }
+            val outerScaleX = if (w > 0) spanLen / w.toFloat() else 0f
+            view.alpha = 1f
+            view.translationZ = underTranslationZ
+            view.pivotX = w * 0.5f
+            view.pivotY = h * 0.5f
+            view.translationX = cx - (view.left + w * 0.5f)
+            view.translationY = cy - (view.top + h * 0.5f)
+            view.rotation = pose.rotationDeg
             view.scaleX = outerScaleX
             view.scaleY = effectiveScale
             view.applyDefaultRubberPose(
                 pose = pose,
+                spanLengthPx = spanLen,
                 effectiveScale = effectiveScale,
                 outerScaleX = outerScaleX,
             )
@@ -416,8 +465,15 @@ internal class RubberViewBinding(
 
         val stretchXmlToken = attachedController?.xmlStretchToken ?: cachedStretchXmlToken
         if (isViewStretchEnabled(view, stretchXmlToken)) {
+            view.alpha = 1f
+            view.translationZ = underTranslationZ
+            view.pivotX = w * 0.5f
+            view.pivotY = h * 0.5f
+            view.translationX = cx - (view.left + w * 0.5f)
+            view.translationY = cy - (view.top + h * 0.5f)
+            view.rotation = pose.rotationDeg
             view.scaleX = computeViewStretchScaleX(
-                lengthPx = pose.length,
+                lengthPx = spanLen,
                 widthPx = w,
                 parentScale = 1f,
             )
@@ -425,34 +481,48 @@ internal class RubberViewBinding(
             if (view is ViewGroup) {
                 resetCompoundRubberDescendants(view)
             }
-        } else {
-            val nonStretchedW = computeNonStretchedWidthPx(view, stretchXmlToken)
-            val effectiveScale = computeRubberEffectiveScale(
-                lengthPx = pose.length,
-                nonStretchedWidthPx = nonStretchedW,
-                poseScale = pose.scale,
+            return
+        }
+
+        val nonStretchedW = computeNonStretchedWidthPx(view, stretchXmlToken)
+        val effectiveScale = computeRubberEffectiveScale(
+            lengthPx = spanLen,
+            nonStretchedWidthPx = nonStretchedW,
+            poseScale = pose.scale,
+        )
+        if (effectiveScale <= 0f) {
+            hideRubberLayer(underTranslationZ)
+            return
+        }
+
+        view.alpha = 1f
+        view.translationZ = underTranslationZ
+        view.pivotX = w * 0.5f
+        view.pivotY = h * 0.5f
+        view.translationX = cx - (view.left + w * 0.5f)
+        view.translationY = cy - (view.top + h * 0.5f)
+        view.rotation = pose.rotationDeg
+
+        if (view is ViewGroup && w > 0 && containsStretchedDescendantOrSelf(view, stretchXmlToken)) {
+            // Compound custom ViewGroup rubber: expand outer RenderNode across `spanLen`
+            // so `rootView.clipChildren = true` never truncates inner stretched lines, while
+            // counter-scaling non-stretched sibling labels/badges to exact `(effectiveScale, effectiveScale)`!
+            val outerScaleX = spanLen / w.toFloat()
+            val invScaleX = if (outerScaleX > 1e-6f) effectiveScale / outerScaleX else 0f
+            view.scaleX = outerScaleX
+            view.scaleY = effectiveScale
+            applyCompoundRubberDescendantsTopDown(
+                group = view,
+                rubberRoot = view,
+                rubberWidthPx = w,
+                invScaleX = invScaleX,
+                stretchXmlToken = stretchXmlToken,
             )
-            if (view is ViewGroup && w > 0 && containsStretchedDescendantOrSelf(view, stretchXmlToken)) {
-                // Compound custom ViewGroup rubber: expand outer RenderNode across `pose.length`
-                // so `rootView.clipChildren = true` never truncates inner stretched lines, while
-                // counter-scaling non-stretched sibling labels/badges to exact `(effectiveScale, effectiveScale)`!
-                val outerScaleX = if (effectiveScale > 0f) pose.length / w.toFloat() else 0f
-                val invScaleX = if (outerScaleX > 1e-6f) effectiveScale / outerScaleX else 0f
-                view.scaleX = outerScaleX
-                view.scaleY = effectiveScale
-                applyCompoundRubberDescendantsTopDown(
-                    group = view,
-                    rubberRoot = view,
-                    rubberWidthPx = w,
-                    invScaleX = invScaleX,
-                    stretchXmlToken = stretchXmlToken,
-                )
-            } else {
-                view.scaleX = effectiveScale
-                view.scaleY = effectiveScale
-                if (view is ViewGroup) {
-                    resetCompoundRubberDescendants(view)
-                }
+        } else {
+            view.scaleX = effectiveScale
+            view.scaleY = effectiveScale
+            if (view is ViewGroup) {
+                resetCompoundRubberDescendants(view)
             }
         }
     }
@@ -634,9 +704,9 @@ internal fun computeRubberEffectiveScale(
 
 /**
  * Applies top-down transforms inside a compound [rubberRoot] whose outer `RenderNode` already spans
- * `pose.length` (`outerScaleX = pose.length / rubberWidthPx`):
+ * the resolved link length (`outerScaleX = spanLen / rubberWidthPx`):
  * - Stretched children scale to fill `[0, rubberWidthPx]` (`scaleX = rubberWidthPx / childW`),
- *   mapping to `pose.length` on screen with ancestor pruning.
+ *   mapping to `spanLen` on screen with ancestor pruning.
  * - Non-stretched sibling subtrees counter-scale by `invScaleX = effectiveScale / outerScaleX`,
  *   rendering at exact undistorted `(effectiveScale, effectiveScale)` on screen without clipping.
  */

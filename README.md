@@ -16,7 +16,7 @@ Decouple force-directed physics from layout containers via lightweight Compose `
 
 - **Unified Cross-Stack API**: Identical 5-part mental model and `dp`-based physics configuration across Compose Multiplatform and Android Views, with full Java interop.
 - **Low-Intrusive & Gesture-Safe**: Preserves standard `.clickable {}`, `OnClickListener`, and ripple feedback via `touchSlop` gating and root-space coordinate projection; elevates dragged items via `zIndex` / `translationZ` without reordering child views or mutating `clipChildren` / `clipToBounds`.
-- **Automatic Contour Clearance & Built-in Spring Links**: Trims link endpoints against node bounds automatically so neither built-in nor custom link views get buried beneath cards; includes ready-to-use `DeponderDefaultRubber` (Compose) and `DeponderRubberView` (Android View / XML) with arrowheads and floating labels.
+- **WindowInsets-Style Link Safe Areas & Built-in Spring Links**: Decouples pure Hooke spring physics (`RubberPhysics`) from UI endpoint clearance (`DeponderRubberInsets`: `Default` automatic contour estimation, `fixed(dp)` explicit clearance values, `None` continuous center-to-center spans, and `startOnly` / `endOnly` asymmetric clearance); includes ready-to-use `DeponderDefaultRubber` (Compose) and `DeponderRubberView` (Android View / XML) with floating labels and directional arrowheads (automatically omitted on center-anchored endpoints).
 - **Frame-Rate-Independent Physics Kernel (`deponder-core`)**:
   - **Consistent Motion Across 60Hz–240Hz**: Adaptive `1/120s` sub-stepping keeps simulation speed consistent across display refresh rates, paired with deterministic symmetry breaking for stacked or collinear nodes.
   - **Idle 0% CPU & 3-Tier Hybrid Quadtree**: Dual velocity/acceleration sleep thresholds drop CPU usage to 0% at rest with instant drag wakeup, scaling automatically across node counts (`< 64` direct array, `64–255` single-thread quadtree, `256+` parallel snapshot evaluation on `Dispatchers.Default`).
@@ -86,6 +86,7 @@ Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
             label = link.relation,
             arrowMode = DeponderArrowMode.BOTH,
             physics = RubberPhysics(naturalLengthDp = 120f),
+            insets = DeponderRubberInsets.Default, // or DeponderRubberInsets.None for center-to-center lines
         )
     }
 

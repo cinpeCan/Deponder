@@ -16,7 +16,7 @@
 
 - **双端统一的接入模型**：在 Compose 与 Android View 上提供语义完全对称的 5 个接入接口与统一的 `dp` 物理参数体系，跨技术栈迁移零额外心智负担。
 - **低侵入容器解耦与手势共存**：通过 `touchSlop` 门限与根容器坐标投影区分点击与拖拽，完整保留组件原有的 `.clickable {}`、`OnClickListener` 与水波纹反馈；拖拽置顶仅调整 `zIndex` / `translationZ`，不改变子视图层级顺序，也不修改宿主的 `clipChildren` / `clipToBounds`。
-- **连线边缘自动避让与默认弹簧组件**：物理内核自动按两端节点的几何轮廓裁剪连线起止点，避免连线与箭头被节点卡片遮挡；内置开箱即用的 `DeponderDefaultRubber`（Compose）与 `DeponderRubberView`（Android View / XML），支持单双向箭头与线体上方透明悬浮标签。
+- **安全区式连线避让与默认弹簧组件**：将纯胡克弹簧力学（`RubberPhysics`）与 UI 端点安全区（`DeponderRubberInsets`）正交解耦，支持自动轮廓估算（`Default`）、显式指定安全区距离（`fixed(dp)`）、纯中心连续直连（`None`）及单侧避让（`startOnly` / `endOnly`）；内置开箱即用的 `DeponderDefaultRubber`（Compose）与 `DeponderRubberView`（Android View / XML），支持线体上方透明悬浮标签与单双向箭头（在圆心直连端自动隐去箭头）。
 - **帧率无关的高性能内核（`deponder-core`）**：
   - **跨屏恒速积分**：采用自适应 `1/120s` 子步积分，在 60Hz–240Hz 屏幕上保持一致的物理运动节奏，并对重叠或共线节点做确定性对称破缺。
   - **静止零开销与三级四叉树加速**：结合速度与加速度双阈值全局休眠（静止态 0% CPU 占用，微幅拖拽即时唤醒），按节点规模自动切换计算策略（64 以内直接遍历、64–255 单线程四叉树、256 及以上切入 `Dispatchers.Default` 并行快照计算）。
@@ -86,6 +86,7 @@ Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
             label = link.relation,
             arrowMode = DeponderArrowMode.BOTH,
             physics = RubberPhysics(naturalLengthDp = 120f),
+            insets = DeponderRubberInsets.Default, // 传 DeponderRubberInsets.None 可切换中心直连
         )
     }
 

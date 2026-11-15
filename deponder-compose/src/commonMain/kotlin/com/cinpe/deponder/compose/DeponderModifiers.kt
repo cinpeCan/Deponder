@@ -36,6 +36,7 @@ import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntSize
+import com.cinpe.deponder.core.DeponderRubberInsets
 import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetBody
 import com.cinpe.deponder.core.PlanetPhysics
@@ -77,15 +78,18 @@ public fun Modifier.deponderPlanet(
  * Marks any UI element inside a [deponderRoot] subtree as an undirected spring link (`Rubber`)
  * connecting [startId] and [endId].
  *
- * Automatically clears both endpoint planets' UI contours so neither built-in nor custom developer
- * rubbers get occluded beneath planet nodes. Chain [deponderStretch] on this modifier or on an inner
- * child element to stretch horizontally along the visible span.
+ * Applies [insets] ([DeponderRubberInsets.Default] contour clearance by default,
+ * [DeponderRubberInsets.fixed] for explicit clearance distances, or [DeponderRubberInsets.None]
+ * for continuous center-to-center spans) on the graphics layer with zero relayout overhead.
+ * Chain [deponderStretch] on this modifier or on an inner child element to stretch horizontally
+ * along the resolved span.
  */
 public fun Modifier.deponderRubber(
     startId: String,
     endId: String,
     physics: RubberPhysics = RubberPhysics(),
-): Modifier = this then DeponderRubberElement(startId, endId, physics) then DeponderRubberInnerAnchorElement
+    insets: DeponderRubberInsets = DeponderRubberInsets.Default,
+): Modifier = this then DeponderRubberElement(startId, endId, physics, insets) then DeponderRubberInnerAnchorElement
 
 /**
  * Opts the modified [deponderRubber] (or a specific inner child inside a [deponderRubber] subtree)
@@ -459,11 +463,12 @@ private data class DeponderRubberElement(
     val startId: String,
     val endId: String,
     val physics: RubberPhysics,
+    val insets: DeponderRubberInsets,
 ) : ModifierNodeElement<DeponderRubberNode>() {
-    override fun create(): DeponderRubberNode = DeponderRubberNode(startId, endId, physics)
+    override fun create(): DeponderRubberNode = DeponderRubberNode(startId, endId, physics, insets)
 
     override fun update(node: DeponderRubberNode) {
-        node.update(startId, endId, physics)
+        node.update(startId, endId, physics, insets)
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -471,6 +476,7 @@ private data class DeponderRubberElement(
         properties["startId"] = startId
         properties["endId"] = endId
         properties["physics"] = physics
+        properties["insets"] = insets
     }
 }
 
@@ -478,6 +484,7 @@ internal class DeponderRubberNode(
     var startId: String,
     var endId: String,
     var physics: RubberPhysics,
+    var insets: DeponderRubberInsets,
 ) : Modifier.Node(),
     LayoutModifierNode,
     LayoutAwareModifierNode,
@@ -489,8 +496,10 @@ internal class DeponderRubberNode(
     var rootNode: DeponderRootNode? = null
         private set
 
+    internal var registeredState: DeponderState? = null
+
     val attachedState: DeponderState?
-        get() = rootNode?.state
+        get() = registeredState ?: rootNode?.state
 
     var boundPose: RubberPose? = null
         private set
@@ -519,8 +528,16 @@ internal class DeponderRubberNode(
 
     internal fun isDirectStretchEnabled(): Boolean = directStretchNodes.any { it.enabled }
 
+    internal fun currentDensityOrDefault(): Float = attachedState?.currentDensity ?: 1f
+
+    internal fun currentSpanLengthPx(pose: RubberPose): Float {
+        if (!pose.isActive || pose.centerDistance <= 1e-4f) return 0f
+        return pose.resolvedLength(insets, currentDensityOrDefault())
+    }
+
     internal fun computeEffectiveContainerScale(pose: RubberPose): Float {
-        if (!pose.isActive || pose.length <= 0f || pose.scale <= 0f) return 0f
+        val spanLen = currentSpanLengthPx(pose)
+        if (spanLen <= 0f || pose.scale <= 0f) return 0f
         if (isDirectStretchEnabled()) return pose.scale
 
         val nonStretchedW = if (explicitNonStretchedWidthPx >= 0) {
@@ -542,8 +559,8 @@ internal class DeponderRubberNode(
             }
         }
 
-        if (nonStretchedW > 0 && pose.length < nonStretchedW * pose.scale) {
-            return (pose.length / nonStretchedW.toFloat()).coerceAtLeast(0f)
+        if (nonStretchedW > 0 && spanLen < nonStretchedW * pose.scale) {
+            return (spanLen / nonStretchedW.toFloat()).coerceAtLeast(0f)
         }
         return pose.scale
     }
@@ -563,23 +580,34 @@ internal class DeponderRubberNode(
         boundPose = foundRoot.state.registerRubberNode(this)
     }
 
-    fun update(newStartId: String, newEndId: String, newPhysics: RubberPhysics) {
+    fun update(
+        newStartId: String,
+        newEndId: String,
+        newPhysics: RubberPhysics,
+        newInsets: DeponderRubberInsets,
+    ) {
         val oldStart = startId
         val oldEnd = endId
         val oldPhysics = physics
-        if (oldStart == newStartId && oldEnd == newEndId && oldPhysics == newPhysics) return
+        val oldInsets = insets
+        if (oldStart == newStartId && oldEnd == newEndId && oldPhysics == newPhysics && oldInsets == newInsets) return
         val oldKey = EdgeKey(oldStart, oldEnd)
         startId = newStartId
         endId = newEndId
         physics = newPhysics
+        insets = newInsets
         val st = attachedState ?: return
-        boundPose = st.updateRubberRegistration(
-            node = this,
-            oldKey = oldKey,
-            newStartId = newStartId,
-            newEndId = newEndId,
-            newPhysics = newPhysics,
-        )
+        if (oldStart != newStartId || oldEnd != newEndId || oldPhysics != newPhysics) {
+            boundPose = st.updateRubberRegistration(
+                node = this,
+                oldKey = oldKey,
+                newStartId = newStartId,
+                newEndId = newEndId,
+                newPhysics = newPhysics,
+            )
+        } else {
+            st.notifyFrameChanged()
+        }
     }
 
     override fun onPlaced(coordinates: LayoutCoordinates) {
@@ -650,7 +678,18 @@ internal class DeponderRubberNode(
                 st?.frameTick
                 val pose = boundPose
                 transformOrigin = TransformOrigin.Center
-                if (st == null || pose == null || !pose.isActive || pose.length <= 0f || !hasBaseOrigin) {
+                val density = st?.currentDensity ?: 1f
+                val spanLen = if (pose != null && pose.isActive && pose.centerDistance > 1e-4f) {
+                    pose.resolvedLength(insets, density)
+                } else {
+                    0f
+                }
+                val effectiveScale = if (pose != null && spanLen > 0f) {
+                    if (isDirectStretchEnabled()) pose.scale else computeEffectiveContainerScale(pose)
+                } else {
+                    0f
+                }
+                if (st == null || pose == null || spanLen <= 0f || effectiveScale <= 0f || !hasBaseOrigin) {
                     alpha = 0f
                     scaleX = 0f
                     scaleY = 0f
@@ -661,18 +700,19 @@ internal class DeponderRubberNode(
                     alpha = 1f
                     val staticCenterX = baseOriginInRootX + measuredWidthPx * 0.5f
                     val staticCenterY = baseOriginInRootY + measuredHeightPx * 0.5f
-                    translationX = pose.centerX - staticCenterX
-                    translationY = pose.centerY - staticCenterY
+                    val targetCx = pose.resolvedCenterX(insets, density)
+                    val targetCy = pose.resolvedCenterY(insets, density)
+                    translationX = targetCx - staticCenterX
+                    translationY = targetCy - staticCenterY
                     rotationZ = pose.rotationDeg
                     if (isDirectStretchEnabled()) {
                         scaleX = computeStretchScaleX(
-                            lengthPx = pose.length,
+                            lengthPx = spanLen,
                             widthPx = measuredWidthPx,
                             parentScale = 1f,
                         )
                         scaleY = pose.scale
                     } else {
-                        val effectiveScale = computeEffectiveContainerScale(pose)
                         scaleX = effectiveScale
                         scaleY = effectiveScale
                     }
@@ -683,6 +723,7 @@ internal class DeponderRubberNode(
 
     override fun onDetach() {
         attachedState?.unregisterRubberNode(this)
+        registeredState = null
         boundPose = null
         outerCoordinates = null
         innerAnchorCoordinates = null
@@ -855,8 +896,6 @@ internal class DeponderStretchNode(
                     !enabled ||
                     rubber == null ||
                     pose == null ||
-                    !pose.isActive ||
-                    pose.length <= 0f ||
                     hasActiveStretchAncestorInsideRubber(rubber)
                 ) {
                     scaleX = 1f
@@ -864,24 +903,32 @@ internal class DeponderStretchNode(
                     translationX = 0f
                     translationY = 0f
                 } else {
-                    val anchor = rubber.innerAnchorCoordinates
-                    val coords = outerCoordinates
-                    if (anchor != null && coords != null && anchor.isAttached && coords.isAttached) {
-                        baseLeftInRubber = anchor.localPositionOf(coords, Offset.Zero).x
+                    val targetLen = rubber.currentSpanLengthPx(pose)
+                    if (targetLen <= 0f) {
+                        scaleX = 0f
+                        scaleY = 1f
+                        translationX = 0f
+                        translationY = 0f
+                    } else {
+                        val anchor = rubber.innerAnchorCoordinates
+                        val coords = outerCoordinates
+                        if (anchor != null && coords != null && anchor.isAttached && coords.isAttached) {
+                            baseLeftInRubber = anchor.localPositionOf(coords, Offset.Zero).x
+                        }
+                        val parentScale = rubber.computeEffectiveContainerScale(pose)
+                        scaleX = computeStretchScaleX(
+                            lengthPx = targetLen,
+                            widthPx = measuredWidthPx,
+                            parentScale = parentScale,
+                        )
+                        scaleY = 1f
+                        translationX = computeChildStretchCenterAlignTx(
+                            rubberWidthPx = rubber.measuredWidthPx,
+                            childLeftInRubberPx = baseLeftInRubber,
+                            childWidthPx = measuredWidthPx,
+                        )
+                        translationY = 0f
                     }
-                    val parentScale = rubber.computeEffectiveContainerScale(pose)
-                    scaleX = computeStretchScaleX(
-                        lengthPx = pose.length,
-                        widthPx = measuredWidthPx,
-                        parentScale = parentScale,
-                    )
-                    scaleY = 1f
-                    translationX = computeChildStretchCenterAlignTx(
-                        rubberWidthPx = rubber.measuredWidthPx,
-                        childLeftInRubberPx = baseLeftInRubber,
-                        childWidthPx = measuredWidthPx,
-                    )
-                    translationY = 0f
                 }
             }
             syncRubberMembershipAndOrigin(requireBound = true)

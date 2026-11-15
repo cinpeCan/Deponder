@@ -1,5 +1,5 @@
 public final class com/cinpe/deponder/compose/DeponderDefaultRubberKt {
-	public static final fun DeponderDefaultRubber (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/cinpe/deponder/core/RubberPhysics;Ljava/lang/String;Lcom/cinpe/deponder/core/DeponderArrowMode;Lcom/cinpe/deponder/compose/DeponderRubberStyle;Landroidx/compose/runtime/Composer;II)V
+	public static final fun DeponderDefaultRubber (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/Modifier;Lcom/cinpe/deponder/core/RubberPhysics;Lcom/cinpe/deponder/core/DeponderRubberInsets;Ljava/lang/String;Lcom/cinpe/deponder/core/DeponderArrowMode;Lcom/cinpe/deponder/compose/DeponderRubberStyle;Landroidx/compose/runtime/Composer;II)V
 }
 
 public final class com/cinpe/deponder/compose/DeponderModifiersKt {
@@ -8,8 +8,8 @@ public final class com/cinpe/deponder/compose/DeponderModifiersKt {
 	public static final fun deponderPlanet (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/cinpe/deponder/core/PlanetPhysics;)Landroidx/compose/ui/Modifier;
 	public static synthetic fun deponderPlanet$default (Landroidx/compose/ui/Modifier;Ljava/lang/String;Lcom/cinpe/deponder/core/PlanetPhysics;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
 	public static final fun deponderRoot (Landroidx/compose/ui/Modifier;Lcom/cinpe/deponder/compose/DeponderState;)Landroidx/compose/ui/Modifier;
-	public static final fun deponderRubber (Landroidx/compose/ui/Modifier;Ljava/lang/String;Ljava/lang/String;Lcom/cinpe/deponder/core/RubberPhysics;)Landroidx/compose/ui/Modifier;
-	public static synthetic fun deponderRubber$default (Landroidx/compose/ui/Modifier;Ljava/lang/String;Ljava/lang/String;Lcom/cinpe/deponder/core/RubberPhysics;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+	public static final fun deponderRubber (Landroidx/compose/ui/Modifier;Ljava/lang/String;Ljava/lang/String;Lcom/cinpe/deponder/core/RubberPhysics;Lcom/cinpe/deponder/core/DeponderRubberInsets;)Landroidx/compose/ui/Modifier;
+	public static synthetic fun deponderRubber$default (Landroidx/compose/ui/Modifier;Ljava/lang/String;Ljava/lang/String;Lcom/cinpe/deponder/core/RubberPhysics;Lcom/cinpe/deponder/core/DeponderRubberInsets;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
 	public static final fun deponderStretch (Landroidx/compose/ui/Modifier;Z)Landroidx/compose/ui/Modifier;
 	public static synthetic fun deponderStretch$default (Landroidx/compose/ui/Modifier;ZILjava/lang/Object;)Landroidx/compose/ui/Modifier;
 }

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cinpe.deponder.core.DeponderArrowMode
 import com.cinpe.deponder.core.DeponderDefaults
+import com.cinpe.deponder.core.DeponderRubberInsets
 import com.cinpe.deponder.core.RubberPhysics
 import kotlin.jvm.JvmName
 import kotlin.math.ceil
@@ -130,7 +131,9 @@ public class DeponderRubberStyle internal constructor(
  *
  * Renders:
  * 1. Endpoint-anchored directional arrowheads ([DeponderArrowMode]: `NONE`, `END`, `START`, `BOTH`) placed
- *    cleanly at the contour-cleared link endpoints, with the line stem inset inside arrow bases so zero line
+ *    at safe-area [insets] endpoints ([DeponderRubberInsets.Default] contour clearance or
+ *    [DeponderRubberInsets.fixed]), automatically omitting arrowheads on center-anchored
+ *    ([DeponderRubberInsets.Mode.NONE]) endpoints, with the line stem inset inside arrow bases so zero line
  *    pixels ever protrude through arrow tips.
  * 2. An optional floating [label] positioned cleanly above the continuous spring line with a fully transparent
  *    default background (`Color.Transparent`) so crossing links are never masked.
@@ -141,6 +144,7 @@ public fun DeponderDefaultRubber(
     endId: String,
     modifier: Modifier = Modifier,
     physics: RubberPhysics = RubberPhysics(),
+    insets: DeponderRubberInsets = DeponderRubberInsets.Default,
     label: String? = null,
     arrowMode: DeponderArrowMode = DeponderArrowMode.NONE,
     style: DeponderRubberStyle = DeponderRubberStyle.Default,
@@ -192,15 +196,16 @@ public fun DeponderDefaultRubber(
     }
 
     val isOpaqueLine = style.lineColor.alpha >= 0.999f
-    val hasStartArrow = arrowMode == DeponderArrowMode.START || arrowMode == DeponderArrowMode.BOTH
-    val hasEndArrow = arrowMode == DeponderArrowMode.END || arrowMode == DeponderArrowMode.BOTH
+    val hasStartArrow = isComposeStartArrowEnabled(arrowMode, insets)
+    val hasEndArrow = isComposeEndArrowEnabled(arrowMode, insets)
 
     val symmetricLabelHeight = if (pillHeightPx > 0) {
         ceil(lineThicknessPx + (labelOffsetPx + pillHeightPx) * 2f).toInt()
     } else {
         0
     }
-    val containerWidth = max(stemBaseWidthPx, max(pillWidthPx, arrowWidthPx * 2))
+    val activeArrowsWidth = (if (hasStartArrow) arrowWidthPx else 0) + (if (hasEndArrow) arrowWidthPx else 0)
+    val containerWidth = max(stemBaseWidthPx, max(pillWidthPx, activeArrowsWidth))
     val containerHeight = max(
         lineThicknessPx,
         max(if (hasStartArrow || hasEndArrow) arrowHeightPx else 0, symmetricLabelHeight),
@@ -210,7 +215,7 @@ public fun DeponderDefaultRubber(
 
     Layout(
         modifier = modifier
-            .deponderRubber(startId = startId, endId = endId, physics = physics)
+            .deponderRubber(startId = startId, endId = endId, physics = physics, insets = insets)
             .then(DefaultRubberBindingElement(holder, pillWidthPx)),
         content = {
             // Child 0: Direct stretched line stem (never wrapped in CompositingStrategy.Offscreen!)
@@ -251,13 +256,14 @@ public fun DeponderDefaultRubber(
                 val rubber = holder.rubberNode
                 rubber?.attachedState?.frameTick
                 val pose = rubber?.boundPose
+                val spanLen = if (rubber != null && pose != null) rubber.currentSpanLengthPx(pose) else 0f
                 transformOrigin = TransformOrigin.Center
-                if (rubber == null || pose == null || !pose.isActive || pose.length <= 0f) {
+                if (rubber == null || pose == null || !pose.isActive || spanLen <= 0f) {
                     scaleX = 0f
                     translationX = 0f
                 } else {
                     val effScale = rubber.computeEffectiveContainerScale(pose)
-                    val localSpan = if (effScale > 1e-4f) pose.length / effScale else 0f
+                    val localSpan = if (effScale > 1e-4f) spanLen / effScale else 0f
                     val arrW = startP.width.toFloat()
                     val arrH = startP.height.toFloat()
                     val arrScale = computeComposeArrowScale(localSpan, arrW, hasStartArrow, hasEndArrow)
@@ -290,14 +296,15 @@ public fun DeponderDefaultRubber(
                 val rubber = holder.rubberNode
                 rubber?.attachedState?.frameTick
                 val pose = rubber?.boundPose
+                val spanLen = if (rubber != null && pose != null) rubber.currentSpanLengthPx(pose) else 0f
                 transformOrigin = TransformOrigin.Center
-                if (!hasStartArrow || arrowLengthPx <= 0f || rubber == null || pose == null || !pose.isActive || pose.length <= 0f) {
+                if (!hasStartArrow || arrowLengthPx <= 0f || rubber == null || pose == null || !pose.isActive || spanLen <= 0f) {
                     scaleX = 0f
                     scaleY = 0f
                     translationX = 0f
                 } else {
                     val effScale = rubber.computeEffectiveContainerScale(pose)
-                    val localSpan = if (effScale > 1e-4f) pose.length / effScale else 0f
+                    val localSpan = if (effScale > 1e-4f) spanLen / effScale else 0f
                     val arrW = startP.width.toFloat()
                     val arrScale = computeComposeArrowScale(localSpan, arrW, hasStartArrow, hasEndArrow)
                     val effArrW = arrW * arrScale
@@ -317,14 +324,15 @@ public fun DeponderDefaultRubber(
                 val rubber = holder.rubberNode
                 rubber?.attachedState?.frameTick
                 val pose = rubber?.boundPose
+                val spanLen = if (rubber != null && pose != null) rubber.currentSpanLengthPx(pose) else 0f
                 transformOrigin = TransformOrigin.Center
-                if (!hasEndArrow || arrowLengthPx <= 0f || rubber == null || pose == null || !pose.isActive || pose.length <= 0f) {
+                if (!hasEndArrow || arrowLengthPx <= 0f || rubber == null || pose == null || !pose.isActive || spanLen <= 0f) {
                     scaleX = 0f
                     scaleY = 0f
                     translationX = 0f
                 } else {
                     val effScale = rubber.computeEffectiveContainerScale(pose)
-                    val localSpan = if (effScale > 1e-4f) pose.length / effScale else 0f
+                    val localSpan = if (effScale > 1e-4f) spanLen / effScale else 0f
                     val arrW = endP.width.toFloat()
                     val arrScale = computeComposeArrowScale(localSpan, arrW, hasStartArrow, hasEndArrow)
                     val effArrW = arrW * arrScale
@@ -348,6 +356,18 @@ public fun DeponderDefaultRubber(
         }
     }
 }
+
+internal fun isComposeStartArrowEnabled(
+    arrowMode: DeponderArrowMode,
+    insets: DeponderRubberInsets,
+): Boolean = (arrowMode == DeponderArrowMode.START || arrowMode == DeponderArrowMode.BOTH) &&
+    insets.hasStartSafeArea
+
+internal fun isComposeEndArrowEnabled(
+    arrowMode: DeponderArrowMode,
+    insets: DeponderRubberInsets,
+): Boolean = (arrowMode == DeponderArrowMode.END || arrowMode == DeponderArrowMode.BOTH) &&
+    insets.hasEndSafeArea
 
 internal fun computeComposeArrowScale(
     localSpan: Float,
