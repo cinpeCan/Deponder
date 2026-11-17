@@ -16,7 +16,8 @@ Decouple force-directed physics from layout containers via lightweight Compose `
 
 - **Unified Cross-Stack API**: Identical 5-part mental model and `dp`-based physics configuration across Compose Multiplatform and Android Views, with full Java interop.
 - **Low-Intrusive & Gesture-Safe**: Preserves standard `.clickable {}`, `OnClickListener`, and ripple feedback via `touchSlop` gating and root-space coordinate projection; elevates dragged items via `zIndex` / `translationZ` without reordering child views or mutating `clipChildren` / `clipToBounds`.
-- **WindowInsets-Style Link Safe Areas & Built-in Spring Links**: Decouples pure Hooke spring physics (`RubberPhysics`) from UI endpoint clearance (`DeponderRubberInsets`: `Default` automatic contour estimation, `fixed(dp)` explicit clearance values, `None` continuous center-to-center spans, and `startOnly` / `endOnly` asymmetric clearance); includes ready-to-use `DeponderDefaultRubber` (Compose) and `DeponderRubberView` (Android View / XML) with floating labels and directional arrowheads (automatically omitted on center-anchored endpoints).
+- **Content-Adaptive Spring Length & WindowInsets-Style Safe Areas**: `RubberPhysics()` automatically adapts spring natural length to measured label/badge width by default (`RubberPhysics.auto(...)` to customize padding & min/max bounds, or `RubberPhysics(naturalLengthDp = 120f)` / XML `app:deponderNaturalLength="wrap_content | 120dp"` for fixed rest lengths), while `DeponderRubberInsets` orthogonally controls UI endpoint clearance (`Default` contour estimation, `fixed(dp)`, `None` center-to-center spans, `startOnly` / `endOnly`); includes ready-to-use `DeponderDefaultRubber` (Compose) and `DeponderRubberView` (Android View / XML) with floating labels and directional arrowheads (automatically omitted on center-anchored endpoints).
+- **Opt-In Sparse Topological Unfolding (`0.6.0`, `RootPhysics.withUnfold(true)`)**: Disabled by default (`false`) to preserve strictly local point-mass physics; when enabled, a deterministic `O(K * (|V| + |E|))` solver (degree-1 tree peeling, Farthest-First PivotMDS, bounded Sparse Stress Majorization, radial subtree fanning, and Procrustes alignment) smoothly untangles knotted cycles, trees, grids, and disconnected islands during topology changes or `reheat()` before fading out completely into pure Newtonian springs and `0% CPU` sleep.
 - **Frame-Rate-Independent Physics Kernel (`deponder-core`)**:
   - **Consistent Motion Across 60Hz–240Hz**: Adaptive `1/120s` sub-stepping keeps simulation speed consistent across display refresh rates, paired with deterministic symmetry breaking for stacked or collinear nodes.
   - **Idle 0% CPU & 3-Tier Hybrid Quadtree**: Dual velocity/acceleration sleep thresholds drop CPU usage to 0% at rest with instant drag wakeup, scaling automatically across node counts (`< 64` direct array, `64–255` single-thread quadtree, `256+` parallel snapshot evaluation on `Dispatchers.Default`).
@@ -37,16 +38,16 @@ Decouple force-directed physics from layout containers via lightweight Compose `
 
 | Artifact | Target UI Stack | Platforms |
 | :--- | :--- | :--- |
-| `io.github.cinpecan:deponder-compose:0.5.0` | Jetpack Compose & Compose Multiplatform | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
-| `io.github.cinpecan:deponder:0.5.0` | Traditional Android `View` / `ViewGroup` | Android (`minSdk 23`, JVM 17) |
-| `io.github.cinpecan:deponder-core:0.5.0` | UI-agnostic KMP physics kernel (custom `Canvas` / headless graphs) | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
-| `io.github.cinpecan:deponder-bom:0.5.0` | Version alignment BOM (optional for hybrid projects) | All |
+| `io.github.cinpecan:deponder-compose:0.6.0` | Jetpack Compose & Compose Multiplatform | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
+| `io.github.cinpecan:deponder:0.6.0` | Traditional Android `View` / `ViewGroup` | Android (`minSdk 23`, JVM 17) |
+| `io.github.cinpecan:deponder-core:0.6.0` | UI-agnostic KMP physics kernel (custom `Canvas` / headless graphs) | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
+| `io.github.cinpecan:deponder-bom:0.6.0` | Version alignment BOM (optional for hybrid projects) | All |
 
 **Compose Multiplatform (`commonMain`) or Pure Jetpack Compose:**
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder-compose:0.5.0")
+    implementation("io.github.cinpecan:deponder-compose:0.6.0")
 }
 ```
 
@@ -54,7 +55,7 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder:0.5.0")
+    implementation("io.github.cinpecan:deponder:0.6.0")
 }
 ```
 
@@ -62,7 +63,7 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.cinpecan:deponder-bom:0.5.0"))
+    implementation(platform("io.github.cinpecan:deponder-bom:0.6.0"))
     implementation("io.github.cinpecan:deponder")
     implementation("io.github.cinpecan:deponder-compose")
 }
@@ -75,6 +76,7 @@ dependencies {
 ```kotlin
 val state = rememberDeponderState(
     RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced)
+        .withUnfold(true) // Optional (default false): smoothly untangle cycles, trees, and meshes
 )
 
 Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
@@ -85,7 +87,7 @@ Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
             endId = link.toId,
             label = link.relation,
             arrowMode = DeponderArrowMode.BOTH,
-            physics = RubberPhysics(naturalLengthDp = 120f),
+            physics = RubberPhysics(), // Auto-adapts to label length by default; pass naturalLengthDp = 120f or RubberPhysics.auto(...) to customize
             insets = DeponderRubberInsets.Default, // or DeponderRubberInsets.None for center-to-center lines
         )
     }
@@ -115,7 +117,8 @@ Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
 ```kotlin
 val controller = rootFrameLayout.deponderRoot(
     lifecycleOwner = this,
-    physics = RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced),
+    physics = RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced)
+        .withUnfold(true), // Optional (default false): smoothly untangle cycles, trees, and meshes
 )
 
 // Ready-to-use default spring View (also supports XML <com.cinpe.deponder.DeponderRubberView>;
@@ -124,7 +127,7 @@ val rubberView = DeponderRubberView(this)
     .withLabel("depends on")
     .withArrowMode(DeponderArrowMode.END)
 rootFrameLayout.addView(rubberView)
-rubberView.deponderRubber("core", "ui", RubberPhysics(naturalLengthDp = 120f))
+rubberView.deponderRubber("core", "ui") // Auto-adapts to label length by default; pass RubberPhysics(naturalLengthDp = 120f) to lock fixed length
 
 // Configure force fields and dragging on direct-child Views while keeping setOnClickListener intact
 cardCore.deponderPlanet("core", PlanetPhysics(pinned = true))

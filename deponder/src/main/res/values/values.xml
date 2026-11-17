@@ -15,7 +15,9 @@
         <attr name="deponderStartId" format="string" />
         <attr name="deponderEndId" format="string" />
         <attr name="deponderElasticity" format="float" />
-        <attr name="deponderNaturalLength" format="dimension" />
+        <attr name="deponderNaturalLength" format="dimension|enum">
+            <enum name="wrap_content" value="-2" />
+        </attr>
         <attr name="deponderInsets" format="dimension|enum">
             <enum name="both" value="0" />
             <enum name="none" value="1" />

@@ -3,6 +3,12 @@ package com.cinpe.deponder.core
 import kotlin.jvm.JvmOverloads
 import kotlin.jvm.JvmStatic
 import kotlin.math.max
+import kotlin.math.min
+
+private fun normalizeZero(value: Float): Float = if (value == 0f) 0f else value
+
+private fun safeDensityOrOne(density: Float): Float =
+    if (density.isFinite()) max(1e-3f, density) else 1f
 
 /**
  * Directional arrowhead rendering mode for built-in default rubber components
@@ -298,25 +304,141 @@ public class DeponderRubberInsets internal constructor(
  * Compose Multiplatform (`rememberDeponderState`) and Android Views (`viewGroup.deponderRoot`).
  *
  * Pass a negative [wallRepulsionDp] (such as [DeponderDefaults.INFINITE_RANGE]) for an unbounded
- * viewport-centering boundary field.
+ * viewport-centering boundary field. Enable [unfoldEnabled] via [withUnfold] so tangled topologies
+ * smoothly unfold before settling into Newtonian equilibrium.
  */
-public data class RootPhysics(
-    public val initScale: Float = DeponderDefaults.Root.INIT_SCALE,
-    public val maxScale: Float = DeponderDefaults.Root.MAX_SCALE,
-    public val minScale: Float = DeponderDefaults.Root.MIN_SCALE,
-    public val airDamping: Float = DeponderDefaults.Root.AIR_DAMPING,
-    public val wallRepulsionDp: Float = DeponderDefaults.Root.WALL_REPULSION_DP,
-    public val wallElasticityStart: Float = DeponderDefaults.Root.WALL_ELASTICITY_START,
-    public val wallElasticityTop: Float = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
-    public val wallElasticityEnd: Float = DeponderDefaults.Root.WALL_ELASTICITY_END,
-    public val wallElasticityBottom: Float = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
-    public val coolingEnabled: Boolean = DeponderDefaults.Root.COOLING_ENABLED,
-    public val alphaDecay: Float = DeponderDefaults.Simulation.ALPHA_DECAY,
+public class RootPhysics internal constructor(
+    initScale: Float,
+    maxScale: Float,
+    minScale: Float,
+    airDamping: Float,
+    wallRepulsionDp: Float,
+    wallElasticityStart: Float,
+    wallElasticityTop: Float,
+    wallElasticityEnd: Float,
+    wallElasticityBottom: Float,
+    public val coolingEnabled: Boolean,
+    alphaDecay: Float,
+    public val unfoldEnabled: Boolean,
 ) {
+    public val initScale: Float = normalizeZero(initScale)
+    public val maxScale: Float = normalizeZero(maxScale)
+    public val minScale: Float = normalizeZero(minScale)
+    public val airDamping: Float = normalizeZero(airDamping)
+    public val wallRepulsionDp: Float = normalizeZero(wallRepulsionDp)
+    public val wallElasticityStart: Float = normalizeZero(wallElasticityStart)
+    public val wallElasticityTop: Float = normalizeZero(wallElasticityTop)
+    public val wallElasticityEnd: Float = normalizeZero(wallElasticityEnd)
+    public val wallElasticityBottom: Float = normalizeZero(wallElasticityBottom)
+    public val alphaDecay: Float = normalizeZero(alphaDecay)
+
+    public constructor() : this(
+        initScale = DeponderDefaults.Root.INIT_SCALE,
+        maxScale = DeponderDefaults.Root.MAX_SCALE,
+        minScale = DeponderDefaults.Root.MIN_SCALE,
+        airDamping = DeponderDefaults.Root.AIR_DAMPING,
+        wallRepulsionDp = DeponderDefaults.Root.WALL_REPULSION_DP,
+        wallElasticityStart = DeponderDefaults.Root.WALL_ELASTICITY_START,
+        wallElasticityTop = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
+        wallElasticityEnd = DeponderDefaults.Root.WALL_ELASTICITY_END,
+        wallElasticityBottom = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
+        coolingEnabled = DeponderDefaults.Root.COOLING_ENABLED,
+        alphaDecay = DeponderDefaults.Simulation.ALPHA_DECAY,
+        unfoldEnabled = DeponderDefaults.Root.UNFOLD_ENABLED,
+    )
+
+    public constructor(
+        initScale: Float = DeponderDefaults.Root.INIT_SCALE,
+        maxScale: Float = DeponderDefaults.Root.MAX_SCALE,
+        minScale: Float = DeponderDefaults.Root.MIN_SCALE,
+        airDamping: Float = DeponderDefaults.Root.AIR_DAMPING,
+        wallRepulsionDp: Float = DeponderDefaults.Root.WALL_REPULSION_DP,
+        wallElasticityStart: Float = DeponderDefaults.Root.WALL_ELASTICITY_START,
+        wallElasticityTop: Float = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
+        wallElasticityEnd: Float = DeponderDefaults.Root.WALL_ELASTICITY_END,
+        wallElasticityBottom: Float = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
+        coolingEnabled: Boolean = DeponderDefaults.Root.COOLING_ENABLED,
+        alphaDecay: Float = DeponderDefaults.Simulation.ALPHA_DECAY,
+    ) : this(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionDp = wallRepulsionDp,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
+        coolingEnabled = coolingEnabled,
+        alphaDecay = alphaDecay,
+        unfoldEnabled = DeponderDefaults.Root.UNFOLD_ENABLED,
+    )
+
     init {
-        require(minScale > 0f) { "minScale must be > 0f, but was $minScale" }
-        require(maxScale >= minScale) { "maxScale ($maxScale) must be >= minScale ($minScale)" }
+        require(this.initScale.isFinite()) { "initScale must be finite, but was ${this.initScale}" }
+        require(this.minScale.isFinite() && this.minScale > 0f) {
+            "minScale must be finite and > 0f, but was ${this.minScale}"
+        }
+        require(this.maxScale.isFinite() && this.maxScale >= this.minScale) {
+            "maxScale (${this.maxScale}) must be finite and >= minScale (${this.minScale})"
+        }
+        require(this.airDamping.isFinite()) { "airDamping must be finite, but was ${this.airDamping}" }
+        require(this.wallRepulsionDp.isFinite()) {
+            "wallRepulsionDp must be finite, but was ${this.wallRepulsionDp}"
+        }
+        require(this.wallElasticityStart.isFinite()) {
+            "wallElasticityStart must be finite, but was ${this.wallElasticityStart}"
+        }
+        require(this.wallElasticityTop.isFinite()) {
+            "wallElasticityTop must be finite, but was ${this.wallElasticityTop}"
+        }
+        require(this.wallElasticityEnd.isFinite()) {
+            "wallElasticityEnd must be finite, but was ${this.wallElasticityEnd}"
+        }
+        require(this.wallElasticityBottom.isFinite()) {
+            "wallElasticityBottom must be finite, but was ${this.wallElasticityBottom}"
+        }
+        require(this.alphaDecay.isFinite()) { "alphaDecay must be finite, but was ${this.alphaDecay}" }
     }
+
+    public operator fun component1(): Float = initScale
+    public operator fun component2(): Float = maxScale
+    public operator fun component3(): Float = minScale
+    public operator fun component4(): Float = airDamping
+    public operator fun component5(): Float = wallRepulsionDp
+    public operator fun component6(): Float = wallElasticityStart
+    public operator fun component7(): Float = wallElasticityTop
+    public operator fun component8(): Float = wallElasticityEnd
+    public operator fun component9(): Float = wallElasticityBottom
+    public operator fun component10(): Boolean = coolingEnabled
+    public operator fun component11(): Float = alphaDecay
+
+    public fun copy(
+        initScale: Float = this.initScale,
+        maxScale: Float = this.maxScale,
+        minScale: Float = this.minScale,
+        airDamping: Float = this.airDamping,
+        wallRepulsionDp: Float = this.wallRepulsionDp,
+        wallElasticityStart: Float = this.wallElasticityStart,
+        wallElasticityTop: Float = this.wallElasticityTop,
+        wallElasticityEnd: Float = this.wallElasticityEnd,
+        wallElasticityBottom: Float = this.wallElasticityBottom,
+        coolingEnabled: Boolean = this.coolingEnabled,
+        alphaDecay: Float = this.alphaDecay,
+    ): RootPhysics = RootPhysics(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionDp = wallRepulsionDp,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
+        coolingEnabled = coolingEnabled,
+        alphaDecay = alphaDecay,
+        unfoldEnabled = this.unfoldEnabled,
+    )
 
     public fun withScaleBounds(initScale: Float, minScale: Float, maxScale: Float): RootPhysics =
         copy(initScale = initScale, minScale = minScale, maxScale = maxScale)
@@ -331,10 +453,30 @@ public data class RootPhysics(
         copy(coolingEnabled = coolingEnabled, alphaDecay = alphaDecay)
 
     /**
+     * Returns a copy with opt-in topological unfolding enabled or disabled.
+     */
+    @JvmOverloads
+    public fun withUnfold(unfoldEnabled: Boolean = true): RootPhysics =
+        RootPhysics(
+            initScale = initScale,
+            maxScale = maxScale,
+            minScale = minScale,
+            airDamping = airDamping,
+            wallRepulsionDp = wallRepulsionDp,
+            wallElasticityStart = wallElasticityStart,
+            wallElasticityTop = wallElasticityTop,
+            wallElasticityEnd = wallElasticityEnd,
+            wallElasticityBottom = wallElasticityBottom,
+            coolingEnabled = coolingEnabled,
+            alphaDecay = alphaDecay,
+            unfoldEnabled = unfoldEnabled,
+        )
+
+    /**
      * Converts this `dp`-based configuration into pixel-space [EnvironmentSpec] for [density] (`px / dp`).
      */
     public fun toEnvironmentSpec(density: Float): EnvironmentSpec {
-        val safeDensity = max(1e-3f, density)
+        val safeDensity = safeDensityOrOne(density)
         val clampedInit = initScale.coerceIn(minScale, maxScale)
         return EnvironmentSpec(
             initScale = clampedInit,
@@ -351,10 +493,56 @@ public data class RootPhysics(
             wallElasticityEnd = wallElasticityEnd,
             wallElasticityBottom = wallElasticityBottom,
             degreeRadiusIncrementPx = DeponderDefaults.Planet.DEGREE_RADIUS_INCREMENT_DP * safeDensity,
+            infiniteChargeStrength = DeponderDefaults.Planet.INFINITE_CHARGE_STRENGTH,
             coolingEnabled = coolingEnabled,
             alphaDecay = alphaDecay,
+            alphaMin = DeponderDefaults.Simulation.ALPHA_MIN,
+            restSpeedPxPerSec = DeponderDefaults.Simulation.REST_SPEED_PX_PER_SEC,
+            restAccelPxPerSecSq = DeponderDefaults.Simulation.REST_ACCEL_PX_PER_SEC_SQ,
+            settleDurationSeconds = DeponderDefaults.Simulation.SETTLE_DURATION_SECONDS,
+            unfoldEnabled = unfoldEnabled,
         )
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is RootPhysics) return false
+        return initScale == other.initScale &&
+            maxScale == other.maxScale &&
+            minScale == other.minScale &&
+            airDamping == other.airDamping &&
+            wallRepulsionDp == other.wallRepulsionDp &&
+            wallElasticityStart == other.wallElasticityStart &&
+            wallElasticityTop == other.wallElasticityTop &&
+            wallElasticityEnd == other.wallElasticityEnd &&
+            wallElasticityBottom == other.wallElasticityBottom &&
+            coolingEnabled == other.coolingEnabled &&
+            alphaDecay == other.alphaDecay &&
+            unfoldEnabled == other.unfoldEnabled
+    }
+
+    override fun hashCode(): Int {
+        var result = initScale.hashCode()
+        result = 31 * result + maxScale.hashCode()
+        result = 31 * result + minScale.hashCode()
+        result = 31 * result + airDamping.hashCode()
+        result = 31 * result + wallRepulsionDp.hashCode()
+        result = 31 * result + wallElasticityStart.hashCode()
+        result = 31 * result + wallElasticityTop.hashCode()
+        result = 31 * result + wallElasticityEnd.hashCode()
+        result = 31 * result + wallElasticityBottom.hashCode()
+        result = 31 * result + coolingEnabled.hashCode()
+        result = 31 * result + alphaDecay.hashCode()
+        result = 31 * result + unfoldEnabled.hashCode()
+        return result
+    }
+
+    override fun toString(): String =
+        "RootPhysics(initScale=$initScale, maxScale=$maxScale, minScale=$minScale, " +
+            "airDamping=$airDamping, wallRepulsionDp=$wallRepulsionDp, " +
+            "wallElasticityStart=$wallElasticityStart, wallElasticityTop=$wallElasticityTop, " +
+            "wallElasticityEnd=$wallElasticityEnd, wallElasticityBottom=$wallElasticityBottom, " +
+            "coolingEnabled=$coolingEnabled, alphaDecay=$alphaDecay, unfoldEnabled=$unfoldEnabled)"
 
     public companion object {
         @JvmStatic
@@ -380,7 +568,11 @@ public data class PlanetPhysics(
     public val pinned: Boolean = false,
 ) {
     init {
-        require(mass > 0f) { "PlanetPhysics.mass must be > 0f, but was $mass" }
+        require(mass.isFinite() && mass > 0f) { "PlanetPhysics.mass must be finite and > 0f, but was $mass" }
+        require(repulsionRadiusDp.isFinite()) {
+            "PlanetPhysics.repulsionRadiusDp must be finite, but was $repulsionRadiusDp"
+        }
+        require(elasticity.isFinite()) { "PlanetPhysics.elasticity must be finite, but was $elasticity" }
     }
 
     public fun withMass(mass: Float): PlanetPhysics = copy(mass = mass)
@@ -396,7 +588,7 @@ public data class PlanetPhysics(
      * Converts this `dp`-based configuration into pixel-space [PlanetSpec] for [id] and [density].
      */
     public fun toPlanetSpec(id: String, density: Float): PlanetSpec {
-        val safeDensity = max(1e-3f, density)
+        val safeDensity = safeDensityOrOne(density)
         return PlanetSpec(
             id = id,
             mass = mass,
@@ -431,46 +623,268 @@ public data class PlanetPhysics(
  * Pure Hooke spring link (`Rubber`) physics configuration used across both
  * Compose Multiplatform (`Modifier.deponderRubber`) and Android Views (`view.deponderRubber`).
  *
+ * By default (`RubberPhysics()` or `naturalLengthDp = DeponderDefaults.AUTO_LENGTH`), natural spring
+ * length adapts automatically to the rubber's measured non-stretched content width (`label` text,
+ * built-in directional arrowheads, or custom non-stretched badges):
+ * ```
+ * resolvedNaturalLengthDp = clamp(contentWidthDp + contentPaddingDp, minLengthDp, maxLengthDp)
+ * ```
+ * Pass an explicit `naturalLengthDp >= 0f` (or [RubberPhysics.fixed]) to lock a fixed center-to-center
+ * spring rest length, or call [RubberPhysics.auto] to customize `contentPaddingDp`, `minLengthDp`, and
+ * `maxLengthDp`.
+ *
  * Visual endpoint contour clearance is configured separately via [DeponderRubberInsets] on the UI
  * operator so physics specifications remain strictly free of rendering concerns.
  *
  * @property elasticity Hooke spring stiffness (`>= 0f` typical).
- * @property naturalLengthDp Rest center-to-center spring length in `dp` (`>= 0f`).
+ * @property naturalLengthDp Explicit rest length in `dp` (`>= 0f`), or [DeponderDefaults.AUTO_LENGTH] (`-1f`) when content-adaptive.
+ * @property contentPaddingDp Total horizontal breathing margin in `dp` added to content width in adaptive mode.
+ * @property minLengthDp Minimum rest length floor in `dp` in adaptive mode (equals [naturalLengthDp] in fixed mode).
+ * @property maxLengthDp Maximum rest length ceiling in `dp` in adaptive mode, or [DeponderDefaults.INFINITE_RANGE] (`-1f`) when unbounded.
  */
-public data class RubberPhysics(
-    public val elasticity: Float = DeponderDefaults.Rubber.ELASTICITY,
-    public val naturalLengthDp: Float = DeponderDefaults.Rubber.NATURAL_LENGTH_DP,
+public class RubberPhysics internal constructor(
+    elasticity: Float,
+    naturalLengthDp: Float,
+    contentPaddingDp: Float,
+    minLengthDp: Float,
+    maxLengthDp: Float,
 ) {
+    public val elasticity: Float = normalizeZero(elasticity)
+    public val naturalLengthDp: Float = normalizeZero(naturalLengthDp)
+    public val contentPaddingDp: Float = normalizeZero(contentPaddingDp)
+    public val minLengthDp: Float = normalizeZero(minLengthDp)
+    public val maxLengthDp: Float = normalizeZero(maxLengthDp)
+
+    /**
+     * Creates a [RubberPhysics] configuration.
+     *
+     * Omitting [naturalLengthDp] (or passing [DeponderDefaults.AUTO_LENGTH]) enables content-adaptive
+     * spring length (`contentPaddingDp = 80dp`, `minLengthDp = 110dp`); passing `naturalLengthDp >= 0f`
+     * locks a fixed center-to-center spring rest length.
+     */
+    @JvmOverloads
+    public constructor(
+        elasticity: Float = DeponderDefaults.Rubber.ELASTICITY,
+        naturalLengthDp: Float = DeponderDefaults.AUTO_LENGTH,
+    ) : this(
+        elasticity = elasticity,
+        naturalLengthDp = naturalLengthDp,
+        contentPaddingDp = if (naturalLengthDp == DeponderDefaults.AUTO_LENGTH) {
+            DeponderDefaults.Rubber.CONTENT_PADDING_DP
+        } else {
+            0f
+        },
+        minLengthDp = if (naturalLengthDp == DeponderDefaults.AUTO_LENGTH) {
+            DeponderDefaults.Rubber.NATURAL_LENGTH_DP
+        } else {
+            max(0f, naturalLengthDp)
+        },
+        maxLengthDp = if (naturalLengthDp == DeponderDefaults.AUTO_LENGTH) {
+            DeponderDefaults.INFINITE_RANGE
+        } else {
+            max(0f, naturalLengthDp)
+        },
+    )
+
     init {
-        require(naturalLengthDp >= 0f) {
-            "RubberPhysics.naturalLengthDp must be >= 0f, but was $naturalLengthDp"
+        require(elasticity.isFinite()) {
+            "RubberPhysics.elasticity must be finite, but was $elasticity"
+        }
+        require(
+            naturalLengthDp.isFinite() &&
+                (naturalLengthDp >= 0f || naturalLengthDp == DeponderDefaults.AUTO_LENGTH),
+        ) {
+            "RubberPhysics.naturalLengthDp must be >= 0f or DeponderDefaults.AUTO_LENGTH (-1f), but was $naturalLengthDp"
+        }
+        require(contentPaddingDp.isFinite() && contentPaddingDp >= 0f) {
+            "RubberPhysics.contentPaddingDp must be finite and >= 0f, but was $contentPaddingDp"
+        }
+        require(minLengthDp.isFinite() && minLengthDp >= 0f) {
+            "RubberPhysics.minLengthDp must be finite and >= 0f, but was $minLengthDp"
+        }
+        require(
+            maxLengthDp.isFinite() &&
+                (maxLengthDp == DeponderDefaults.INFINITE_RANGE || maxLengthDp >= minLengthDp),
+        ) {
+            "RubberPhysics.maxLengthDp ($maxLengthDp) must be DeponderDefaults.INFINITE_RANGE (-1f) or >= minLengthDp ($minLengthDp)"
         }
     }
 
-    public fun withElasticity(elasticity: Float): RubberPhysics = copy(elasticity = elasticity)
+    /** `true` when rest length adapts dynamically to rubber content width ([naturalLengthDp] == [DeponderDefaults.AUTO_LENGTH]). */
+    public val isAutoLength: Boolean
+        get() = naturalLengthDp < 0f
 
+    public operator fun component1(): Float = elasticity
+
+    public operator fun component2(): Float = naturalLengthDp
+
+    public fun copy(
+        elasticity: Float = this.elasticity,
+        naturalLengthDp: Float = this.naturalLengthDp,
+    ): RubberPhysics {
+        if (naturalLengthDp == DeponderDefaults.AUTO_LENGTH) {
+            return if (this.isAutoLength) {
+                RubberPhysics(
+                    elasticity = elasticity,
+                    naturalLengthDp = DeponderDefaults.AUTO_LENGTH,
+                    contentPaddingDp = this.contentPaddingDp,
+                    minLengthDp = this.minLengthDp,
+                    maxLengthDp = this.maxLengthDp,
+                )
+            } else {
+                RubberPhysics(elasticity = elasticity, naturalLengthDp = DeponderDefaults.AUTO_LENGTH)
+            }
+        }
+        return RubberPhysics(elasticity = elasticity, naturalLengthDp = naturalLengthDp)
+    }
+
+    /** Returns a copy with updated [elasticity], preserving fixed or customized auto-length parameters. */
+    public fun withElasticity(elasticity: Float): RubberPhysics =
+        RubberPhysics(
+            elasticity = elasticity,
+            naturalLengthDp = this.naturalLengthDp,
+            contentPaddingDp = this.contentPaddingDp,
+            minLengthDp = this.minLengthDp,
+            maxLengthDp = this.maxLengthDp,
+        )
+
+    /**
+     * Returns a copy with [naturalLengthDp] (`>= 0f` for fixed length, or [DeponderDefaults.AUTO_LENGTH] for adaptive length).
+     */
     public fun withNaturalLengthDp(naturalLengthDp: Float): RubberPhysics =
         copy(naturalLengthDp = naturalLengthDp)
 
     /**
-     * Converts this `dp`-based configuration into pixel-space [RubberSpec] for [startId], [endId], and [density].
+     * Returns a copy configured for content-adaptive spring length with customized padding and bounds.
      */
-    public fun toRubberSpec(startId: String, endId: String, density: Float): RubberSpec {
-        val safeDensity = max(1e-3f, density)
-        return RubberSpec(
-            startId = startId,
-            endId = endId,
-            elasticity = elasticity,
-            naturalLengthPx = naturalLengthDp * safeDensity,
-        )
+    @JvmOverloads
+    public fun withAutoLength(
+        contentPaddingDp: Float = DeponderDefaults.Rubber.CONTENT_PADDING_DP,
+        minLengthDp: Float = DeponderDefaults.Rubber.NATURAL_LENGTH_DP,
+        maxLengthDp: Float = DeponderDefaults.INFINITE_RANGE,
+    ): RubberPhysics = auto(
+        contentPaddingDp = contentPaddingDp,
+        minLengthDp = minLengthDp,
+        maxLengthDp = maxLengthDp,
+        elasticity = this.elasticity,
+    )
+
+    /**
+     * Resolves the effective rest length in `dp` for a measured unscaled [contentWidthDp] (`>= 0f`).
+     */
+    @JvmOverloads
+    public fun resolveNaturalLengthDp(contentWidthDp: Float = 0f): Float {
+        if (!isAutoLength) return naturalLengthDp
+        val safeContentDp = if (contentWidthDp.isFinite() && contentWidthDp > 0f) contentWidthDp else 0f
+        val floored = max(minLengthDp, safeContentDp + contentPaddingDp)
+        return if (maxLengthDp < 0f) floored else min(floored, maxLengthDp)
     }
 
+    /**
+     * Resolves the effective rest length in pixels for [density] (`px / dp`) and unscaled [contentWidthPx].
+     */
+    @JvmOverloads
+    public fun resolveNaturalLengthPx(density: Float, contentWidthPx: Float = 0f): Float {
+        val safeDensity = safeDensityOrOne(density)
+        val safeContentPx = if (contentWidthPx.isFinite() && contentWidthPx > 0f) contentWidthPx else 0f
+        return resolveNaturalLengthDp(safeContentPx / safeDensity) * safeDensity
+    }
+
+    /**
+     * Converts this `dp`-based configuration into pixel-space [RubberSpec] for [startId], [endId], and [density].
+     */
+    public fun toRubberSpec(startId: String, endId: String, density: Float): RubberSpec =
+        toRubberSpec(startId = startId, endId = endId, density = density, contentWidthPx = 0f)
+
+    /**
+     * Converts this `dp`-based configuration into pixel-space [RubberSpec] for [startId], [endId],
+     * [density], and measured unscaled [contentWidthPx].
+     */
+    public fun toRubberSpec(
+        startId: String,
+        endId: String,
+        density: Float,
+        contentWidthPx: Float,
+    ): RubberSpec = RubberSpec(
+        startId = startId,
+        endId = endId,
+        elasticity = elasticity,
+        naturalLengthPx = resolveNaturalLengthPx(density = density, contentWidthPx = contentWidthPx),
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is RubberPhysics) return false
+        return elasticity == other.elasticity &&
+            naturalLengthDp == other.naturalLengthDp &&
+            contentPaddingDp == other.contentPaddingDp &&
+            minLengthDp == other.minLengthDp &&
+            maxLengthDp == other.maxLengthDp
+    }
+
+    override fun hashCode(): Int {
+        var result = elasticity.hashCode()
+        result = 31 * result + naturalLengthDp.hashCode()
+        result = 31 * result + contentPaddingDp.hashCode()
+        result = 31 * result + minLengthDp.hashCode()
+        result = 31 * result + maxLengthDp.hashCode()
+        return result
+    }
+
+    override fun toString(): String =
+        if (isAutoLength) {
+            "RubberPhysics.Auto(elasticity=$elasticity, contentPaddingDp=$contentPaddingDp, " +
+                "minLengthDp=$minLengthDp, maxLengthDp=$maxLengthDp)"
+        } else {
+            "RubberPhysics.Fixed(elasticity=$elasticity, naturalLengthDp=$naturalLengthDp)"
+        }
+
     public companion object {
+        /** Default content-adaptive [RubberPhysics] (`elasticity = 1.68f`, `contentPaddingDp = 80dp`, `minLengthDp = 110dp`). */
+        public val Default: RubberPhysics = RubberPhysics()
+
+        /**
+         * Creates a content-adaptive [RubberPhysics] whose rest length expands with measured rubber content width:
+         * `clamp(contentWidthDp + contentPaddingDp, minLengthDp, maxLengthDp)`.
+         */
+        @JvmStatic
+        @JvmOverloads
+        public fun auto(
+            contentPaddingDp: Float = DeponderDefaults.Rubber.CONTENT_PADDING_DP,
+            minLengthDp: Float = DeponderDefaults.Rubber.NATURAL_LENGTH_DP,
+            maxLengthDp: Float = DeponderDefaults.INFINITE_RANGE,
+            elasticity: Float = DeponderDefaults.Rubber.ELASTICITY,
+        ): RubberPhysics = RubberPhysics(
+            elasticity = elasticity,
+            naturalLengthDp = DeponderDefaults.AUTO_LENGTH,
+            contentPaddingDp = contentPaddingDp,
+            minLengthDp = minLengthDp,
+            maxLengthDp = maxLengthDp,
+        )
+
+        /**
+         * Creates a fixed-length [RubberPhysics] locked to [naturalLengthDp] (`>= 0f`) regardless of label length.
+         */
+        @JvmStatic
+        @JvmOverloads
+        public fun fixed(
+            naturalLengthDp: Float,
+            elasticity: Float = DeponderDefaults.Rubber.ELASTICITY,
+        ): RubberPhysics {
+            require(naturalLengthDp.isFinite() && naturalLengthDp >= 0f) {
+                "RubberPhysics.fixed naturalLengthDp must be finite and >= 0f, but was $naturalLengthDp"
+            }
+            return RubberPhysics(elasticity = elasticity, naturalLengthDp = naturalLengthDp)
+        }
+
+        /**
+         * Creates a content-adaptive [RubberPhysics] seeded from [preset] (`minLengthDp = preset.rubberNaturalLengthDp`).
+         */
         @JvmStatic
         public fun fromPreset(preset: DeponderDefaults.Preset): RubberPhysics =
-            RubberPhysics(
+            auto(
+                minLengthDp = preset.rubberNaturalLengthDp,
                 elasticity = preset.rubberElasticity,
-                naturalLengthDp = preset.rubberNaturalLengthDp,
             )
     }
 }

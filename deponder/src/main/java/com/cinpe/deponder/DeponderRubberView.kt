@@ -49,6 +49,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
 
     private var _label: String? = null
     private var _arrowMode: DeponderArrowMode = DeponderArrowMode.NONE
+    private var _physics: RubberPhysics = RubberPhysics()
     private var _insets: DeponderRubberInsets = DeponderRubberInsets.Default
 
     @ColorInt
@@ -96,6 +97,24 @@ public class DeponderRubberView @JvmOverloads public constructor(
                 syncChildMeasurementsAndRedraw()
             }
         }
+
+    /**
+     * Pure Hooke spring physics configuration ([RubberPhysics.Default] content-adaptive rest length
+     * by default, or initialized from XML `app:deponderElasticity` / `app:deponderNaturalLength`).
+     */
+    public var physics: RubberPhysics
+        get() = _physics
+        set(value) {
+            if (_physics != value) {
+                _physics = value
+                val rubberBinding = getTag(R.id.deponder_rubber_binding_tag) as? RubberViewBinding
+                rubberBinding?.updatePhysicsOnly(value)
+            }
+        }
+
+    internal fun syncPhysicsFromBinding(value: RubberPhysics) {
+        _physics = value
+    }
 
     /**
      * Endpoint safe-area clearance ([DeponderRubberInsets.Default] contour avoidance by default,
@@ -155,7 +174,10 @@ public class DeponderRubberView @JvmOverloads public constructor(
     public var lineThicknessDp: Float
         get() = _lineThicknessPx / density
         set(value) {
-            val px = max(1f, value * density)
+            require(value.isFinite() && value >= 0f) {
+                "lineThicknessDp must be finite and >= 0f, but was $value"
+            }
+            val px = (value * density).coerceIn(1f, MAX_STYLE_DIMENSION_PX)
             if (_lineThicknessPx != px) {
                 _lineThicknessPx = px
                 syncChildMeasurementsAndRedraw()
@@ -166,7 +188,10 @@ public class DeponderRubberView @JvmOverloads public constructor(
     public var arrowSizeDp: Float
         get() = _arrowSizePx / density
         set(value) {
-            val px = max(0f, value * density)
+            require(value.isFinite() && value >= 0f) {
+                "arrowSizeDp must be finite and >= 0f, but was $value"
+            }
+            val px = (value * density).coerceIn(0f, MAX_STYLE_DIMENSION_PX)
             if (_arrowSizePx != px) {
                 _arrowSizePx = px
                 syncChildMeasurementsAndRedraw()
@@ -189,7 +214,10 @@ public class DeponderRubberView @JvmOverloads public constructor(
     public var labelTextSizeSp: Float
         get() = _labelTextSizePx / scaledDensity
         set(value) {
-            val px = max(1f, value * scaledDensity)
+            require(value.isFinite() && value > 0f) {
+                "labelTextSizeSp must be finite and > 0f, but was $value"
+            }
+            val px = (value * scaledDensity).coerceIn(1f, MAX_STYLE_DIMENSION_PX)
             if (_labelTextSizePx != px) {
                 _labelTextSizePx = px
                 syncChildMeasurementsAndRedraw()
@@ -215,7 +243,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
         var xmlStartId: String? = null
         var xmlEndId: String? = null
         var xmlElasticity: Float = DeponderDefaults.Rubber.ELASTICITY
-        var xmlNaturalLengthDp: Float = DeponderDefaults.Rubber.NATURAL_LENGTH_DP
+        var xmlNaturalLengthDp: Float = DeponderDefaults.AUTO_LENGTH
 
         if (attrs != null) {
             val a = context.obtainStyledAttributes(attrs, R.styleable.DeponderRubberView, defStyleAttr, 0)
@@ -226,12 +254,13 @@ public class DeponderRubberView @JvmOverloads public constructor(
                     R.styleable.DeponderRubberView_deponderElasticity,
                     DeponderDefaults.Rubber.ELASTICITY,
                 )
-                if (a.hasValue(R.styleable.DeponderRubberView_deponderNaturalLength)) {
-                    val naturalPx = a.getDimension(
-                        R.styleable.DeponderRubberView_deponderNaturalLength,
-                        DeponderDefaults.Rubber.NATURAL_LENGTH_DP * density,
-                    )
-                    xmlNaturalLengthDp = (naturalPx / density).coerceAtLeast(0f)
+                xmlNaturalLengthDp = if (
+                    a.getType(R.styleable.DeponderRubberView_deponderNaturalLength) == TypedValue.TYPE_DIMENSION
+                ) {
+                    val naturalPx = a.getDimension(R.styleable.DeponderRubberView_deponderNaturalLength, 0f)
+                    (naturalPx / density).coerceAtLeast(0f)
+                } else {
+                    DeponderDefaults.AUTO_LENGTH
                 }
                 val gapDp = if (a.hasValue(R.styleable.DeponderRubberView_deponderInsetGap)) {
                     val gapPx = a.getDimension(
@@ -303,14 +332,16 @@ public class DeponderRubberView @JvmOverloads public constructor(
 
         syncChildMeasurementsAndRedraw()
 
+        _physics = RubberPhysics(
+            elasticity = xmlElasticity,
+            naturalLengthDp = xmlNaturalLengthDp,
+        )
+
         if (!xmlStartId.isNullOrEmpty() && !xmlEndId.isNullOrEmpty()) {
             deponderRubber(
                 startId = xmlStartId,
                 endId = xmlEndId,
-                physics = RubberPhysics(
-                    elasticity = xmlElasticity,
-                    naturalLengthDp = xmlNaturalLengthDp,
-                ),
+                physics = _physics,
                 insets = _insets,
             )
         }
@@ -324,6 +355,11 @@ public class DeponderRubberView @JvmOverloads public constructor(
     /** Fluent Java/Kotlin helper to configure directional [DeponderArrowMode]. */
     public fun withArrowMode(arrowMode: DeponderArrowMode): DeponderRubberView = apply {
         this.arrowMode = arrowMode
+    }
+
+    /** Fluent Java/Kotlin helper to configure spring [RubberPhysics]. */
+    public fun withPhysics(physics: RubberPhysics): DeponderRubberView = apply {
+        this.physics = physics
     }
 
     /** Fluent Java/Kotlin helper to configure endpoint [DeponderRubberInsets]. */
@@ -392,6 +428,16 @@ public class DeponderRubberView @JvmOverloads public constructor(
     }
 
     internal fun nonStretchedContentWidthPx(): Int = labelView.measuredLabelWidthPx
+
+    internal fun adaptiveContentWidthPx(): Int {
+        val declaredArrowsCount = when (_arrowMode) {
+            DeponderArrowMode.NONE -> 0
+            DeponderArrowMode.END, DeponderArrowMode.START -> 1
+            DeponderArrowMode.BOTH -> 2
+        }
+        val arrowW = if (_arrowSizePx > 0f) ceil(_arrowSizePx).toInt() else 0
+        return labelView.measuredLabelWidthPx + declaredArrowsCount * arrowW
+    }
 
     internal val isStartArrowRendered: Boolean
         get() = startArrowView.scaleX > 0f && startArrowView.scaleY > 0f
@@ -601,7 +647,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
         requestLayout()
         val rubberBinding = getTag(R.id.deponder_rubber_binding_tag) as? RubberViewBinding
         if (rubberBinding?.attachedController != null) {
-            rubberBinding.refreshPoseFromController()
+            rubberBinding.syncAdaptiveLengthAndRefreshPose()
         } else {
             applySubViewTransforms(lastPose, lastSpanLengthPx, lastEffectiveScale, lastOuterScaleX)
         }
@@ -733,6 +779,7 @@ public class DeponderRubberView @JvmOverloads public constructor(
     public companion object {
         private const val ARROW_HEIGHT_RATIO: Float = 1.35f
         private const val ARROW_STEM_INSET_RATIO: Float = 0.75f
+        private const val MAX_STYLE_DIMENSION_PX: Float = 16_384f
 
         public const val DEFAULT_LINE_COLOR: Int = 0xFF78909C.toInt()
         public const val DEFAULT_LABEL_COLOR: Int = 0xFF37474F.toInt()

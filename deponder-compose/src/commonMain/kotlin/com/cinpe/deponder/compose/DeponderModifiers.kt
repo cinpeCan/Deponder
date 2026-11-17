@@ -3,7 +3,6 @@ package com.cinpe.deponder.compose
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -21,6 +20,7 @@ import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.DelegatingNode
+import androidx.compose.ui.node.GlobalPositionAwareModifierNode
 import androidx.compose.ui.node.LayoutAwareModifierNode
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
@@ -29,6 +29,7 @@ import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.node.TraversableNode
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.findNearestAncestor
+import androidx.compose.ui.node.invalidateMeasurement
 import androidx.compose.ui.node.observeReads
 import androidx.compose.ui.node.requireLayoutCoordinates
 import androidx.compose.ui.node.traverseAncestors
@@ -42,10 +43,12 @@ import com.cinpe.deponder.core.PlanetBody
 import com.cinpe.deponder.core.PlanetPhysics
 import com.cinpe.deponder.core.RubberPhysics
 import com.cinpe.deponder.core.RubberPose
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.coroutines.coroutineContext
+import kotlin.math.abs
 
 internal object DeponderRootTraverseKey
 internal object DeponderPlanetTraverseKey
@@ -145,41 +148,50 @@ private data class DeponderRootElement(
 }
 
 internal class DeponderRootNode(
-    var state: DeponderState,
+    initialState: DeponderState,
 ) : Modifier.Node(),
     TraversableNode,
     LayoutAwareModifierNode,
+    GlobalPositionAwareModifierNode,
     CompositionLocalConsumerModifierNode,
     ObserverModifierNode {
 
     override val traverseKey: Any
         get() = DeponderRootTraverseKey
 
+    private val activeStateSource = MutableStateFlow(initialState)
+    var state: DeponderState = initialState
+        private set
+
     var rootCoordinates: LayoutCoordinates? = null
         private set
+
+    private var lastViewportSize: IntSize = IntSize.Zero
+    private var hasViewportSize: Boolean = false
 
     override fun onAttach() {
         val density = observeDensity()
         state.attachRoot(this, density)
         coroutineScope.launch {
-            snapshotFlow { state.isAwake }
-                .collectLatest { awake ->
-                    if (!awake) return@collectLatest
+            activeStateSource.collectLatest { activeState ->
+                activeState.loopGateFlow.collectLatest { canRun ->
+                    if (!canRun) return@collectLatest
                     var lastFrameNanos = 0L
                     withFrameNanos { firstNanos ->
                         lastFrameNanos = firstNanos
                     }
-                    while (isActive && state.isAwake) {
+                    while (isActive && state === activeState && activeState.isAwake) {
                         val dtSeconds = withFrameNanos { nowNanos ->
                             val dt = (nowNanos - lastFrameNanos) * 1e-9f
                             lastFrameNanos = nowNanos
                             dt
                         }
-                        if (!state.stepFrame(dtSeconds)) {
+                        if (!activeState.stepFrame(dtSeconds)) {
                             break
                         }
                     }
                 }
+            }
         }
     }
 
@@ -200,21 +212,45 @@ internal class DeponderRootNode(
     fun updateState(newState: DeponderState) {
         if (state === newState) return
         val oldState = state
-        if (isAttached) {
-            oldState.detachRoot(this)
+        if (!isAttached) {
+            state = newState
+            activeStateSource.value = newState
+            return
         }
+        val migratedPlanets = ArrayList(oldState.activePlanetsById.values)
+        val migratedRubbers = ArrayList(oldState.activeRubbersByKey.values)
+        for (rubber in migratedRubbers) {
+            rubber.detachForStateTransfer(oldState)
+        }
+        for (planet in migratedPlanets) {
+            planet.detachForStateTransfer(oldState)
+        }
+        oldState.detachRoot(this)
+        oldState.notifyFrameChanged()
+
         state = newState
-        if (isAttached) {
-            val density = observeDensity()
-            newState.attachRoot(this, density)
+        activeStateSource.value = newState
+        val density = observeDensity()
+        newState.attachRoot(this, density)
+        if (hasViewportSize) {
+            newState.updateViewportSize(lastViewportSize.width, lastViewportSize.height)
         }
+        for (planet in migratedPlanets) {
+            planet.attachAfterStateTransfer(newState)
+        }
+        for (rubber in migratedRubbers) {
+            rubber.attachAfterStateTransfer(newState)
+        }
+        newState.notifyFrameChanged()
     }
 
     override fun onRemeasured(size: IntSize) {
+        lastViewportSize = size
+        hasViewportSize = true
         state.updateViewportSize(size.width, size.height)
     }
 
-    override fun onPlaced(coordinates: LayoutCoordinates) {
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
         rootCoordinates = coordinates
         for (planet in state.activePlanetsById.values) {
             planet.refreshBaseOriginFromRoot()
@@ -226,6 +262,8 @@ internal class DeponderRootNode(
 
     override fun onDetach() {
         rootCoordinates = null
+        hasViewportSize = false
+        lastViewportSize = IntSize.Zero
         state.detachRoot(this)
     }
 }
@@ -252,7 +290,7 @@ internal class DeponderPlanetNode(
     var physics: PlanetPhysics,
 ) : Modifier.Node(),
     LayoutModifierNode,
-    LayoutAwareModifierNode,
+    GlobalPositionAwareModifierNode,
     TraversableNode {
 
     override val traverseKey: Any
@@ -261,11 +299,13 @@ internal class DeponderPlanetNode(
     var rootNode: DeponderRootNode? = null
         private set
 
+    internal var registeredState: DeponderState? = null
+
     val attachedState: DeponderState?
-        get() = rootNode?.state
+        get() = registeredState ?: rootNode?.state
 
     var boundBody: PlanetBody? = null
-        private set
+        internal set
 
     var outerCoordinates: LayoutCoordinates? = null
         private set
@@ -318,9 +358,8 @@ internal class DeponderPlanetNode(
         )
     }
 
-    override fun onPlaced(coordinates: LayoutCoordinates) {
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
         outerCoordinates = coordinates
-        bindUpstreamSameNodeDrags()
         refreshBaseOriginFromRoot()
     }
 
@@ -371,8 +410,8 @@ internal class DeponderPlanetNode(
         if (sizeChanged && boundBody != null) {
             attachedState?.updatePlanetMeasuredSize(planetId, placeable.width, placeable.height)
         }
+        bindUpstreamSameNodeDrags()
         return layout(placeable.width, placeable.height) {
-            bindUpstreamSameNodeDrags()
             // Read zOrder exclusively inside placement so bringToFront() causes zero re-measurements!
             placeable.placeWithLayer(0, 0, zIndex = zOrder) {
                 val st = attachedState
@@ -396,8 +435,29 @@ internal class DeponderPlanetNode(
         }
     }
 
+    internal fun detachForStateTransfer(oldState: DeponderState) {
+        oldState.unregisterPlanetNode(this)
+        if (registeredState === oldState) {
+            registeredState = null
+        }
+        boundBody = null
+        zOrder = 0f
+    }
+
+    internal fun attachAfterStateTransfer(newState: DeponderState) {
+        newState.registerPlanetNode(this)
+        if (hasBaseOrigin) {
+            boundBody = newState.syncPlanetPlacement(
+                node = this,
+                initialCenterX = baseOriginInRootX + measuredWidthPx * 0.5f,
+                initialCenterY = baseOriginInRootY + measuredHeightPx * 0.5f,
+            )
+        }
+    }
+
     override fun onDetach() {
         attachedState?.unregisterPlanetNode(this)
+        registeredState = null
         boundBody = null
         outerCoordinates = null
         hasBaseOrigin = false
@@ -487,7 +547,7 @@ internal class DeponderRubberNode(
     var insets: DeponderRubberInsets,
 ) : Modifier.Node(),
     LayoutModifierNode,
-    LayoutAwareModifierNode,
+    GlobalPositionAwareModifierNode,
     TraversableNode {
 
     override val traverseKey: Any
@@ -523,6 +583,7 @@ internal class DeponderRubberNode(
         private set
 
     internal var explicitNonStretchedWidthPx: Int = -1
+    internal var explicitAdaptiveContentWidthPx: Int = -1
     internal val directStretchNodes = ArrayList<DeponderStretchNode>(1)
     internal val childStretchNodes = ArrayList<DeponderStretchNode>(1)
 
@@ -535,29 +596,36 @@ internal class DeponderRubberNode(
         return pose.resolvedLength(insets, currentDensityOrDefault())
     }
 
+    internal fun resolveNonStretchedWidthPx(): Int {
+        if (explicitNonStretchedWidthPx >= 0) return explicitNonStretchedWidthPx
+        var maxInnerStretchW = -1
+        for (i in childStretchNodes.indices) {
+            val n = childStretchNodes[i]
+            if (n.enabled && n.reportedLayoutWidthPx > maxInnerStretchW) {
+                maxInnerStretchW = n.reportedLayoutWidthPx
+            }
+        }
+        return if (maxInnerStretchW < 0) {
+            measuredWidthPx
+        } else if (measuredWidthPx > maxInnerStretchW) {
+            measuredWidthPx
+        } else {
+            0
+        }
+    }
+
+    internal fun resolveAdaptiveContentWidthPx(): Int {
+        if (explicitAdaptiveContentWidthPx >= 0) return explicitAdaptiveContentWidthPx
+        if (isDirectStretchEnabled()) return 0
+        return resolveNonStretchedWidthPx()
+    }
+
     internal fun computeEffectiveContainerScale(pose: RubberPose): Float {
         val spanLen = currentSpanLengthPx(pose)
         if (spanLen <= 0f || pose.scale <= 0f) return 0f
         if (isDirectStretchEnabled()) return pose.scale
 
-        val nonStretchedW = if (explicitNonStretchedWidthPx >= 0) {
-            explicitNonStretchedWidthPx
-        } else {
-            var maxInnerStretchW = -1
-            for (i in childStretchNodes.indices) {
-                val n = childStretchNodes[i]
-                if (n.enabled && n.measuredWidthPx > maxInnerStretchW) {
-                    maxInnerStretchW = n.measuredWidthPx
-                }
-            }
-            if (maxInnerStretchW < 0) {
-                measuredWidthPx
-            } else if (measuredWidthPx > maxInnerStretchW) {
-                measuredWidthPx
-            } else {
-                0
-            }
-        }
+        val nonStretchedW = resolveNonStretchedWidthPx()
 
         if (nonStretchedW > 0 && spanLen < nonStretchedW * pose.scale) {
             return (spanLen / nonStretchedW.toFloat()).coerceAtLeast(0f)
@@ -610,9 +678,8 @@ internal class DeponderRubberNode(
         }
     }
 
-    override fun onPlaced(coordinates: LayoutCoordinates) {
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
         outerCoordinates = coordinates
-        bindUpstreamSameNodeStretches()
         refreshBaseOriginFromRoot()
     }
 
@@ -661,6 +728,8 @@ internal class DeponderRubberNode(
         val placeable = measurable.measure(childConstraints)
         measuredWidthPx = placeable.width
         measuredHeightPx = placeable.height
+        bindUpstreamSameNodeStretches()
+        attachedState?.syncRubberAdaptiveLength(this@DeponderRubberNode)
         val reportedWidth = if (constraints.hasFixedWidth) {
             constraints.maxWidth
         } else {
@@ -672,7 +741,6 @@ internal class DeponderRubberNode(
             placeable.height.coerceIn(constraints.minHeight, constraints.maxHeight)
         }
         return layout(reportedWidth, reportedHeight) {
-            bindUpstreamSameNodeStretches()
             placeable.placeWithLayer(0, 0, zIndex = -1f) {
                 val st = attachedState
                 st?.frameTick
@@ -721,6 +789,18 @@ internal class DeponderRubberNode(
         }
     }
 
+    internal fun detachForStateTransfer(oldState: DeponderState) {
+        oldState.unregisterRubberNode(this)
+        if (registeredState === oldState) {
+            registeredState = null
+        }
+        boundPose = null
+    }
+
+    internal fun attachAfterStateTransfer(newState: DeponderState) {
+        boundPose = newState.registerRubberNode(this)
+    }
+
     override fun onDetach() {
         attachedState?.unregisterRubberNode(this)
         registeredState = null
@@ -729,6 +809,7 @@ internal class DeponderRubberNode(
         innerAnchorCoordinates = null
         hasBaseOrigin = false
         explicitNonStretchedWidthPx = -1
+        explicitAdaptiveContentWidthPx = -1
         for (s in directStretchNodes) {
             s.unbindRubber(this)
         }
@@ -751,13 +832,18 @@ private object DeponderRubberInnerAnchorElement : ModifierNodeElement<DeponderRu
     override fun equals(other: Any?): Boolean = other === this
 }
 
-internal class DeponderRubberInnerAnchorNode : Modifier.Node(), LayoutAwareModifierNode {
+internal class DeponderRubberInnerAnchorNode : Modifier.Node(), GlobalPositionAwareModifierNode {
     private var boundRubber: DeponderRubberNode? = null
 
-    override fun onPlaced(coordinates: LayoutCoordinates) {
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
         val rubber = findNearestAncestor(DeponderRubberTraverseKey) as? DeponderRubberNode
         boundRubber = rubber
-        rubber?.innerAnchorCoordinates = coordinates
+        if (rubber != null) {
+            rubber.innerAnchorCoordinates = coordinates
+            for (i in rubber.childStretchNodes.indices) {
+                rubber.childStretchNodes[i].refreshBaseLeftInRubber()
+            }
+        }
     }
 
     override fun onDetach() {
@@ -788,7 +874,7 @@ internal class DeponderStretchNode(
     var enabled: Boolean,
 ) : Modifier.Node(),
     LayoutModifierNode,
-    LayoutAwareModifierNode,
+    GlobalPositionAwareModifierNode,
     TraversableNode {
 
     override val traverseKey: Any
@@ -798,8 +884,11 @@ internal class DeponderStretchNode(
     private var isSameNodeAsRubber: Boolean = false
     private var outerCoordinates: LayoutCoordinates? = null
     private var baseLeftInRubber: Float = 0f
+    private var hasBaseLeftInRubber: Boolean = false
 
     internal var measuredWidthPx: Int = 0
+        private set
+    internal var reportedLayoutWidthPx: Int = 0
         private set
 
     override fun onAttach() {
@@ -823,16 +912,36 @@ internal class DeponderStretchNode(
     fun update(newEnabled: Boolean) {
         if (enabled != newEnabled) {
             enabled = newEnabled
-            hostRubberNode?.attachedState?.notifyFrameChanged()
+            invalidateMeasurement()
+            val rubber = hostRubberNode
+            if (rubber != null) {
+                rubber.attachedState?.syncRubberAdaptiveLength(rubber)
+                rubber.attachedState?.notifyFrameChanged()
+            }
         }
     }
 
-    override fun onPlaced(coordinates: LayoutCoordinates) {
+    override fun onGloballyPositioned(coordinates: LayoutCoordinates) {
         outerCoordinates = coordinates
-        syncRubberMembershipAndOrigin(requireBound = false)
+        refreshBaseLeftInRubber()
     }
 
-    private fun syncRubberMembershipAndOrigin(requireBound: Boolean) {
+    internal fun refreshBaseLeftInRubber() {
+        if (isSameNodeAsRubber) return
+        val rubber = hostRubberNode ?: return
+        val anchor = rubber.innerAnchorCoordinates ?: return
+        val coords = outerCoordinates ?: return
+        if (!anchor.isAttached || !coords.isAttached) return
+        val newLeft = anchor.localPositionOf(coords, Offset.Zero).x
+        val changed = !hasBaseLeftInRubber || abs(newLeft - baseLeftInRubber) > 1e-3f
+        baseLeftInRubber = newLeft
+        hasBaseLeftInRubber = true
+        if (changed) {
+            rubber.attachedState?.notifyFrameChanged()
+        }
+    }
+
+    private fun syncRubberMembership(requireBound: Boolean) {
         val rubber = hostRubberNode ?: (findNearestAncestor(DeponderRubberTraverseKey) as? DeponderRubberNode)
         if (rubber == null) {
             if (requireBound && enabled) {
@@ -854,11 +963,6 @@ internal class DeponderStretchNode(
             rubber.directStretchNodes.remove(this)
             if (!rubber.childStretchNodes.contains(this)) {
                 rubber.childStretchNodes.add(this)
-            }
-            val anchor = rubber.innerAnchorCoordinates
-            val coords = outerCoordinates
-            if (anchor != null && coords != null && anchor.isAttached && coords.isAttached) {
-                baseLeftInRubber = anchor.localPositionOf(coords, Offset.Zero).x
             }
         }
     }
@@ -885,7 +989,15 @@ internal class DeponderStretchNode(
         }
         val placeable = measurable.measure(adjustedConstraints)
         measuredWidthPx = placeable.width
-        return layout(placeable.width, placeable.height) {
+        syncRubberMembership(requireBound = true)
+        val isInnerChildStretch = enabled && !isSameNodeAsRubber
+        val layoutWidth = if (isInnerChildStretch && !constraints.hasFixedWidth) {
+            minOf(placeable.width, maxOf(1, constraints.minWidth)).coerceIn(constraints.minWidth, constraints.maxWidth)
+        } else {
+            placeable.width
+        }
+        reportedLayoutWidthPx = layoutWidth
+        return layout(layoutWidth, placeable.height) {
             placeable.placeWithLayer(0, 0) {
                 val rubber = hostRubberNode
                 val st = rubber?.attachedState
@@ -896,6 +1008,7 @@ internal class DeponderStretchNode(
                     !enabled ||
                     rubber == null ||
                     pose == null ||
+                    !hasBaseLeftInRubber ||
                     hasActiveStretchAncestorInsideRubber(rubber)
                 ) {
                     scaleX = 1f
@@ -910,11 +1023,6 @@ internal class DeponderStretchNode(
                         translationX = 0f
                         translationY = 0f
                     } else {
-                        val anchor = rubber.innerAnchorCoordinates
-                        val coords = outerCoordinates
-                        if (anchor != null && coords != null && anchor.isAttached && coords.isAttached) {
-                            baseLeftInRubber = anchor.localPositionOf(coords, Offset.Zero).x
-                        }
                         val parentScale = rubber.computeEffectiveContainerScale(pose)
                         scaleX = computeStretchScaleX(
                             lengthPx = targetLen,
@@ -931,17 +1039,24 @@ internal class DeponderStretchNode(
                     }
                 }
             }
-            syncRubberMembershipAndOrigin(requireBound = true)
         }
     }
 
     override fun onDetach() {
-        hostRubberNode?.directStretchNodes?.remove(this)
-        hostRubberNode?.childStretchNodes?.remove(this)
+        val rubber = hostRubberNode
+        rubber?.directStretchNodes?.remove(this)
+        rubber?.childStretchNodes?.remove(this)
         hostRubberNode = null
         isSameNodeAsRubber = false
         outerCoordinates = null
         baseLeftInRubber = 0f
+        hasBaseLeftInRubber = false
+        measuredWidthPx = 0
+        reportedLayoutWidthPx = 0
+        if (rubber != null && rubber.isAttached) {
+            rubber.attachedState?.syncRubberAdaptiveLength(rubber)
+            rubber.attachedState?.notifyFrameChanged()
+        }
     }
 }
 
@@ -952,8 +1067,7 @@ private data class DeponderDragElement(
     override fun create(): DeponderDragNode = DeponderDragNode(enabled, bringToFrontOnPress)
 
     override fun update(node: DeponderDragNode) {
-        node.enabled = enabled
-        node.bringToFrontOnPress = bringToFrontOnPress
+        node.update(enabled, bringToFrontOnPress)
     }
 
     override fun InspectorInfo.inspectableProperties() {
@@ -1020,24 +1134,33 @@ internal class DeponderDragNode(
         }
     }
 
+    fun update(newEnabled: Boolean, newBringToFrontOnPress: Boolean) {
+        val wasEnabled = enabled
+        enabled = newEnabled
+        bringToFrontOnPress = newBringToFrontOnPress
+        if (!wasEnabled && newEnabled && targetPlanetNode == null) {
+            invalidateMeasurement()
+        }
+    }
+
     override fun MeasureScope.measure(
         measurable: Measurable,
         constraints: Constraints,
     ): MeasureResult {
         val placeable = measurable.measure(constraints)
+        if (targetPlanetNode == null) {
+            val ancestorPlanet = findNearestAncestor(DeponderPlanetTraverseKey) as? DeponderPlanetNode
+            if (ancestorPlanet != null) {
+                targetPlanetNode = ancestorPlanet
+                delegatesToPlanetInnerLayer = false
+            } else if (enabled) {
+                throw IllegalStateException(
+                    "Modifier.deponderDrag must be applied directly to or nested inside a Modifier.deponderPlanet.",
+                )
+            }
+        }
         return layout(placeable.width, placeable.height) {
             placeable.place(0, 0)
-            if (targetPlanetNode == null) {
-                val ancestorPlanet = findNearestAncestor(DeponderPlanetTraverseKey) as? DeponderPlanetNode
-                if (ancestorPlanet != null) {
-                    targetPlanetNode = ancestorPlanet
-                    delegatesToPlanetInnerLayer = false
-                } else if (enabled) {
-                    throw IllegalStateException(
-                        "Modifier.deponderDrag must be applied directly to or nested inside a Modifier.deponderPlanet.",
-                    )
-                }
-            }
         }
     }
 
@@ -1210,8 +1333,15 @@ private suspend fun PointerInputScope.runPlanetDragLoop(
                 }
             } finally {
                 if (isDragging) {
-                    val currentPlanetId = planetProvider()?.planetId ?: activePlanetId
-                    state.setPressed(currentPlanetId, false)
+                    state.setPressed(activePlanetId, false)
+                    val currentPlanet = planetProvider()
+                    val currentState = currentPlanet?.attachedState
+                    if (currentPlanet != null &&
+                        currentState != null &&
+                        (currentState !== state || currentPlanet.planetId != activePlanetId)
+                    ) {
+                        currentState.setPressed(currentPlanet.planetId, false)
+                    }
                 }
             }
         }

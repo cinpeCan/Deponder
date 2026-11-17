@@ -68,12 +68,14 @@ public fun View.deponderPlanet(
 }
 
 /**
- * Removes any active [deponderPlanet] binding from this [View] and resets its render matrix to identity.
+ * Removes any active [deponderPlanet] binding from this [View] and resets its render matrix to identity,
+ * while cleanly uninstalling any attached [deponderDrag] probes inside its subtree.
  */
 public fun View.clearDeponderPlanet() {
     val existing = getTag(R.id.deponder_planet_binding_tag) as? PlanetViewBinding ?: return
     existing.uninstall()
     setTag(R.id.deponder_planet_binding_tag, null)
+    clearDragProbesInSubtree(this)
 }
 
 /**
@@ -82,21 +84,23 @@ public fun View.clearDeponderPlanet() {
  *
  * Applies [insets] ([DeponderRubberInsets.Default] contour clearance by default, or
  * [DeponderRubberInsets.None] for continuous center-to-center spans; defaults to [DeponderRubberView.insets]
- * when called on a pre-configured [DeponderRubberView]) on hardware `RenderNode` properties with zero
- * `requestLayout()` overhead, expanding outer bounds when inner [deponderStretch] children are present
- * so host containers with default `clipChildren = true` never truncate stretched lines.
+ * and [DeponderRubberView.physics] when called on a pre-configured [DeponderRubberView]) on hardware
+ * `RenderNode` properties with zero `requestLayout()` overhead, expanding outer bounds when inner
+ * [deponderStretch] children are present so host containers with default `clipChildren = true` never
+ * truncate stretched lines.
  */
 @JvmOverloads
 public fun View.deponderRubber(
     startId: String,
     endId: String,
-    physics: RubberPhysics = RubberPhysics(),
+    physics: RubberPhysics = if (this is DeponderRubberView) this.physics else RubberPhysics(),
     insets: DeponderRubberInsets = if (this is DeponderRubberView) this.insets else DeponderRubberInsets.Default,
 ) {
     check(getTag(R.id.deponder_planet_binding_tag) == null) {
         "View cannot be bound as both deponderRubber('$startId', '$endId') and deponderPlanet simultaneously."
     }
     if (this is DeponderRubberView) {
+        syncPhysicsFromBinding(physics)
         syncInsetsFromBinding(insets)
     }
     val existing = getTag(R.id.deponder_rubber_binding_tag) as? RubberViewBinding
@@ -116,12 +120,14 @@ public fun View.deponderRubber(
 }
 
 /**
- * Removes any active [deponderRubber] binding from this [View] and resets its render matrix to identity.
+ * Removes any active [deponderRubber] binding from this [View] and resets its render matrix to identity,
+ * clearing programmatic [deponderStretch] markers inside its subtree without altering `View.getTag()`.
  */
 public fun View.clearDeponderRubber() {
     val existing = getTag(R.id.deponder_rubber_binding_tag) as? RubberViewBinding ?: return
     existing.uninstall()
     setTag(R.id.deponder_rubber_binding_tag, null)
+    clearProgrammaticStretchTagsInSubtree(this)
 }
 
 /**
@@ -149,7 +155,7 @@ public fun View.deponderStretch(
     }
     val enclosingRubber = findEnclosingRubberBinding(this)
     if (enclosingRubber != null) {
-        enclosingRubber.refreshPoseFromController()
+        enclosingRubber.syncAdaptiveLengthAndRefreshPose()
     } else if (enabled) {
         findEnclosingRootController(this)?.markOrphanValidationDirty()
     }
@@ -208,10 +214,9 @@ internal class PlanetViewBinding(
         if (ctrl.world.bodyOf(planetId) == null && hasLaidOutBounds()) {
             ctrl.seedOrUpdatePlanetBody(this)
         } else if (changed) {
-            val w = (r - l).coerceAtLeast(0).toFloat()
-            val h = (b - t).coerceAtLeast(0).toFloat()
-            ctrl.world.setBodySize(planetId, w, h, ctrl.scale)
-            ctrl.applyCurrentPosesToViews()
+            val w = (r - l).coerceAtLeast(0)
+            val h = (b - t).coerceAtLeast(0)
+            ctrl.updatePlanetMeasuredSize(planetId, w, h)
         }
     }
 
@@ -320,7 +325,7 @@ internal class RubberViewBinding(
     private val cachedStretchXmlToken: String = view.resources.getString(R.string.deponder_stretch)
 
     private val layoutListener = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-        refreshPoseFromController()
+        syncAdaptiveLengthAndRefreshPose()
     }
 
     private val attachListener = object : View.OnAttachStateChangeListener {
@@ -383,6 +388,27 @@ internal class RubberViewBinding(
             insets = newInsets
             refreshPoseFromController()
         }
+    }
+
+    fun updatePhysicsOnly(newPhysics: RubberPhysics) {
+        if (physics != newPhysics) {
+            physics = newPhysics
+            attachedController?.rebindRubberEndpointsOrPhysics(this, EdgeKey(startId, endId))
+        }
+    }
+
+    internal fun currentAdaptiveContentWidthPx(): Float {
+        if (view is DeponderRubberView) {
+            return view.adaptiveContentWidthPx().toFloat()
+        }
+        val stretchXmlToken = attachedController?.xmlStretchToken ?: cachedStretchXmlToken
+        return computeNonStretchedWidthPx(view, stretchXmlToken).toFloat()
+    }
+
+    internal fun syncAdaptiveLengthAndRefreshPose() {
+        val ctrl = attachedController ?: return
+        ctrl.syncRubberAdaptiveLength(this)
+        refreshPoseFromController()
     }
 
     fun refreshPoseFromController() {
@@ -561,7 +587,7 @@ internal class RubberViewBinding(
     }
 }
 
-internal fun assertNoOrphanXmlStretchInSubtree(view: View, xmlStretchToken: String) {
+internal fun assertNoStretchInPlanetSubtree(view: View, xmlStretchToken: String) {
     if (view.getTag(R.id.deponder_rubber_binding_tag) != null) return
     if (isViewStretchEnabled(view, xmlStretchToken)) {
         throw IllegalStateException(
@@ -570,7 +596,59 @@ internal fun assertNoOrphanXmlStretchInSubtree(view: View, xmlStretchToken: Stri
     }
     if (view is ViewGroup) {
         for (i in 0 until view.childCount) {
-            assertNoOrphanXmlStretchInSubtree(view.getChildAt(i), xmlStretchToken)
+            assertNoStretchInPlanetSubtree(view.getChildAt(i), xmlStretchToken)
+        }
+    }
+}
+
+internal fun assertNoOrphanProgrammaticStretchInSubtree(view: View) {
+    if (view.getTag(R.id.deponder_rubber_binding_tag) != null) return
+    if ((view.getTag(R.id.deponder_stretch_state_tag) as? Boolean) == true) {
+        throw IllegalStateException(
+            "deponderStretch() must be applied directly to or nested inside a deponderRubber view.",
+        )
+    }
+    if (view is ViewGroup) {
+        for (i in 0 until view.childCount) {
+            assertNoOrphanProgrammaticStretchInSubtree(view.getChildAt(i))
+        }
+    }
+}
+
+private fun clearProgrammaticStretchTagsInSubtree(view: View) {
+    if (view.getTag(R.id.deponder_stretch_state_tag) != null) {
+        view.setTag(R.id.deponder_stretch_state_tag, null)
+        view.scaleX = 1f
+        view.scaleY = 1f
+        view.translationX = 0f
+        view.translationY = 0f
+    }
+    if (view is ViewGroup) {
+        for (i in 0 until view.childCount) {
+            clearProgrammaticStretchTagsInSubtree(view.getChildAt(i))
+        }
+    }
+}
+
+private fun clearDragProbesInSubtree(view: View) {
+    val dragBinding = view.getTag(R.id.deponder_drag_binding_tag) as? DragProbeBinding
+    if (dragBinding != null) {
+        dragBinding.uninstall()
+        view.setTag(R.id.deponder_drag_binding_tag, null)
+    }
+    if (view is ViewGroup) {
+        for (i in 0 until view.childCount) {
+            clearDragProbesInSubtree(view.getChildAt(i))
+        }
+    }
+}
+
+internal fun cancelActiveDragProbesInSubtree(view: View) {
+    val dragBinding = view.getTag(R.id.deponder_drag_binding_tag) as? DragProbeBinding
+    dragBinding?.cancelActiveDrag()
+    if (view is ViewGroup) {
+        for (i in 0 until view.childCount) {
+            cancelActiveDragProbesInSubtree(view.getChildAt(i))
         }
     }
 }
@@ -848,6 +926,7 @@ internal class DragProbeBinding(
     private var grabOffsetY: Float = 0f
     private var isDragging: Boolean = false
     private var activePlanetId: String? = null
+    private var listenersAttached: Boolean = false
 
     private val attachListener = object : View.OnAttachStateChangeListener {
         override fun onViewAttachedToWindow(v: View) = Unit
@@ -857,14 +936,30 @@ internal class DragProbeBinding(
         }
     }
 
+    private fun ensureListenersAttached() {
+        if (!listenersAttached) {
+            sourceView.addOnAttachStateChangeListener(attachListener)
+            sourceView.setOnTouchListener(this)
+            listenersAttached = true
+        }
+    }
+
+    private fun detachListeners() {
+        if (listenersAttached) {
+            sourceView.removeOnAttachStateChangeListener(attachListener)
+            sourceView.setOnTouchListener(null)
+            listenersAttached = false
+        }
+    }
+
     fun install() {
-        sourceView.addOnAttachStateChangeListener(attachListener)
-        sourceView.setOnTouchListener(this)
-        if (enabled && findEnclosingRubberBinding(sourceView) != null) {
+        if (!enabled) return
+        if (findEnclosingRubberBinding(sourceView) != null) {
             throw IllegalStateException(
                 "deponderDrag() must be applied directly to or nested inside a deponderPlanet view, not a deponderRubber.",
             )
         }
+        ensureListenersAttached()
     }
 
     fun update(newEnabled: Boolean, newBringToFrontOnPress: Boolean) {
@@ -872,11 +967,20 @@ internal class DragProbeBinding(
         bringToFrontOnPress = newBringToFrontOnPress
         if (!newEnabled) {
             cancelActiveDrag()
-        } else if (findEnclosingRubberBinding(sourceView) != null) {
-            throw IllegalStateException(
-                "deponderDrag() must be applied directly to or nested inside a deponderPlanet view, not a deponderRubber.",
-            )
+            detachListeners()
+        } else {
+            if (findEnclosingRubberBinding(sourceView) != null) {
+                throw IllegalStateException(
+                    "deponderDrag() must be applied directly to or nested inside a deponderPlanet view, not a deponderRubber.",
+                )
+            }
+            ensureListenersAttached()
         }
+    }
+
+    fun uninstall() {
+        cancelActiveDrag()
+        detachListeners()
     }
 
     private fun cancelNativeViewPressState(v: View, sourceEvent: MotionEvent?) {
@@ -892,7 +996,7 @@ internal class DragProbeBinding(
         v.cancelPendingInputEvents()
     }
 
-    private fun cancelActiveDrag() {
+    internal fun cancelActiveDrag() {
         if (isDragging) {
             if (sourceView.isPressed) {
                 sourceView.isPressed = false
@@ -972,6 +1076,7 @@ internal class DragProbeBinding(
                     val touchSlop = ViewConfiguration.get(v.context).scaledTouchSlop.toFloat()
                     if (dist >= touchSlop) {
                         isDragging = true
+                        activePlanetId = planetBinding.planetId
                         v.parent?.requestDisallowInterceptTouchEvent(true)
                         cancelNativeViewPressState(v, event)
                         controller.setPressed(planetBinding.planetId, true)
@@ -1048,7 +1153,13 @@ internal class DragProbeBinding(
                     if (v.isPressed) {
                         v.isPressed = false
                     }
-                    controller.setPressed(planetBinding.planetId, false)
+                    val lockedId = activePlanetId
+                    if (lockedId != null) {
+                        controller.setPressed(lockedId, false)
+                    }
+                    if (planetBinding.planetId != lockedId) {
+                        controller.setPressed(planetBinding.planetId, false)
+                    }
                 }
                 isDragging = false
                 activePointerId = MotionEvent.INVALID_POINTER_ID
@@ -1069,7 +1180,13 @@ internal class DragProbeBinding(
                     if (v.isPressed) {
                         v.isPressed = false
                     }
-                    controller.setPressed(planetBinding.planetId, false)
+                    val lockedId = activePlanetId
+                    if (lockedId != null) {
+                        controller.setPressed(lockedId, false)
+                    }
+                    if (planetBinding.planetId != lockedId) {
+                        controller.setPressed(planetBinding.planetId, false)
+                    }
                 }
                 isDragging = false
                 activePointerId = MotionEvent.INVALID_POINTER_ID

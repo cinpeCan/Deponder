@@ -17,6 +17,13 @@ public object DeponderDefaults {
     public const val INFINITE_RANGE: Float = -1f
 
     /**
+     * Sentinel spring length value indicating content-adaptive natural length on [RubberPhysics]:
+     * resolves rest center-to-center length from the rubber's measured non-stretched content width
+     * plus [Rubber.CONTENT_PADDING_DP], clamped within `[minLengthDp, maxLengthDp]`.
+     */
+    public const val AUTO_LENGTH: Float = -1f
+
+    /**
      * Default environment (container viewport) parameters.
      */
     public object Root {
@@ -46,6 +53,12 @@ public object DeponderDefaults {
          * before Global Kinetic-Force Sleep suspends at 0% CPU.
          */
         public const val COOLING_ENABLED: Boolean = false
+
+        /**
+         * Disabled by default to preserve strictly local point-mass spring behavior; enable via
+         * [RootPhysics.withUnfold] so tangled cycles, trees, and meshes smoothly unfold before settling.
+         */
+        public const val UNFOLD_ENABLED: Boolean = false
     }
 
     /**
@@ -85,6 +98,7 @@ public object DeponderDefaults {
     public object Rubber {
         public const val ELASTICITY: Float = 1.68f
         public const val NATURAL_LENGTH_DP: Float = 110f
+        public const val CONTENT_PADDING_DP: Float = 80f
         public const val DEFAULT_ENDPOINT_GAP_DP: Float = 4f
         public const val DEFAULT_THICKNESS_DP: Float = 2f
         public const val DEFAULT_ARROW_SIZE_DP: Float = 7.5f

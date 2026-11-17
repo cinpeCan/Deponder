@@ -16,7 +16,8 @@
 
 - **双端统一的接入模型**：在 Compose 与 Android View 上提供语义完全对称的 5 个接入接口与统一的 `dp` 物理参数体系，跨技术栈迁移零额外心智负担。
 - **低侵入容器解耦与手势共存**：通过 `touchSlop` 门限与根容器坐标投影区分点击与拖拽，完整保留组件原有的 `.clickable {}`、`OnClickListener` 与水波纹反馈；拖拽置顶仅调整 `zIndex` / `translationZ`，不改变子视图层级顺序，也不修改宿主的 `clipChildren` / `clipToBounds`。
-- **安全区式连线避让与默认弹簧组件**：将纯胡克弹簧力学（`RubberPhysics`）与 UI 端点安全区（`DeponderRubberInsets`）正交解耦，支持自动轮廓估算（`Default`）、显式指定安全区距离（`fixed(dp)`）、纯中心连续直连（`None`）及单侧避让（`startOnly` / `endOnly`）；内置开箱即用的 `DeponderDefaultRubber`（Compose）与 `DeponderRubberView`（Android View / XML），支持线体上方透明悬浮标签与单双向箭头（在圆心直连端自动隐去箭头）。
+- **内容自适应弹簧长度与安全区式连线避让**：`RubberPhysics()` 默认自动根据连线文字/徽章测量宽度动态撑开自然长度（支持通过 `RubberPhysics.auto(...)` 自定义留白与上下限，或传入 `RubberPhysics(naturalLengthDp = 120f)` / XML `app:deponderNaturalLength="wrap_content | 120dp"` 锁定固定长度），同时与 UI 端点安全区（`DeponderRubberInsets`：自动轮廓估算 `Default`、显式距离 `fixed(dp)`、中心直连 `None`、单侧避让 `startOnly` / `endOnly`）正交解耦；内置开箱即用的 `DeponderDefaultRubber`（Compose）与 `DeponderRubberView`（Android View / XML），支持线体上方透明悬浮标签与单双向箭头（在圆心直连端自动隐去箭头）。
+- **按需开启的稀疏拓扑自然展开（`0.6.0`，`RootPhysics.withUnfold(true)`）**：默认保持 `false` 以严格延续原有纯质点物理行为；开启后，内核基于线性级复杂度（`O(K * (|V| + |E|))`）的 2-核剥离、地标 PivotMDS、有界稀疏应力松弛、枝叶径向扇形展开与 Procrustes 姿态对齐，在拓扑变化或 `reheat()` 时顺滑解开打结的环路、树、网格与多孤岛图谱，并在短时退火导引结束后 100% 交还纯牛顿弹簧物理与静态 `0% CPU` 休眠。
 - **帧率无关的高性能内核（`deponder-core`）**：
   - **跨屏恒速积分**：采用自适应 `1/120s` 子步积分，在 60Hz–240Hz 屏幕上保持一致的物理运动节奏，并对重叠或共线节点做确定性对称破缺。
   - **静止零开销与三级四叉树加速**：结合速度与加速度双阈值全局休眠（静止态 0% CPU 占用，微幅拖拽即时唤醒），按节点规模自动切换计算策略（64 以内直接遍历、64–255 单线程四叉树、256 及以上切入 `Dispatchers.Default` 并行快照计算）。
@@ -37,16 +38,16 @@
 
 | Maven 构件 | 适用 UI 体系 | 支持平台 |
 | :--- | :--- | :--- |
-| `io.github.cinpecan:deponder-compose:0.5.0` | Jetpack Compose 与 Compose Multiplatform | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
-| `io.github.cinpecan:deponder:0.5.0` | 传统 Android `View` / `ViewGroup` | Android（`minSdk 23`, JVM 17） |
-| `io.github.cinpecan:deponder-core:0.5.0` | 纯 KMP 无 UI 物理计算内核（适合自绘 `Canvas` 或无头图布局） | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
-| `io.github.cinpecan:deponder-bom:0.5.0` | 版本对齐清单（混合工程可选） | 全平台 |
+| `io.github.cinpecan:deponder-compose:0.6.0` | Jetpack Compose 与 Compose Multiplatform | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
+| `io.github.cinpecan:deponder:0.6.0` | 传统 Android `View` / `ViewGroup` | Android（`minSdk 23`, JVM 17） |
+| `io.github.cinpecan:deponder-core:0.6.0` | 纯 KMP 无 UI 物理计算内核（适合自绘 `Canvas` 或无头图布局） | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
+| `io.github.cinpecan:deponder-bom:0.6.0` | 版本对齐清单（混合工程可选） | 全平台 |
 
 **Compose Multiplatform（`commonMain`）或纯 Jetpack Compose 项目：**
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder-compose:0.5.0")
+    implementation("io.github.cinpecan:deponder-compose:0.6.0")
 }
 ```
 
@@ -54,7 +55,7 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder:0.5.0")
+    implementation("io.github.cinpecan:deponder:0.6.0")
 }
 ```
 
@@ -62,7 +63,7 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.cinpecan:deponder-bom:0.5.0"))
+    implementation(platform("io.github.cinpecan:deponder-bom:0.6.0"))
     implementation("io.github.cinpecan:deponder")
     implementation("io.github.cinpecan:deponder-compose")
 }
@@ -75,6 +76,7 @@ dependencies {
 ```kotlin
 val state = rememberDeponderState(
     RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced)
+        .withUnfold(true) // 可选（默认 false）：拓扑变动或 reheat() 时顺滑解缠环路、树与复杂网格
 )
 
 Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
@@ -85,7 +87,7 @@ Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
             endId = link.toId,
             label = link.relation,
             arrowMode = DeponderArrowMode.BOTH,
-            physics = RubberPhysics(naturalLengthDp = 120f),
+            physics = RubberPhysics(), // 默认跟随文字长度自适应；也可传 naturalLengthDp = 120f 或 RubberPhysics.auto(...) 定制
             insets = DeponderRubberInsets.Default, // 传 DeponderRubberInsets.None 可切换中心直连
         )
     }
@@ -115,7 +117,8 @@ Box(modifier = Modifier.fillMaxSize().deponderRoot(state)) {
 ```kotlin
 val controller = rootFrameLayout.deponderRoot(
     lifecycleOwner = this,
-    physics = RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced),
+    physics = RootPhysics.fromPreset(DeponderDefaults.Presets.Balanced)
+        .withUnfold(true), // 可选（默认 false）：拓扑变动或 reheat() 时顺滑解缠环路、树与复杂网格
 )
 
 // 开箱即用的默认弹簧 View（亦支持 XML <com.cinpe.deponder.DeponderRubberView>；
@@ -124,7 +127,7 @@ val rubberView = DeponderRubberView(this)
     .withLabel("依赖")
     .withArrowMode(DeponderArrowMode.END)
 rootFrameLayout.addView(rubberView)
-rubberView.deponderRubber("core", "ui", RubberPhysics(naturalLengthDp = 120f))
+rubberView.deponderRubber("core", "ui") // 默认跟随文字长度自适应；传 RubberPhysics(naturalLengthDp = 120f) 可锁定固定长度
 
 // 为现有直接子 View 配置物理力场与拖拽，完整保留原有 setOnClickListener
 cardCore.deponderPlanet("core", PlanetPhysics(pinned = true))

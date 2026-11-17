@@ -15,36 +15,60 @@ import com.cinpe.deponder.core.SimulationWorld
 import com.cinpe.deponder.internal.awaitChoreographerFrameNanos
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 import kotlin.math.max
+
+private sealed interface ControllerIntent
+private data class ControllerUpdatePhysics(val physics: RootPhysics) : ControllerIntent
+private data class ControllerSubmitScale(val scale: Float) : ControllerIntent
+private data class ControllerSubmitRubberElasticity(val elasticity: Float) : ControllerIntent
+private data object ControllerReheat : ControllerIntent
+private data class ControllerSetPinned(val id: String, val pinned: Boolean) : ControllerIntent
+private data class ControllerSetPressed(val id: String, val pressed: Boolean) : ControllerIntent
+private data class ControllerBringToFront(val id: String) : ControllerIntent
+private data class ControllerUpdateViewport(val widthPx: Int, val heightPx: Int) : ControllerIntent
+private data class ControllerUpdatePlanetSize(val id: String, val widthPx: Int, val heightPx: Int) : ControllerIntent
+private data object ControllerCancel : ControllerIntent
 
 /**
  * Imperative physics controller bound to a host [ViewGroup] via [deponderRoot].
  *
+ * - Architecture follows a Dual-Plane Unidirectional Data Flow (UDF):
+ *   1. **Control Plane**: Orthogonal host-attachment, Android [Lifecycle], topology-non-empty,
+ *      cancellation, and kinetic-energy sources are merged with [combine] + [distinctUntilChanged]
+ *      into [loopGateFlow], driving a single `collectLatest` Choreographer VSYNC loop.
+ *   2. **Data Plane**: State mutations flow through a single reducer pipeline (`ControllerIntent`
+ *      for discrete configuration/lifecycle events, zero-allocation fast-path reducers for
+ *      120Hz dragging), followed by read-only pose projection to View `RenderNode` properties.
  * - Never calls `addView`/`removeView`, never modifies `clipChildren`/`clipToPadding`, and never
  *   mutates child indices via `ViewGroup.bringToFront()`.
- * - Automatically pauses the Choreographer VSYNC loop when [Lifecycle.State] drops below
- *   [Lifecycle.State.STARTED] or when [rootView] detaches from window, preserving all bound
- *   planet/rubber topologies and coordinates for seamless resume.
  */
 public class DeponderController internal constructor(
     public val rootView: ViewGroup,
     explicitLifecycleOwner: LifecycleOwner?,
     initialPhysics: RootPhysics,
 ) {
+
     public var physics: RootPhysics = initialPhysics
         private set
 
     internal val density: Float
         get() = rootView.resources.displayMetrics.density.coerceAtLeast(1e-3f)
 
+    private var currentDensity: Float = density
+
     internal val xmlStretchToken: String = rootView.resources.getString(R.string.deponder_stretch)
 
-    internal val world: SimulationWorld = SimulationWorld(initialPhysics.toEnvironmentSpec(density))
+    internal val world: SimulationWorld = SimulationWorld(initialPhysics.toEnvironmentSpec(currentDensity))
 
     public var scale: Float = initialPhysics.initScale.coerceIn(initialPhysics.minScale, initialPhysics.maxScale)
         private set
@@ -55,8 +79,24 @@ public class DeponderController internal constructor(
     public var isCancelled: Boolean = false
         private set
 
+    // Orthogonal Control-Plane sources: each listener writes only its own fact.
+    private val cancelledSource = MutableStateFlow(false)
+    private val hostAttachedSource = MutableStateFlow(rootView.isAttachedToWindow)
+    private val lifecycleStartedSource = MutableStateFlow(true)
+    private val topologyActiveSource = MutableStateFlow(false)
+    private val energyAwakeSource = MutableStateFlow(false)
+
+    internal val loopGateFlow: Flow<Boolean> = combine(
+        cancelledSource,
+        hostAttachedSource,
+        lifecycleStartedSource,
+        topologyActiveSource,
+        energyAwakeSource,
+    ) { cancelled, attached, started, hasBodies, energyAwake ->
+        !cancelled && attached && started && hasBodies && energyAwake
+    }.distinctUntilChanged()
+
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private var frameLoopJob: Job? = null
 
     private var observedLifecycle: Lifecycle? = null
     private var explicitOwner: LifecycleOwner? = explicitLifecycleOwner
@@ -86,28 +126,32 @@ public class DeponderController internal constructor(
         val h = (bottom - top).coerceAtLeast(0)
         if (v === rootView) {
             validateOrphanOperatorsInDirectChildren()
-            world.updateViewport(w.toFloat(), h.toFloat())
-            applyCurrentPosesToViews()
-            ensureFrameLoopIfEligible()
+            dispatch(ControllerUpdateViewport(w, h))
         }
     }
 
     private val rootAttachListener = object : View.OnAttachStateChangeListener {
         override fun onViewAttachedToWindow(v: View) {
             orphanValidationDirty = true
+            hostAttachedSource.value = true
             bindLifecycleIfAvailable()
+            val densityChanged = syncDensityIfChanged()
             if (rootView.width > 0 || rootView.height > 0) {
-                world.updateViewport(rootView.width.toFloat(), rootView.height.toFloat())
+                dispatch(ControllerUpdateViewport(rootView.width, rootView.height))
+            } else if (densityChanged && world.bodies.isNotEmpty()) {
+                energyAwakeSource.value = true
             }
             attachPendingDirectChildren()
             applyCurrentPosesToViews()
-            ensureFrameLoopIfEligible()
+            syncDerivedFlags()
         }
 
         override fun onViewDetachedFromWindow(v: View) {
             rootView.removeCallbacks(orphanCheckRunnable)
             orphanCheckPosted = false
-            pauseFrameLoop()
+            releaseAllActivePressesAndDrags()
+            hostAttachedSource.value = false
+            syncDerivedFlags()
         }
     }
 
@@ -115,11 +159,18 @@ public class DeponderController internal constructor(
         when (event) {
             Lifecycle.Event.ON_START,
             Lifecycle.Event.ON_RESUME,
-            -> ensureFrameLoopIfEligible()
+            -> {
+                lifecycleStartedSource.value = true
+                syncDerivedFlags()
+            }
 
-            Lifecycle.Event.ON_STOP -> pauseFrameLoop()
+            Lifecycle.Event.ON_STOP -> {
+                releaseAllActivePressesAndDrags()
+                lifecycleStartedSource.value = false
+                syncDerivedFlags()
+            }
 
-            Lifecycle.Event.ON_DESTROY -> cancel()
+            Lifecycle.Event.ON_DESTROY -> dispatch(ControllerCancel)
 
             else -> Unit
         }
@@ -133,6 +184,233 @@ public class DeponderController internal constructor(
         }
         bindLifecycleIfAvailable()
         attachPendingDirectChildren()
+        syncDerivedFlags()
+
+        scope.launch {
+            loopGateFlow.collectLatest { canRun ->
+                syncDerivedFlags()
+                if (!canRun) return@collectLatest
+                var lastNanos = awaitChoreographerFrameNanos()
+                while (isActive && !isCancelled && isAwake) {
+                    val nowNanos = awaitChoreographerFrameNanos()
+                    if (!isActive || isCancelled || !isAwake) break
+                    val dtSeconds = (nowNanos - lastNanos) * 1e-9f
+                    lastNanos = nowNanos
+                    if (!stepSingleFrame(dtSeconds)) {
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    private fun releaseAllActivePressesAndDrags() {
+        for (binding in activePlanetsById.values) {
+            cancelActiveDragProbesInSubtree(binding.view)
+        }
+        var releasedAny = false
+        val bodies = world.bodies
+        for (i in bodies.indices) {
+            val body = bodies[i]
+            if (body.isPressed) {
+                world.setBodyPressed(body.spec.id, false)
+                releasedAny = true
+            }
+        }
+        if (releasedAny && world.bodies.isNotEmpty()) {
+            energyAwakeSource.value = true
+        }
+    }
+
+    private fun syncDensityIfChanged(): Boolean {
+        val nextDensity = density
+        if (abs(currentDensity - nextDensity) <= 1e-4f) return false
+        currentDensity = nextDensity
+        world.updateEnvironment(physics.toEnvironmentSpec(nextDensity), reheatSimulation = false)
+        for ((id, binding) in activePlanetsById) {
+            val body = world.bodyOf(id) ?: continue
+            world.upsertPlanet(
+                spec = binding.physics.toPlanetSpec(id, nextDensity).copy(pinned = body.spec.pinned),
+                initialX = body.x,
+                initialY = body.y,
+                scale = scale,
+            )
+        }
+        for ((key, binding) in activeRubbersByKey) {
+            val pose = world.rubberOf(key) ?: continue
+            val targetNatPx = binding.physics.resolveNaturalLengthPx(
+                density = nextDensity,
+                contentWidthPx = binding.currentAdaptiveContentWidthPx(),
+            )
+            world.upsertRubber(pose.spec.copy(naturalLengthPx = targetNatPx), scale)
+        }
+        world.refreshRubberPoses(scale)
+        return true
+    }
+
+    private fun syncDerivedFlags() {
+        val cancelled = cancelledSource.value
+        isCancelled = cancelled
+        isAwake = !cancelled &&
+            hostAttachedSource.value &&
+            lifecycleStartedSource.value &&
+            topologyActiveSource.value &&
+            energyAwakeSource.value
+    }
+
+    private fun completeReduction(
+        energized: Boolean?,
+        projectPoses: Boolean,
+    ) {
+        val hasBodies = world.bodies.isNotEmpty()
+        topologyActiveSource.value = hasBodies
+        if (energized != null) {
+            energyAwakeSource.value = energized
+        }
+        if (projectPoses) {
+            applyCurrentPosesToViews()
+        }
+        syncDerivedFlags()
+    }
+
+    private fun dispatch(intent: ControllerIntent) {
+        if (intent is ControllerCancel) {
+            reduceCancel()
+            return
+        }
+        if (isCancelled) return
+        when (intent) {
+            is ControllerUpdatePhysics -> {
+                if (physics == intent.physics) return
+                physics = intent.physics
+                scale = scale.coerceIn(intent.physics.minScale, intent.physics.maxScale)
+                world.updateEnvironment(intent.physics.toEnvironmentSpec(currentDensity), reheatSimulation = true)
+                world.refreshRubberPoses(scale)
+                completeReduction(energized = true, projectPoses = true)
+            }
+
+            is ControllerSubmitScale -> {
+                val clamped = intent.scale.coerceIn(physics.minScale, physics.maxScale)
+                if (scale != clamped) {
+                    scale = clamped
+                    world.refreshRubberPoses(clamped)
+                    world.wake(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+                    completeReduction(energized = true, projectPoses = true)
+                }
+            }
+
+            is ControllerSubmitRubberElasticity -> {
+                val rubbers = world.rubbers
+                var anyChanged = false
+                for (i in rubbers.indices) {
+                    if (rubbers[i].spec.elasticity != intent.elasticity) {
+                        anyChanged = true
+                        break
+                    }
+                }
+                if (anyChanged) {
+                    world.updateAllRubbersElasticity(intent.elasticity)
+                    completeReduction(
+                        energized = if (world.bodies.isNotEmpty()) true else null,
+                        projectPoses = true,
+                    )
+                }
+            }
+
+            ControllerReheat -> {
+                world.reheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
+                completeReduction(energized = true, projectPoses = false)
+            }
+
+            is ControllerSetPinned -> {
+                world.setBodyPinned(intent.id, intent.pinned)
+                completeReduction(
+                    energized = if (!intent.pinned) true else null,
+                    projectPoses = false,
+                )
+            }
+
+            is ControllerSetPressed -> {
+                world.setBodyPressed(intent.id, intent.pressed)
+                completeReduction(energized = true, projectPoses = false)
+            }
+
+            is ControllerBringToFront -> {
+                val binding = activePlanetsById[intent.id] ?: return
+                var maxVisualZ = topVisualZCounter
+                for (other in activePlanetsById.values) {
+                    val z = other.view.elevation + other.view.translationZ
+                    if (z > maxVisualZ) maxVisualZ = z
+                }
+                val targetVisualZ = max(topVisualZCounter + 1f, maxVisualZ + 1f)
+                topVisualZCounter = targetVisualZ
+                val neededTranslationZ = targetVisualZ - binding.view.elevation
+                binding.hasElevatedZ = true
+                binding.elevatedTranslationZ = neededTranslationZ
+                binding.view.translationZ = neededTranslationZ
+            }
+
+            is ControllerUpdateViewport -> {
+                val densityChanged = syncDensityIfChanged()
+                val prevW = world.viewportWidthPx
+                val prevH = world.viewportHeightPx
+                world.updateViewport(intent.widthPx.toFloat(), intent.heightPx.toFloat())
+                val changed = world.viewportWidthPx != prevW || world.viewportHeightPx != prevH
+                completeReduction(
+                    energized = if ((changed || densityChanged) && world.bodies.isNotEmpty()) true else null,
+                    projectPoses = true,
+                )
+            }
+
+            is ControllerUpdatePlanetSize -> {
+                val body = world.bodyOf(intent.id) ?: return
+                val prevHalfW = body.halfWidthPx
+                val prevHalfH = body.halfHeightPx
+                world.setBodySize(
+                    id = intent.id,
+                    widthPx = intent.widthPx.toFloat(),
+                    heightPx = intent.heightPx.toFloat(),
+                    scale = scale,
+                )
+                val sizeChanged = body.halfWidthPx != prevHalfW || body.halfHeightPx != prevHalfH
+                completeReduction(energized = null, projectPoses = sizeChanged)
+            }
+
+            ControllerCancel -> Unit
+        }
+    }
+
+    private fun reduceCancel() {
+        if (cancelledSource.value) return
+        cancelledSource.value = true
+        energyAwakeSource.value = false
+        topologyActiveSource.value = false
+        syncDerivedFlags()
+
+        rootView.removeCallbacks(orphanCheckRunnable)
+        orphanCheckPosted = false
+        scope.cancel()
+        observedLifecycle?.removeObserver(lifecycleObserver)
+        observedLifecycle = null
+        explicitOwner = null
+        rootView.removeOnLayoutChangeListener(rootLayoutListener)
+        rootView.removeOnAttachStateChangeListener(rootAttachListener)
+
+        val planetsSnapshot = ArrayList(activePlanetsById.values)
+        activePlanetsById.clear()
+        for (p in planetsSnapshot) {
+            p.onRootCancelled()
+        }
+
+        val rubbersSnapshot = ArrayList(activeRubbersByKey.values)
+        activeRubbersByKey.clear()
+        for (r in rubbersSnapshot) {
+            r.onRootCancelled()
+        }
+
+        if (rootView.getTag(R.id.deponder_root_controller_tag) === this) {
+            rootView.setTag(R.id.deponder_root_controller_tag, null)
+        }
     }
 
     private fun bindLifecycleIfAvailable() {
@@ -143,10 +421,15 @@ public class DeponderController internal constructor(
         observedLifecycle = nextLifecycle
         if (nextLifecycle != null) {
             if (nextLifecycle.currentState == Lifecycle.State.DESTROYED) {
-                cancel()
+                dispatch(ControllerCancel)
                 return
             }
+            lifecycleStartedSource.value = nextLifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
             nextLifecycle.addObserver(lifecycleObserver)
+            syncDerivedFlags()
+        } else {
+            lifecycleStartedSource.value = true
+            syncDerivedFlags()
         }
     }
 
@@ -172,10 +455,16 @@ public class DeponderController internal constructor(
         lastValidatedChildCount = count
         for (i in 0 until count) {
             val child = rootView.getChildAt(i)
-            if (child.getTag(R.id.deponder_rubber_binding_tag) == null) {
-                assertNoOrphanXmlStretchInSubtree(child, xmlStretchToken)
+            val isRubber = child.getTag(R.id.deponder_rubber_binding_tag) != null
+            val isPlanet = child.getTag(R.id.deponder_planet_binding_tag) != null
+            if (!isRubber) {
+                if (isPlanet) {
+                    assertNoStretchInPlanetSubtree(child, xmlStretchToken)
+                } else {
+                    assertNoOrphanProgrammaticStretchInSubtree(child)
+                }
             }
-            if (child.getTag(R.id.deponder_planet_binding_tag) == null) {
+            if (!isPlanet) {
                 assertNoOrphanDragInSubtree(child)
             }
         }
@@ -194,86 +483,72 @@ public class DeponderController internal constructor(
      * Updates the root container [RootPhysics] while preserving all active planet coordinates and velocities.
      */
     public fun updatePhysics(newPhysics: RootPhysics) {
-        if (isCancelled || physics == newPhysics) return
-        physics = newPhysics
-        scale = scale.coerceIn(newPhysics.minScale, newPhysics.maxScale)
-        world.updateEnvironment(newPhysics.toEnvironmentSpec(density), reheatSimulation = true)
-        world.refreshRubberPoses(scale)
-        applyCurrentPosesToViews()
-        wakeUpInternal()
+        dispatch(ControllerUpdatePhysics(newPhysics))
     }
 
     /**
      * Updates the simulation zoom scale within `[physics.minScale, physics.maxScale]` and wakes the loop.
      */
     public fun submitScale(newScale: Float) {
-        if (isCancelled) return
-        val clamped = newScale.coerceIn(physics.minScale, physics.maxScale)
-        if (scale != clamped) {
-            scale = clamped
-            world.refreshRubberPoses(clamped)
-            world.reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
-            applyCurrentPosesToViews()
-            wakeUpInternal()
-        }
+        require(newScale.isFinite()) { "scale must be finite, but was $newScale" }
+        dispatch(ControllerSubmitScale(newScale))
     }
 
     /**
      * Dynamically updates the spring [elasticity] across all bound rubbers and wakes the physics loop.
      */
     public fun submitRubberElasticity(elasticity: Float) {
-        if (isCancelled) return
-        world.updateAllRubbersElasticity(elasticity)
-        wakeUpInternal()
+        require(elasticity.isFinite()) { "elasticity must be finite, but was $elasticity" }
+        dispatch(ControllerSubmitRubberElasticity(elasticity))
     }
 
     /**
      * Reheats simulated annealing and wakes the physics VSYNC loop if sleeping.
      */
     public fun reheat() {
-        if (isCancelled) return
-        world.reheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
-        wakeUpInternal()
+        dispatch(ControllerReheat)
     }
 
     /**
      * Dynamically pins or unpins planet [id].
      */
     public fun setPinned(id: String, pinned: Boolean) {
-        if (isCancelled) return
-        world.setBodyPinned(id, pinned)
-        if (!pinned) {
-            wakeUpInternal()
-        }
+        dispatch(ControllerSetPinned(id, pinned))
     }
 
     /**
      * Marks planet [id] as actively pressed/held (`pressed = true` locks velocity and elevates interaction alpha).
      */
     public fun setPressed(id: String, pressed: Boolean) {
-        if (isCancelled) return
-        world.setBodyPressed(id, pressed)
-        wakeUpInternal()
+        dispatch(ControllerSetPressed(id, pressed))
     }
 
     /**
      * Offsets planet [id] by `(dxPx, dyPx)` in static [rootView] pixel coordinates and wakes neighbors.
+     *
+     * Fast-path zero-allocation Data-Plane reducer so 120Hz touch dragging maintains 0-frame input latency.
      */
     public fun dragBy(id: String, dxPx: Float, dyPx: Float) {
+        require(dxPx.isFinite() && dyPx.isFinite()) {
+            "dragBy delta must be finite, but were ($dxPx, $dyPx)"
+        }
         if (isCancelled || (dxPx == 0f && dyPx == 0f)) return
         world.offsetBodyPosition(id, dxPx, dyPx, scale)
-        applyCurrentPosesToViews()
-        wakeUpInternal()
+        completeReduction(energized = true, projectPoses = true)
     }
 
     /**
      * Moves planet [id] directly to `(xPx, yPx)` in static [rootView] pixel coordinates and wakes neighbors.
+     *
+     * Fast-path zero-allocation Data-Plane reducer so 120Hz touch dragging maintains 0-frame input latency.
      */
     public fun moveTo(id: String, xPx: Float, yPx: Float) {
+        require(xPx.isFinite() && yPx.isFinite()) {
+            "moveTo coordinates must be finite, but were ($xPx, $yPx)"
+        }
         if (isCancelled) return
         world.setBodyPosition(id, xPx, yPx, scale)
-        applyCurrentPosesToViews()
-        wakeUpInternal()
+        completeReduction(energized = true, projectPoses = true)
     }
 
     /**
@@ -281,53 +556,18 @@ public class DeponderController internal constructor(
      * sibling planets (including high-elevation `CardView`s) without mutating `ViewGroup` child order.
      */
     public fun bringToFront(id: String) {
-        if (isCancelled) return
-        val binding = activePlanetsById[id] ?: return
-        var maxVisualZ = topVisualZCounter
-        for (other in activePlanetsById.values) {
-            val z = other.view.elevation + other.view.translationZ
-            if (z > maxVisualZ) maxVisualZ = z
-        }
-        val targetVisualZ = max(topVisualZCounter + 1f, maxVisualZ + 1f)
-        topVisualZCounter = targetVisualZ
-        val neededTranslationZ = targetVisualZ - binding.view.elevation
-        binding.hasElevatedZ = true
-        binding.elevatedTranslationZ = neededTranslationZ
-        binding.view.translationZ = neededTranslationZ
+        dispatch(ControllerBringToFront(id))
     }
 
     /**
      * Permanently detaches this controller from [rootView], cancels VSYNC coroutines, and resets bound view transforms.
      */
     public fun cancel() {
-        if (isCancelled) return
-        isCancelled = true
-        isAwake = false
-        rootView.removeCallbacks(orphanCheckRunnable)
-        orphanCheckPosted = false
-        pauseFrameLoop()
-        scope.cancel()
-        observedLifecycle?.removeObserver(lifecycleObserver)
-        observedLifecycle = null
-        explicitOwner = null
-        rootView.removeOnLayoutChangeListener(rootLayoutListener)
-        rootView.removeOnAttachStateChangeListener(rootAttachListener)
+        dispatch(ControllerCancel)
+    }
 
-        val planetsSnapshot = ArrayList(activePlanetsById.values)
-        activePlanetsById.clear()
-        for (p in planetsSnapshot) {
-            p.onRootCancelled()
-        }
-
-        val rubbersSnapshot = ArrayList(activeRubbersByKey.values)
-        activeRubbersByKey.clear()
-        for (r in rubbersSnapshot) {
-            r.onRootCancelled()
-        }
-
-        if (rootView.getTag(R.id.deponder_root_controller_tag) === this) {
-            rootView.setTag(R.id.deponder_root_controller_tag, null)
-        }
+    internal fun updatePlanetMeasuredSize(id: String, widthPx: Int, heightPx: Int) {
+        dispatch(ControllerUpdatePlanetSize(id, widthPx, heightPx))
     }
 
     internal fun registerPlanetBinding(binding: PlanetViewBinding) {
@@ -335,7 +575,7 @@ public class DeponderController internal constructor(
         check(existing == null || existing === binding) {
             "Duplicate deponderPlanet id '${binding.planetId}' under the same deponderRoot."
         }
-        assertNoOrphanXmlStretchInSubtree(
+        assertNoStretchInPlanetSubtree(
             binding.view,
             xmlStretchToken,
         )
@@ -348,7 +588,7 @@ public class DeponderController internal constructor(
     internal fun seedOrUpdatePlanetBody(binding: PlanetViewBinding): PlanetBody {
         val cx = binding.staticCenterX()
         val cy = binding.staticCenterY()
-        world.upsertPlanet(binding.physics.toPlanetSpec(binding.planetId, density), cx, cy, scale)
+        world.upsertPlanet(binding.physics.toPlanetSpec(binding.planetId, currentDensity), cx, cy, scale)
         world.setBodySize(
             id = binding.planetId,
             widthPx = binding.view.width.toFloat(),
@@ -356,8 +596,7 @@ public class DeponderController internal constructor(
             scale = scale,
         )
         val body = world.bodyOf(binding.planetId)!!
-        applyCurrentPosesToViews()
-        wakeUpInternal()
+        completeReduction(energized = true, projectPoses = true)
         return body
     }
 
@@ -378,7 +617,7 @@ public class DeponderController internal constructor(
             world.removePlanet(oldId, scale)
             activePlanetsById[newId] = binding
             if (binding.hasLaidOutBounds() || prevBody != null) {
-                world.upsertPlanet(binding.physics.toPlanetSpec(newId, density), seedX, seedY, scale)
+                world.upsertPlanet(binding.physics.toPlanetSpec(newId, currentDensity), seedX, seedY, scale)
                 world.setBodySize(
                     id = newId,
                     widthPx = binding.view.width.toFloat(),
@@ -390,7 +629,7 @@ public class DeponderController internal constructor(
             val prevBody = world.bodyOf(newId)
             val seedX = prevBody?.x ?: binding.staticCenterX()
             val seedY = prevBody?.y ?: binding.staticCenterY()
-            world.upsertPlanet(binding.physics.toPlanetSpec(newId, density), seedX, seedY, scale)
+            world.upsertPlanet(binding.physics.toPlanetSpec(newId, currentDensity), seedX, seedY, scale)
             world.setBodySize(
                 id = newId,
                 widthPx = binding.view.width.toFloat(),
@@ -398,16 +637,17 @@ public class DeponderController internal constructor(
                 scale = scale,
             )
         }
-        applyCurrentPosesToViews()
-        wakeUpInternal()
+        completeReduction(energized = if (world.bodies.isNotEmpty()) true else null, projectPoses = true)
     }
 
     internal fun unregisterPlanetBinding(binding: PlanetViewBinding) {
         if (activePlanetsById[binding.planetId] === binding) {
             activePlanetsById.remove(binding.planetId)
             world.removePlanet(binding.planetId, scale)
-            applyCurrentPosesToViews()
-            wakeUpInternal()
+            completeReduction(
+                energized = world.bodies.isNotEmpty(),
+                projectPoses = true,
+            )
         }
     }
 
@@ -420,11 +660,15 @@ public class DeponderController internal constructor(
         assertNoOrphanDragInSubtree(binding.view)
         activeRubbersByKey[key] = binding
         val pose = world.upsertRubber(
-            binding.physics.toRubberSpec(binding.startId, binding.endId, density),
+            binding.physics.toRubberSpec(
+                startId = binding.startId,
+                endId = binding.endId,
+                density = currentDensity,
+                contentWidthPx = binding.currentAdaptiveContentWidthPx(),
+            ),
             scale,
         )
-        applyCurrentPosesToViews()
-        wakeUpInternal()
+        completeReduction(energized = true, projectPoses = true)
         return pose
     }
 
@@ -445,11 +689,30 @@ public class DeponderController internal constructor(
             activeRubbersByKey[newKey] = binding
         }
         world.upsertRubber(
-            binding.physics.toRubberSpec(binding.startId, binding.endId, density),
+            binding.physics.toRubberSpec(
+                startId = binding.startId,
+                endId = binding.endId,
+                density = currentDensity,
+                contentWidthPx = binding.currentAdaptiveContentWidthPx(),
+            ),
             scale,
         )
-        applyCurrentPosesToViews()
-        wakeUpInternal()
+        completeReduction(energized = true, projectPoses = true)
+    }
+
+    internal fun syncRubberAdaptiveLength(binding: RubberViewBinding) {
+        if (isCancelled || !binding.physics.isAutoLength) return
+        val key = EdgeKey(binding.startId, binding.endId)
+        if (activeRubbersByKey[key] !== binding) return
+        val pose = world.rubberOf(key) ?: return
+        val targetNatPx = binding.physics.resolveNaturalLengthPx(
+            density = currentDensity,
+            contentWidthPx = binding.currentAdaptiveContentWidthPx(),
+        )
+        if (abs(pose.spec.naturalLengthPx - targetNatPx) > 0.05f) {
+            world.upsertRubber(pose.spec.copy(naturalLengthPx = targetNatPx), scale)
+            completeReduction(energized = true, projectPoses = false)
+        }
     }
 
     internal fun unregisterRubberBinding(binding: RubberViewBinding) {
@@ -457,8 +720,10 @@ public class DeponderController internal constructor(
         if (activeRubbersByKey[key] === binding) {
             activeRubbersByKey.remove(key)
             world.removeRubber(key, scale)
-            applyCurrentPosesToViews()
-            wakeUpInternal()
+            completeReduction(
+                energized = if (world.bodies.isNotEmpty()) true else null,
+                projectPoses = true,
+            )
         }
     }
 
@@ -471,10 +736,10 @@ public class DeponderController internal constructor(
             validateOrphanOperatorsInDirectChildren()
         }
         val keepRunning = world.step(dtSeconds, scale)
-        applyCurrentPosesToViews()
-        if (!keepRunning) {
-            isAwake = false
-        }
+        completeReduction(
+            energized = if (keepRunning) null else false,
+            projectPoses = true,
+        )
         return keepRunning
     }
 
@@ -487,39 +752,5 @@ public class DeponderController internal constructor(
             val pose = world.rubberOf(key)
             binding.applyRubberPose(pose)
         }
-    }
-
-    private fun wakeUpInternal() {
-        if (isCancelled || world.bodies.isEmpty()) return
-        isAwake = true
-        ensureFrameLoopIfEligible()
-    }
-
-    private fun isLifecycleStartedOrUnbound(): Boolean {
-        val lc = observedLifecycle ?: return true
-        return lc.currentState.isAtLeast(Lifecycle.State.STARTED)
-    }
-
-    private fun ensureFrameLoopIfEligible() {
-        if (isCancelled || !isAwake || world.bodies.isEmpty()) return
-        if (!rootView.isAttachedToWindow || !isLifecycleStartedOrUnbound()) return
-        if (frameLoopJob?.isActive == true) return
-
-        frameLoopJob = scope.launch {
-            var lastNanos = awaitChoreographerFrameNanos()
-            while (isActive && isAwake && rootView.isAttachedToWindow && isLifecycleStartedOrUnbound()) {
-                val nowNanos = awaitChoreographerFrameNanos()
-                val dtSeconds = (nowNanos - lastNanos) * 1e-9f
-                lastNanos = nowNanos
-                if (!stepSingleFrame(dtSeconds)) {
-                    break
-                }
-            }
-        }
-    }
-
-    private fun pauseFrameLoop() {
-        frameLoopJob?.cancel()
-        frameLoopJob = null
     }
 }

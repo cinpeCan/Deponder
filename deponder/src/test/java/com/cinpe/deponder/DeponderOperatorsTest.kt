@@ -9,6 +9,9 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
 import androidx.test.core.app.ApplicationProvider
 import com.cinpe.deponder.core.DeponderArrowMode
 import com.cinpe.deponder.core.DeponderRubberInsets
@@ -16,6 +19,7 @@ import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetPhysics
 import com.cinpe.deponder.core.RootPhysics
 import com.cinpe.deponder.core.RubberPhysics
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -312,8 +316,54 @@ class DeponderOperatorsTest {
             val xmlFixedRubber = DeponderRubberView(activity, xmlAttrs)
             assertEquals(DeponderRubberInsets.fixed(24f), xmlFixedRubber.insets)
 
+            // Adaptive natural length: mutating short label -> long label expands `pose.spec.naturalLengthPx`
+            // while preserving runtime `submitRubberElasticity`, and XML supports both `wrap_content` and `145dp`!
             ctrl.submitRubberElasticity(4.2f)
             assertEquals(4.2f, ctrl.world.rubberOf(EdgeKey("a", "b"))!!.spec.elasticity, 1e-4f)
+
+            defaultRubber.label = "Hi"
+            val shortNatPx = ctrl.world.rubberOf(EdgeKey("b", "c"))!!.spec.naturalLengthPx
+            defaultRubber.label = "LONG_ADAPTIVE_ANDROID_VIEW_LABEL_TEXT_1234567890"
+            val longNatPx = ctrl.world.rubberOf(EdgeKey("b", "c"))!!.spec.naturalLengthPx
+            assertTrue("Long label ($longNatPx) must exceed short label ($shortNatPx)", longNatPx > shortNatPx + 80f)
+            assertEquals(4.2f, ctrl.world.rubberOf(EdgeKey("b", "c"))!!.spec.elasticity, 1e-4f)
+
+            val pD = View(activity).also {
+                root.addView(it, FrameLayout.LayoutParams(40, 40))
+                it.layout(320, 280, 360, 320)
+                it.deponderPlanet("d", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f))
+            }
+            assertTrue(pD.width == 40)
+            @Suppress("DEPRECATION")
+            val xmlFixedLenAttrs = Robolectric.buildAttributeSet()
+                .addAttribute(R.attr.deponderStartId, "c")
+                .addAttribute(R.attr.deponderEndId, "d")
+                .addAttribute(R.attr.deponderNaturalLength, "145dp")
+                .addAttribute(R.attr.deponderLabel, "VERY_LONG_LABEL_LOCKED_BY_FIXED_XML_LENGTH")
+                .build()
+            val xmlFixedLenRubber = DeponderRubberView(activity, xmlFixedLenAttrs)
+            root.addView(xmlFixedLenRubber, FrameLayout.LayoutParams(120, 40))
+            assertEquals(145f * ctrl.density, ctrl.world.rubberOf(EdgeKey("c", "d"))!!.spec.naturalLengthPx, 1e-3f)
+
+            // XML `deponderNaturalLength` + `deponderElasticity` WITHOUT XML start/end IDs must be preserved
+            // when `deponderRubber(startId, endId)` is subsequently invoked without explicit `physics`!
+            @Suppress("DEPRECATION")
+            val xmlTemplateAttrs = Robolectric.buildAttributeSet()
+                .addAttribute(R.attr.deponderNaturalLength, "155dp")
+                .addAttribute(R.attr.deponderElasticity, "2.75")
+                .addAttribute(R.attr.deponderLabel, "VERY_LONG_TEMPLATE_LABEL_THAT_MUST_STAY_FIXED")
+                .build()
+            val xmlTemplateRubber = DeponderRubberView(activity, xmlTemplateAttrs)
+            root.addView(xmlTemplateRubber, FrameLayout.LayoutParams(120, 40))
+            xmlTemplateRubber.deponderRubber("a", "d")
+            val templatePose = ctrl.world.rubberOf(EdgeKey("a", "d"))!!
+            assertEquals(155f * ctrl.density, templatePose.spec.naturalLengthPx, 1e-3f)
+            assertEquals(2.75f, templatePose.spec.elasticity, 1e-4f)
+
+            // Mutating `.physics` at runtime updates the active RubberSpec immediately:
+            xmlTemplateRubber.physics = RubberPhysics.fixed(175f, elasticity = 3.25f)
+            assertEquals(175f * ctrl.density, templatePose.spec.naturalLengthPx, 1e-3f)
+            assertEquals(3.25f, templatePose.spec.elasticity, 1e-4f)
         }
     }
 
@@ -471,5 +521,294 @@ class DeponderOperatorsTest {
         mapViewPointToRootStaticSpace(handle, root, 45f, 25f, out)
         assertEquals(280f, out[0], 1e-3f)
         assertEquals(160f, out[1], 1e-3f)
+    }
+
+    @Test
+    fun clearPlanetAndRubber_cleanSubtreeProbesWithoutBreakingSubsequentLayout_andPreserveBusinessTouchAndTags() {
+        mountAttachedRoot { activity, root ->
+            val ctrl = root.deponderRoot()
+
+            val customTouchPlanet = View(activity)
+            var customTouchCalls = 0
+            customTouchPlanet.setOnTouchListener { _, _ ->
+                customTouchCalls += 1
+                false
+            }
+            // Disabling drag upfront must NOT overwrite an existing custom OnTouchListener.
+            customTouchPlanet.deponderDrag(enabled = false)
+            root.addView(customTouchPlanet, FrameLayout.LayoutParams(40, 40))
+            customTouchPlanet.layout(60, 280, 100, 320)
+            customTouchPlanet.deponderPlanet("p1", PlanetPhysics(pinned = true))
+
+            val downProbe = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 10f, 10f, 0)
+            customTouchPlanet.dispatchTouchEvent(downProbe)
+            downProbe.recycle()
+            assertEquals(1, customTouchCalls)
+
+            // Planet with nested drag handle -> clearDeponderPlanet() keeps view in root without orphan drag crash!
+            val handle = View(activity)
+            val cardPlanet = FrameLayout(activity).apply {
+                addView(handle, FrameLayout.LayoutParams(20, 20))
+            }
+            root.addView(cardPlanet, FrameLayout.LayoutParams(48, 48))
+            cardPlanet.layout(200, 280, 248, 328)
+            cardPlanet.deponderPlanet("p2", PlanetPhysics(pinned = true))
+            handle.deponderDrag(enabled = true)
+
+            // Custom compound rubber with both XML tag and programmatic stretch -> clearDeponderRubber() keeps view in root!
+            val customRubber = FrameLayout(activity)
+            val xmlStem = View(activity).apply { tag = activity.getString(R.string.deponder_stretch) }
+            val progStem = View(activity).apply { deponderStretch(true) }
+            customRubber.addView(xmlStem, FrameLayout.LayoutParams(20, 2))
+            customRubber.addView(progStem, FrameLayout.LayoutParams(20, 2))
+            root.addView(customRubber, FrameLayout.LayoutParams(80, 20))
+            customRubber.layout(0, 0, 80, 20)
+            xmlStem.layout(0, 8, 20, 10)
+            progStem.layout(0, 12, 20, 14)
+            customRubber.deponderRubber("p1", "p2")
+            ctrl.applyCurrentPosesToViews()
+
+            cardPlanet.clearDeponderPlanet()
+            customRubber.clearDeponderRubber()
+
+            // Re-measuring & laying out root while cleared views remain attached must NOT throw,
+            // and both rubber stems must reset cleanly to 1.0x!
+            root.measure(
+                View.MeasureSpec.makeMeasureSpec(800, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(600, View.MeasureSpec.EXACTLY),
+            )
+            root.layout(0, 0, 800, 600)
+            assertEquals(1f, xmlStem.scaleX, 1e-4f)
+            assertEquals(1f, progStem.scaleX, 1e-4f)
+
+            // XML @string/deponder_stretch tag remains preserved and re-activates cleanly on re-bind,
+            // while programmatic stretch was cleared (counter-scaled as non-stretched content so screen width stays 1.0x).
+            assertEquals(activity.getString(R.string.deponder_stretch), xmlStem.tag)
+            cardPlanet.deponderPlanet("p2", PlanetPhysics(pinned = true))
+            customRubber.deponderRubber("p1", "p2", RubberPhysics.fixed(100f), DeponderRubberInsets.None)
+            ctrl.applyCurrentPosesToViews()
+            assertTrue(xmlStem.scaleX > 1f)
+            assertEquals(1f, progStem.scaleX * customRubber.scaleX, 1e-4f)
+
+            // Non-finite guards on DeponderController:
+            try {
+                ctrl.submitScale(Float.NaN)
+                fail("Expected IllegalArgumentException for NaN scale")
+            } catch (_: IllegalArgumentException) {
+            }
+            try {
+                ctrl.submitRubberElasticity(Float.POSITIVE_INFINITY)
+                fail("Expected IllegalArgumentException for non-finite elasticity")
+            } catch (_: IllegalArgumentException) {
+            }
+            try {
+                ctrl.dragBy("p1", Float.NaN, 0f)
+                fail("Expected IllegalArgumentException for NaN dragBy")
+            } catch (_: IllegalArgumentException) {
+            }
+            try {
+                ctrl.moveTo("p1", 0f, Float.NEGATIVE_INFINITY)
+                fail("Expected IllegalArgumentException for non-finite moveTo")
+            } catch (_: IllegalArgumentException) {
+            }
+        }
+    }
+
+    @Test
+    fun controlPlaneCombine_pausesOnLifecycleStop_resumesUnsettledOnStart_andStaysAsleepOnceSettled() = runTest {
+        val activityController = Robolectric.buildActivity(Activity::class.java).setup()
+        val activity = activityController.get()
+        val root = FrameLayout(activity)
+        activity.setContentView(root, FrameLayout.LayoutParams(600, 600))
+        ShadowLooper.idleMainLooper(16, TimeUnit.MILLISECONDS)
+        root.layout(0, 0, 600, 600)
+
+        lateinit var registry: LifecycleRegistry
+        val owner = object : LifecycleOwner {
+            override val lifecycle: Lifecycle
+                get() = registry
+        }
+        registry = LifecycleRegistry.createUnsafe(owner)
+        registry.currentState = Lifecycle.State.STARTED
+
+        val ctrl = root.deponderRoot(
+            lifecycleOwner = owner,
+            physics = RootPhysics(airDamping = 8f, wallRepulsionDp = 0f),
+        )
+        assertFalse(ctrl.isAwake)
+        assertFalse(ctrl.loopGateFlow.first())
+
+        val pA = View(activity).also {
+            root.addView(it, FrameLayout.LayoutParams(40, 40))
+            it.layout(100, 280, 140, 320)
+            it.deponderPlanet("a", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f))
+        }
+        val pB = View(activity).also {
+            root.addView(it, FrameLayout.LayoutParams(40, 40))
+            it.layout(220, 280, 260, 320)
+            it.deponderPlanet("b", PlanetPhysics(pinned = false, repulsionRadiusDp = 0f))
+        }
+        assertTrue(pA.width == 40 && pB.width == 40)
+        val rubber = DeponderRubberView(activity).also {
+            root.addView(it, FrameLayout.LayoutParams(80, 20))
+            it.layout(0, 0, 80, 20)
+            it.deponderRubber("a", "b", RubberPhysics.fixed(100f, elasticity = 12f))
+        }
+        assertTrue(rubber.isAttachedToWindow)
+
+        assertTrue(ctrl.isAwake)
+        assertTrue(ctrl.loopGateFlow.first())
+
+        // ON_STOP pauses the frame loop while preserving unsettled kinetic energy.
+        registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        assertFalse(ctrl.isAwake)
+        assertFalse(ctrl.loopGateFlow.first())
+
+        // ON_START automatically resumes because mechanical energy was never wiped!
+        registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        assertTrue(ctrl.isAwake)
+        assertTrue(ctrl.loopGateFlow.first())
+
+        // Step deterministically until kinetic-force sleep is reached.
+        var active = true
+        var guard = 0
+        while (active && guard < 800) {
+            active = ctrl.stepSingleFrame(0.016f)
+            guard += 1
+        }
+        assertFalse("Critically damped system must settle within 800 steps (guard=$guard)", active)
+        assertFalse(ctrl.isAwake)
+        assertFalse(ctrl.loopGateFlow.first())
+
+        // Once settled, cycling ON_STOP -> ON_START stays asleep at 0% CPU.
+        registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        assertFalse(ctrl.isAwake)
+        registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        assertFalse(ctrl.isAwake)
+        assertFalse(ctrl.loopGateFlow.first())
+
+        // Idempotent unchanged elasticity & planet contour size updates keep settled loop asleep!
+        ctrl.submitRubberElasticity(12f)
+        assertFalse(ctrl.isAwake)
+        ctrl.updatePlanetMeasuredSize("a", 64, 64)
+        assertFalse(ctrl.isAwake)
+
+        // Mid-drag ON_STOP releases pressed state so ON_START settles cleanly instead of spinning forever!
+        pB.layout(100, 280, 140, 320)
+        ctrl.setPressed("b", true)
+        assertTrue(ctrl.world.bodyOf("b")!!.isPressed)
+        registry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        assertFalse(ctrl.world.bodyOf("b")!!.isPressed)
+        assertFalse(ctrl.isAwake)
+
+        registry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        assertTrue(ctrl.isAwake)
+        var resumedActive = true
+        var resumeGuard = 0
+        while (resumedActive && resumeGuard < 800) {
+            resumedActive = ctrl.stepSingleFrame(0.016f)
+            resumeGuard += 1
+        }
+        assertFalse("Released body after ON_STOP/ON_START must settle to sleep", resumedActive)
+        assertFalse(ctrl.isAwake)
+
+        // Style finite guards on DeponderRubberView:
+        try {
+            rubber.lineThicknessDp = Float.NaN
+            fail("Expected IllegalArgumentException for NaN lineThicknessDp")
+        } catch (_: IllegalArgumentException) {
+        }
+        try {
+            rubber.arrowSizeDp = -1f
+            fail("Expected IllegalArgumentException for negative arrowSizeDp")
+        } catch (_: IllegalArgumentException) {
+        }
+        try {
+            rubber.labelTextSizeSp = 0f
+            fail("Expected IllegalArgumentException for non-positive labelTextSizeSp")
+        } catch (_: IllegalArgumentException) {
+        }
+
+        ctrl.cancel()
+        activityController.destroy()
+    }
+
+    @Test
+    fun controllerSubmitScale_wakesWithoutUnfolding_whileReheatUnfoldsCrossedCycle() = runTest {
+        val activityController = Robolectric.buildActivity(Activity::class.java).setup()
+        val activity = activityController.get()
+        val root = FrameLayout(activity)
+        activity.setContentView(root, FrameLayout.LayoutParams(600, 600))
+        ShadowLooper.idleMainLooper(16, TimeUnit.MILLISECONDS)
+        root.layout(0, 0, 600, 600)
+
+        val ctrl = root.deponderRoot(physics = RootPhysics().withUnfold(true))
+        val views = (0 until 4).map { idx ->
+            View(activity).also { v ->
+                root.addView(v, FrameLayout.LayoutParams(40, 40))
+                v.layout(200, 200, 240, 240)
+                v.deponderPlanet("n$idx", PlanetPhysics())
+            }
+        }
+        val links = listOf(0 to 1, 1 to 2, 2 to 3, 3 to 0).map { (u, v) ->
+            DeponderRubberView(activity).also { rv ->
+                root.addView(rv, FrameLayout.LayoutParams(80, 20))
+                rv.layout(0, 0, 80, 20)
+                rv.deponderRubber("n$u", "n$v", RubberPhysics.fixed(120f))
+            }
+        }
+        assertTrue(views.size == 4 && links.size == 4)
+
+        var active = true
+        var guard = 0
+        while (active && guard < 1800) {
+            active = ctrl.stepSingleFrame(0.016f)
+            guard += 1
+        }
+        assertFalse(active)
+
+        // Manually arrange into a crossed bowtie and drag Scale slider -> must NOT wipe manual arrangement.
+        ctrl.moveTo("n0", 200f, 200f)
+        ctrl.moveTo("n1", 400f, 400f)
+        ctrl.moveTo("n2", 200f, 400f)
+        ctrl.moveTo("n3", 400f, 200f)
+        ctrl.submitScale(1.25f)
+        var scaleActive = true
+        var scaleGuard = 0
+        while (scaleActive && scaleGuard < 1800) {
+            scaleActive = ctrl.stepSingleFrame(0.016f)
+            scaleGuard += 1
+        }
+        assertFalse(scaleActive)
+
+        val b0 = ctrl.world.bodyOf("n0")!!
+        val b1 = ctrl.world.bodyOf("n1")!!
+        val b2 = ctrl.world.bodyOf("n2")!!
+        val b3 = ctrl.world.bodyOf("n3")!!
+        fun orient(ax: Float, ay: Float, bx: Float, by: Float, cx: Float, cy: Float): Float =
+            (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+        fun hasCrossing(): Boolean {
+            val c0123 =
+                (orient(b0.x, b0.y, b1.x, b1.y, b2.x, b2.y) * orient(b0.x, b0.y, b1.x, b1.y, b3.x, b3.y) < 0f) &&
+                    (orient(b2.x, b2.y, b3.x, b3.y, b0.x, b0.y) * orient(b2.x, b2.y, b3.x, b3.y, b1.x, b1.y) < 0f)
+            val c1230 =
+                (orient(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y) * orient(b1.x, b1.y, b2.x, b2.y, b0.x, b0.y) < 0f) &&
+                    (orient(b3.x, b3.y, b0.x, b0.y, b1.x, b1.y) * orient(b3.x, b3.y, b0.x, b0.y, b2.x, b2.y) < 0f)
+            return c0123 || c1230
+        }
+        assertTrue("submitScale() must preserve manual layout without triggering unfold", hasCrossing())
+
+        ctrl.reheat()
+        var reheatActive = true
+        var reheatGuard = 0
+        while (reheatActive && reheatGuard < 1800) {
+            reheatActive = ctrl.stepSingleFrame(0.016f)
+            reheatGuard += 1
+        }
+        assertFalse(reheatActive)
+        assertFalse("reheat() must untangle crossed cycle", hasCrossing())
+
+        ctrl.cancel()
+        activityController.destroy()
     }
 }

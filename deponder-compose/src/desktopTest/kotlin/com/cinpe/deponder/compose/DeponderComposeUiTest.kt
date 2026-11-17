@@ -25,10 +25,12 @@ import com.cinpe.deponder.core.DeponderArrowMode
 import com.cinpe.deponder.core.DeponderRubberInsets
 import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetPhysics
+import com.cinpe.deponder.core.RootPhysics
 import com.cinpe.deponder.core.RubberPhysics
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalTestApi::class)
@@ -107,6 +109,15 @@ class DeponderComposeUiTest {
             state.bringToFront("p1")
             waitForIdle()
             assertEquals(measureBeforeZ, p1MeasureCount, "bringToFront must not re-measure planet content")
+
+            // 2b. Physics drag / scale updates cause ZERO extra Compose re-measurements!
+            val measureBeforeMove = p1MeasureCount
+            state.moveTo("p1", 110f, 180f)
+            state.submitScale(1.15f)
+            waitForIdle()
+            assertEquals(measureBeforeMove, p1MeasureCount, "Physics updates must not trigger planet re-measurement")
+            state.submitScale(1.0f)
+            waitForIdle()
 
             // 3. Dragging BOTH p1 (.deponderPlanet().deponderDrag().clickable) and
             // p2 (.deponderDrag().deponderPlanet().clickable) moves bodies in root space without firing .clickable {}!
@@ -262,6 +273,85 @@ class DeponderComposeUiTest {
         }
 
     @Test
+    fun adaptiveRubberLength_scalesWithDefaultLabelAndCustomBadge_andPreservesRuntimeElasticity() =
+        runComposeUiTest {
+            val state = DeponderState()
+            var dynamicLabel by mutableStateOf("Hi")
+            var customBadgeWidthPx by mutableStateOf(20)
+            var rubberPhysics by mutableStateOf(RubberPhysics())
+
+            setContent {
+                Box(
+                    modifier = Modifier
+                        .size(600.dp, 400.dp)
+                        .deponderRoot(state),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .deponderPlanet("a", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .deponderPlanet("b", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .deponderPlanet("c", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
+                    )
+
+                    DeponderDefaultRubber(
+                        startId = "a",
+                        endId = "b",
+                        label = dynamicLabel,
+                        arrowMode = DeponderArrowMode.END,
+                        physics = rubberPhysics,
+                    )
+
+                    Box(
+                        modifier = Modifier.deponderRubber("b", "c", RubberPhysics.auto(contentPaddingDp = 50f, minLengthDp = 80f)),
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth().height(2.dp).deponderStretch())
+                        Layout(modifier = Modifier) { _, _ ->
+                            layout(customBadgeWidthPx, 16) {}
+                        }
+                    }
+                }
+            }
+
+            waitForIdle()
+            val poseAb = state.world.rubberOf(EdgeKey("a", "b"))!!
+            val poseBc = state.world.rubberOf(EdgeKey("b", "c"))!!
+            val density = state.currentDensity
+
+            val shortNatPx = poseAb.spec.naturalLengthPx
+            assertEquals(110f * density, shortNatPx, 1f)
+
+            // Override runtime elasticity, then expand label text -> naturalLengthPx grows while preserving elasticity!
+            state.submitRubberElasticity(3.75f)
+            dynamicLabel = "LONG_RELATIONSHIP_DESCRIPTION_TEXT_FOR_ADAPTIVE_SPRING"
+            waitForIdle()
+
+            val longNatPx = poseAb.spec.naturalLengthPx
+            assertTrue(longNatPx > shortNatPx + 80f * density, "Long label ($longNatPx) must expand beyond short ($shortNatPx)")
+            assertEquals(3.75f, poseAb.spec.elasticity, 1e-4f)
+
+            // Custom compound rubber badge width growth also expands its spring rest length automatically!
+            val smallBadgeNatPx = poseBc.spec.naturalLengthPx
+            customBadgeWidthPx = (160f * density).toInt()
+            waitForIdle()
+            assertEquals(210f * density, poseBc.spec.naturalLengthPx, 2f)
+            assertTrue(poseBc.spec.naturalLengthPx > smallBadgeNatPx)
+
+            // Switching explicitly to fixed length locks exact 130dp regardless of the long label!
+            rubberPhysics = RubberPhysics.fixed(130f)
+            waitForIdle()
+            assertEquals(130f * density, poseAb.spec.naturalLengthPx, 1e-3f)
+        }
+
+    @Test
     fun invalidModifierPlacements_failFastInRealComposeHierarchy() {
         // 1. deponderPlanet outside deponderRoot
         assertFailsWith<IllegalStateException> {
@@ -314,4 +404,197 @@ class DeponderComposeUiTest {
             }
         }
     }
+
+    @Test
+    fun dynamicDeponderStateSwapFromSleep_migratesMountedNodesWithoutLeaks_andWakesNewSession() =
+        runComposeUiTest {
+            val state1 = DeponderState(RootPhysics(airDamping = 25f))
+            val state2 = DeponderState(RootPhysics(airDamping = 1.5f))
+            var activeState by mutableStateOf(state1)
+
+            setContent {
+                Box(
+                    modifier = Modifier
+                        .size(400.dp, 300.dp)
+                        .deponderRoot(activeState),
+                ) {
+                    DeponderDefaultRubber(
+                        startId = "a",
+                        endId = "b",
+                        physics = RubberPhysics.fixed(180f),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 120.dp, y = 140.dp)
+                            .size(30.dp)
+                            .deponderPlanet("a", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 170.dp, y = 140.dp)
+                            .size(30.dp)
+                            .deponderPlanet("b", PlanetPhysics(pinned = false, repulsionRadiusDp = 0f)),
+                    )
+                }
+            }
+
+            waitForIdle()
+            assertFalse(state1.isAwake, "First state should settle cleanly to sleep before swapping")
+            assertEquals(2, state1.activePlanetsById.size)
+            assertEquals(1, state1.activeRubbersByKey.size)
+
+            // Swap to state2 while state1 is sleeping!
+            activeState = state2
+            waitForIdle()
+
+            assertTrue(state1.activePlanetsById.isEmpty(), "Old state must not leak planet nodes after root state swap")
+            assertTrue(state1.activeRubbersByKey.isEmpty(), "Old state must not leak rubber nodes after root state swap")
+            assertEquals(2, state2.activePlanetsById.size)
+            assertEquals(1, state2.activeRubbersByKey.size)
+            assertTrue(state2.world.viewportWidthPx > 0f && state2.world.viewportHeightPx > 0f)
+            assertTrue(state2.world.rubberOf(EdgeKey("a", "b"))!!.isActive)
+
+            val bInState2 = state2.world.bodyOf("b")!!
+            assertTrue(
+                bInState2.x > 260f * state2.currentDensity,
+                "New state2 frame loop must wake and pull 'b' toward 180dp rest distance from 'a' (x=${bInState2.x})",
+            )
+        }
+
+    @Test
+    fun innerSizedStretchChild_collapsesLayoutWidthForBadgeAndAdaptiveLength_andRefreshesOnDetach() =
+        runComposeUiTest {
+            val state = DeponderState()
+            var showStretch by mutableStateOf(true)
+            var planetMeasureCount = 0
+            var planetPlacementCount = 0
+
+            setContent {
+                Box(
+                    modifier = Modifier
+                        .size(500.dp, 400.dp)
+                        .deponderRoot(state),
+                ) {
+                    Layout(
+                        modifier = Modifier
+                            .offset(x = 100.dp, y = 150.dp)
+                            .deponderPlanet("a", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
+                    ) { _, _ ->
+                        planetMeasureCount += 1
+                        layout(20, 20) {
+                            planetPlacementCount += 1
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 220.dp, y = 150.dp)
+                            .size(20.dp)
+                            .deponderPlanet("b", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
+                    )
+
+                    Box(
+                        modifier = Modifier.deponderRubber(
+                            startId = "a",
+                            endId = "b",
+                            physics = RubberPhysics.auto(contentPaddingDp = 40f, minLengthDp = 60f),
+                            insets = DeponderRubberInsets.None,
+                        ),
+                    ) {
+                        if (showStretch) {
+                            Box(
+                                modifier = Modifier
+                                    .deponderStretch()
+                                    .size(120.dp, 2.dp),
+                            )
+                        }
+                        Layout(modifier = Modifier) { _, _ ->
+                            layout(40, 16) {}
+                        }
+                    }
+                }
+            }
+
+            waitForIdle()
+            val rubber = state.activeRubbersByKey[EdgeKey("a", "b")]!!
+            val pose = state.world.rubberOf(EdgeKey("a", "b"))!!
+            val density = state.currentDensity
+
+            assertEquals(40, rubber.measuredWidthPx)
+            assertEquals((40f / density + 40f).coerceAtLeast(60f) * density, pose.spec.naturalLengthPx, 1e-2f)
+
+            val measureBefore = planetMeasureCount
+            val placeBefore = planetPlacementCount
+            state.moveTo("a", 200f, 160f)
+            state.moveTo("b", 220f, 160f)
+            waitForIdle()
+            assertEquals(measureBefore, planetMeasureCount)
+            assertEquals(placeBefore, planetPlacementCount)
+            assertEquals(0.5f, rubber.computeEffectiveContainerScale(pose), 1e-3f)
+
+            // Detaching the inner stretch node triggers clean membership removal and pose refresh.
+            showStretch = false
+            waitForIdle()
+            assertTrue(rubber.childStretchNodes.isEmpty())
+            assertEquals(40, rubber.measuredWidthPx)
+        }
+
+    @Test
+    fun unpinnedMovingPlanet_undergoesMultiFrameSpringMotion_withZeroRelayouts() =
+        runComposeUiTest {
+            val state = DeponderState(RootPhysics(airDamping = 1.5f))
+            var movingMeasureCount = 0
+            var movingPlacementCount = 0
+
+            setContent {
+                Box(
+                    modifier = Modifier
+                        .size(400.dp, 300.dp)
+                        .deponderRoot(state),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 100.dp, y = 140.dp)
+                            .size(20.dp)
+                            .deponderPlanet("anchor", PlanetPhysics(pinned = true, repulsionRadiusDp = 0f)),
+                    )
+                    Layout(
+                        modifier = Modifier
+                            .offset(x = 150.dp, y = 140.dp)
+                            .deponderPlanet("mover", PlanetPhysics(pinned = false, repulsionRadiusDp = 0f))
+                            .deponderDrag(),
+                    ) { _, _ ->
+                        movingMeasureCount += 1
+                        layout(20, 20) {
+                            movingPlacementCount += 1
+                        }
+                    }
+                    Box(
+                        modifier = Modifier
+                            .deponderRubber("anchor", "mover", RubberPhysics.fixed(180f), DeponderRubberInsets.None)
+                            .deponderStretch(),
+                    ) {
+                        Box(modifier = Modifier.size(20.dp, 2.dp))
+                    }
+                }
+            }
+
+            waitForIdle()
+            val measureBaseline = movingMeasureCount
+            val placeBaseline = movingPlacementCount
+            val settledBeforeX = state.world.bodyOf("mover")!!.x
+            val displacedX = settledBeforeX - 100f
+
+            // Displace mover toward anchor so multi-frame spring integration runs continuously until sleep.
+            state.moveTo("mover", displacedX, state.world.bodyOf("mover")!!.y)
+            state.reheat()
+            waitForIdle()
+
+            val settledAfterX = state.world.bodyOf("mover")!!.x
+            assertTrue(
+                settledAfterX > displacedX + 40f,
+                "Spring must actively integrate over multiple frames (displacedX=$displacedX, settledAfterX=$settledAfterX)",
+            )
+            assertEquals(measureBaseline, movingMeasureCount, "Multi-frame physics motion must trigger 0 remeasurements")
+            assertEquals(placeBaseline, movingPlacementCount, "Multi-frame physics motion must trigger 0 relayouts")
+        }
 }

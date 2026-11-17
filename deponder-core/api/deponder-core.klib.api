@@ -91,6 +91,7 @@ final class com.cinpe.deponder.core/EdgeKey { // com.cinpe.deponder.core/EdgeKey
 }
 
 final class com.cinpe.deponder.core/EnvironmentSpec { // com.cinpe.deponder.core/EnvironmentSpec|null[0]
+    constructor <init>() // com.cinpe.deponder.core/EnvironmentSpec.<init>|<init>(){}[0]
     constructor <init>(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Boolean = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ...) // com.cinpe.deponder.core/EnvironmentSpec.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Boolean;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
 
     final val airDamping // com.cinpe.deponder.core/EnvironmentSpec.airDamping|{}airDamping[0]
@@ -117,6 +118,8 @@ final class com.cinpe.deponder.core/EnvironmentSpec { // com.cinpe.deponder.core
         final fun <get-restSpeedPxPerSec>(): kotlin/Float // com.cinpe.deponder.core/EnvironmentSpec.restSpeedPxPerSec.<get-restSpeedPxPerSec>|<get-restSpeedPxPerSec>(){}[0]
     final val settleDurationSeconds // com.cinpe.deponder.core/EnvironmentSpec.settleDurationSeconds|{}settleDurationSeconds[0]
         final fun <get-settleDurationSeconds>(): kotlin/Float // com.cinpe.deponder.core/EnvironmentSpec.settleDurationSeconds.<get-settleDurationSeconds>|<get-settleDurationSeconds>(){}[0]
+    final val unfoldEnabled // com.cinpe.deponder.core/EnvironmentSpec.unfoldEnabled|{}unfoldEnabled[0]
+        final fun <get-unfoldEnabled>(): kotlin/Boolean // com.cinpe.deponder.core/EnvironmentSpec.unfoldEnabled.<get-unfoldEnabled>|<get-unfoldEnabled>(){}[0]
     final val wallElasticityBottom // com.cinpe.deponder.core/EnvironmentSpec.wallElasticityBottom|{}wallElasticityBottom[0]
         final fun <get-wallElasticityBottom>(): kotlin/Float // com.cinpe.deponder.core/EnvironmentSpec.wallElasticityBottom.<get-wallElasticityBottom>|<get-wallElasticityBottom>(){}[0]
     final val wallElasticityEnd // com.cinpe.deponder.core/EnvironmentSpec.wallElasticityEnd|{}wallElasticityEnd[0]
@@ -149,6 +152,7 @@ final class com.cinpe.deponder.core/EnvironmentSpec { // com.cinpe.deponder.core
     final fun equals(kotlin/Any?): kotlin/Boolean // com.cinpe.deponder.core/EnvironmentSpec.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.cinpe.deponder.core/EnvironmentSpec.hashCode|hashCode(){}[0]
     final fun toString(): kotlin/String // com.cinpe.deponder.core/EnvironmentSpec.toString|toString(){}[0]
+    final fun withUnfold(kotlin/Boolean = ...): com.cinpe.deponder.core/EnvironmentSpec // com.cinpe.deponder.core/EnvironmentSpec.withUnfold|withUnfold(kotlin.Boolean){}[0]
 }
 
 final class com.cinpe.deponder.core/NodePair { // com.cinpe.deponder.core/NodePair|null[0]
@@ -251,6 +255,7 @@ final class com.cinpe.deponder.core/PlanetSpec { // com.cinpe.deponder.core/Plan
 }
 
 final class com.cinpe.deponder.core/RootPhysics { // com.cinpe.deponder.core/RootPhysics|null[0]
+    constructor <init>() // com.cinpe.deponder.core/RootPhysics.<init>|<init>(){}[0]
     constructor <init>(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Boolean = ..., kotlin/Float = ...) // com.cinpe.deponder.core/RootPhysics.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Boolean;kotlin.Float){}[0]
 
     final val airDamping // com.cinpe.deponder.core/RootPhysics.airDamping|{}airDamping[0]
@@ -265,6 +270,8 @@ final class com.cinpe.deponder.core/RootPhysics { // com.cinpe.deponder.core/Roo
         final fun <get-maxScale>(): kotlin/Float // com.cinpe.deponder.core/RootPhysics.maxScale.<get-maxScale>|<get-maxScale>(){}[0]
     final val minScale // com.cinpe.deponder.core/RootPhysics.minScale|{}minScale[0]
         final fun <get-minScale>(): kotlin/Float // com.cinpe.deponder.core/RootPhysics.minScale.<get-minScale>|<get-minScale>(){}[0]
+    final val unfoldEnabled // com.cinpe.deponder.core/RootPhysics.unfoldEnabled|{}unfoldEnabled[0]
+        final fun <get-unfoldEnabled>(): kotlin/Boolean // com.cinpe.deponder.core/RootPhysics.unfoldEnabled.<get-unfoldEnabled>|<get-unfoldEnabled>(){}[0]
     final val wallElasticityBottom // com.cinpe.deponder.core/RootPhysics.wallElasticityBottom|{}wallElasticityBottom[0]
         final fun <get-wallElasticityBottom>(): kotlin/Float // com.cinpe.deponder.core/RootPhysics.wallElasticityBottom.<get-wallElasticityBottom>|<get-wallElasticityBottom>(){}[0]
     final val wallElasticityEnd // com.cinpe.deponder.core/RootPhysics.wallElasticityEnd|{}wallElasticityEnd[0]
@@ -295,6 +302,7 @@ final class com.cinpe.deponder.core/RootPhysics { // com.cinpe.deponder.core/Roo
     final fun withAirDamping(kotlin/Float): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.withAirDamping|withAirDamping(kotlin.Float){}[0]
     final fun withCooling(kotlin/Boolean, kotlin/Float = ...): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.withCooling|withCooling(kotlin.Boolean;kotlin.Float){}[0]
     final fun withScaleBounds(kotlin/Float, kotlin/Float, kotlin/Float): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.withScaleBounds|withScaleBounds(kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+    final fun withUnfold(kotlin/Boolean = ...): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.withUnfold|withUnfold(kotlin.Boolean){}[0]
     final fun withWallRepulsionDp(kotlin/Float): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.withWallRepulsionDp|withWallRepulsionDp(kotlin.Float){}[0]
 
     final object Companion { // com.cinpe.deponder.core/RootPhysics.Companion|null[0]
@@ -305,8 +313,16 @@ final class com.cinpe.deponder.core/RootPhysics { // com.cinpe.deponder.core/Roo
 final class com.cinpe.deponder.core/RubberPhysics { // com.cinpe.deponder.core/RubberPhysics|null[0]
     constructor <init>(kotlin/Float = ..., kotlin/Float = ...) // com.cinpe.deponder.core/RubberPhysics.<init>|<init>(kotlin.Float;kotlin.Float){}[0]
 
+    final val contentPaddingDp // com.cinpe.deponder.core/RubberPhysics.contentPaddingDp|{}contentPaddingDp[0]
+        final fun <get-contentPaddingDp>(): kotlin/Float // com.cinpe.deponder.core/RubberPhysics.contentPaddingDp.<get-contentPaddingDp>|<get-contentPaddingDp>(){}[0]
     final val elasticity // com.cinpe.deponder.core/RubberPhysics.elasticity|{}elasticity[0]
         final fun <get-elasticity>(): kotlin/Float // com.cinpe.deponder.core/RubberPhysics.elasticity.<get-elasticity>|<get-elasticity>(){}[0]
+    final val isAutoLength // com.cinpe.deponder.core/RubberPhysics.isAutoLength|{}isAutoLength[0]
+        final fun <get-isAutoLength>(): kotlin/Boolean // com.cinpe.deponder.core/RubberPhysics.isAutoLength.<get-isAutoLength>|<get-isAutoLength>(){}[0]
+    final val maxLengthDp // com.cinpe.deponder.core/RubberPhysics.maxLengthDp|{}maxLengthDp[0]
+        final fun <get-maxLengthDp>(): kotlin/Float // com.cinpe.deponder.core/RubberPhysics.maxLengthDp.<get-maxLengthDp>|<get-maxLengthDp>(){}[0]
+    final val minLengthDp // com.cinpe.deponder.core/RubberPhysics.minLengthDp|{}minLengthDp[0]
+        final fun <get-minLengthDp>(): kotlin/Float // com.cinpe.deponder.core/RubberPhysics.minLengthDp.<get-minLengthDp>|<get-minLengthDp>(){}[0]
     final val naturalLengthDp // com.cinpe.deponder.core/RubberPhysics.naturalLengthDp|{}naturalLengthDp[0]
         final fun <get-naturalLengthDp>(): kotlin/Float // com.cinpe.deponder.core/RubberPhysics.naturalLengthDp.<get-naturalLengthDp>|<get-naturalLengthDp>(){}[0]
 
@@ -315,12 +331,21 @@ final class com.cinpe.deponder.core/RubberPhysics { // com.cinpe.deponder.core/R
     final fun copy(kotlin/Float = ..., kotlin/Float = ...): com.cinpe.deponder.core/RubberPhysics // com.cinpe.deponder.core/RubberPhysics.copy|copy(kotlin.Float;kotlin.Float){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.cinpe.deponder.core/RubberPhysics.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.cinpe.deponder.core/RubberPhysics.hashCode|hashCode(){}[0]
+    final fun resolveNaturalLengthDp(kotlin/Float = ...): kotlin/Float // com.cinpe.deponder.core/RubberPhysics.resolveNaturalLengthDp|resolveNaturalLengthDp(kotlin.Float){}[0]
+    final fun resolveNaturalLengthPx(kotlin/Float, kotlin/Float = ...): kotlin/Float // com.cinpe.deponder.core/RubberPhysics.resolveNaturalLengthPx|resolveNaturalLengthPx(kotlin.Float;kotlin.Float){}[0]
     final fun toRubberSpec(kotlin/String, kotlin/String, kotlin/Float): com.cinpe.deponder.core/RubberSpec // com.cinpe.deponder.core/RubberPhysics.toRubberSpec|toRubberSpec(kotlin.String;kotlin.String;kotlin.Float){}[0]
+    final fun toRubberSpec(kotlin/String, kotlin/String, kotlin/Float, kotlin/Float): com.cinpe.deponder.core/RubberSpec // com.cinpe.deponder.core/RubberPhysics.toRubberSpec|toRubberSpec(kotlin.String;kotlin.String;kotlin.Float;kotlin.Float){}[0]
     final fun toString(): kotlin/String // com.cinpe.deponder.core/RubberPhysics.toString|toString(){}[0]
+    final fun withAutoLength(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ...): com.cinpe.deponder.core/RubberPhysics // com.cinpe.deponder.core/RubberPhysics.withAutoLength|withAutoLength(kotlin.Float;kotlin.Float;kotlin.Float){}[0]
     final fun withElasticity(kotlin/Float): com.cinpe.deponder.core/RubberPhysics // com.cinpe.deponder.core/RubberPhysics.withElasticity|withElasticity(kotlin.Float){}[0]
     final fun withNaturalLengthDp(kotlin/Float): com.cinpe.deponder.core/RubberPhysics // com.cinpe.deponder.core/RubberPhysics.withNaturalLengthDp|withNaturalLengthDp(kotlin.Float){}[0]
 
     final object Companion { // com.cinpe.deponder.core/RubberPhysics.Companion|null[0]
+        final val Default // com.cinpe.deponder.core/RubberPhysics.Companion.Default|{}Default[0]
+            final fun <get-Default>(): com.cinpe.deponder.core/RubberPhysics // com.cinpe.deponder.core/RubberPhysics.Companion.Default.<get-Default>|<get-Default>(){}[0]
+
+        final fun auto(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ...): com.cinpe.deponder.core/RubberPhysics // com.cinpe.deponder.core/RubberPhysics.Companion.auto|auto(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+        final fun fixed(kotlin/Float, kotlin/Float = ...): com.cinpe.deponder.core/RubberPhysics // com.cinpe.deponder.core/RubberPhysics.Companion.fixed|fixed(kotlin.Float;kotlin.Float){}[0]
         final fun fromPreset(com.cinpe.deponder.core/DeponderDefaults.Preset): com.cinpe.deponder.core/RubberPhysics // com.cinpe.deponder.core/RubberPhysics.Companion.fromPreset|fromPreset(com.cinpe.deponder.core.DeponderDefaults.Preset){}[0]
     }
 }
@@ -418,6 +443,7 @@ final class com.cinpe.deponder.core/SimulationWorld { // com.cinpe.deponder.core
     final fun updateViewport(kotlin/Float, kotlin/Float) // com.cinpe.deponder.core/SimulationWorld.updateViewport|updateViewport(kotlin.Float;kotlin.Float){}[0]
     final fun upsertPlanet(com.cinpe.deponder.core/PlanetSpec, kotlin/Float, kotlin/Float, kotlin/Float = ...) // com.cinpe.deponder.core/SimulationWorld.upsertPlanet|upsertPlanet(com.cinpe.deponder.core.PlanetSpec;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
     final fun upsertRubber(com.cinpe.deponder.core/RubberSpec, kotlin/Float = ...): com.cinpe.deponder.core/RubberPose // com.cinpe.deponder.core/SimulationWorld.upsertRubber|upsertRubber(com.cinpe.deponder.core.RubberSpec;kotlin.Float){}[0]
+    final fun wake(kotlin/Float = ...) // com.cinpe.deponder.core/SimulationWorld.wake|wake(kotlin.Float){}[0]
     final suspend fun step(kotlin/Float, kotlin/Float): kotlin/Boolean // com.cinpe.deponder.core/SimulationWorld.step|step(kotlin.Float;kotlin.Float){}[0]
 
     final object Companion { // com.cinpe.deponder.core/SimulationWorld.Companion|null[0]
@@ -450,6 +476,8 @@ final value class com.cinpe.deponder.core/Vec2 { // com.cinpe.deponder.core/Vec2
 }
 
 final object com.cinpe.deponder.core/DeponderDefaults { // com.cinpe.deponder.core/DeponderDefaults|null[0]
+    final const val AUTO_LENGTH // com.cinpe.deponder.core/DeponderDefaults.AUTO_LENGTH|{}AUTO_LENGTH[0]
+        final fun <get-AUTO_LENGTH>(): kotlin/Float // com.cinpe.deponder.core/DeponderDefaults.AUTO_LENGTH.<get-AUTO_LENGTH>|<get-AUTO_LENGTH>(){}[0]
     final const val INFINITE_RANGE // com.cinpe.deponder.core/DeponderDefaults.INFINITE_RANGE|{}INFINITE_RANGE[0]
         final fun <get-INFINITE_RANGE>(): kotlin/Float // com.cinpe.deponder.core/DeponderDefaults.INFINITE_RANGE.<get-INFINITE_RANGE>|<get-INFINITE_RANGE>(){}[0]
 
@@ -517,6 +545,8 @@ final object com.cinpe.deponder.core/DeponderDefaults { // com.cinpe.deponder.co
             final fun <get-MAX_SCALE>(): kotlin/Float // com.cinpe.deponder.core/DeponderDefaults.Root.MAX_SCALE.<get-MAX_SCALE>|<get-MAX_SCALE>(){}[0]
         final const val MIN_SCALE // com.cinpe.deponder.core/DeponderDefaults.Root.MIN_SCALE|{}MIN_SCALE[0]
             final fun <get-MIN_SCALE>(): kotlin/Float // com.cinpe.deponder.core/DeponderDefaults.Root.MIN_SCALE.<get-MIN_SCALE>|<get-MIN_SCALE>(){}[0]
+        final const val UNFOLD_ENABLED // com.cinpe.deponder.core/DeponderDefaults.Root.UNFOLD_ENABLED|{}UNFOLD_ENABLED[0]
+            final fun <get-UNFOLD_ENABLED>(): kotlin/Boolean // com.cinpe.deponder.core/DeponderDefaults.Root.UNFOLD_ENABLED.<get-UNFOLD_ENABLED>|<get-UNFOLD_ENABLED>(){}[0]
         final const val WALL_ELASTICITY_BOTTOM // com.cinpe.deponder.core/DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM|{}WALL_ELASTICITY_BOTTOM[0]
             final fun <get-WALL_ELASTICITY_BOTTOM>(): kotlin/Float // com.cinpe.deponder.core/DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM.<get-WALL_ELASTICITY_BOTTOM>|<get-WALL_ELASTICITY_BOTTOM>(){}[0]
         final const val WALL_ELASTICITY_END // com.cinpe.deponder.core/DeponderDefaults.Root.WALL_ELASTICITY_END|{}WALL_ELASTICITY_END[0]
@@ -530,6 +560,8 @@ final object com.cinpe.deponder.core/DeponderDefaults { // com.cinpe.deponder.co
     }
 
     final object Rubber { // com.cinpe.deponder.core/DeponderDefaults.Rubber|null[0]
+        final const val CONTENT_PADDING_DP // com.cinpe.deponder.core/DeponderDefaults.Rubber.CONTENT_PADDING_DP|{}CONTENT_PADDING_DP[0]
+            final fun <get-CONTENT_PADDING_DP>(): kotlin/Float // com.cinpe.deponder.core/DeponderDefaults.Rubber.CONTENT_PADDING_DP.<get-CONTENT_PADDING_DP>|<get-CONTENT_PADDING_DP>(){}[0]
         final const val DEFAULT_ARROW_SIZE_DP // com.cinpe.deponder.core/DeponderDefaults.Rubber.DEFAULT_ARROW_SIZE_DP|{}DEFAULT_ARROW_SIZE_DP[0]
             final fun <get-DEFAULT_ARROW_SIZE_DP>(): kotlin/Float // com.cinpe.deponder.core/DeponderDefaults.Rubber.DEFAULT_ARROW_SIZE_DP.<get-DEFAULT_ARROW_SIZE_DP>|<get-DEFAULT_ARROW_SIZE_DP>(){}[0]
         final const val DEFAULT_ENDPOINT_GAP_DP // com.cinpe.deponder.core/DeponderDefaults.Rubber.DEFAULT_ENDPOINT_GAP_DP|{}DEFAULT_ENDPOINT_GAP_DP[0]

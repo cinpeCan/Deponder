@@ -34,6 +34,7 @@ public final class com/cinpe/deponder/DeponderRubberView : android/widget/FrameL
 	public final fun getLabelTextSizeSp ()F
 	public final fun getLineColor ()I
 	public final fun getLineThicknessDp ()F
+	public final fun getPhysics ()Lcom/cinpe/deponder/core/RubberPhysics;
 	protected fun onLayout (ZIIII)V
 	protected fun onMeasure (II)V
 	public final fun setArrowMode (Lcom/cinpe/deponder/core/DeponderArrowMode;)V
@@ -45,6 +46,7 @@ public final class com/cinpe/deponder/DeponderRubberView : android/widget/FrameL
 	public final fun setLabelTextSizeSp (F)V
 	public final fun setLineColor (I)V
 	public final fun setLineThicknessDp (F)V
+	public final fun setPhysics (Lcom/cinpe/deponder/core/RubberPhysics;)V
 	public final fun withArrowMode (Lcom/cinpe/deponder/core/DeponderArrowMode;)Lcom/cinpe/deponder/DeponderRubberView;
 	public final fun withInsets (Lcom/cinpe/deponder/core/DeponderRubberInsets;)Lcom/cinpe/deponder/DeponderRubberView;
 	public final fun withLabel (Ljava/lang/String;)Lcom/cinpe/deponder/DeponderRubberView;
@@ -55,6 +57,7 @@ public final class com/cinpe/deponder/DeponderRubberView : android/widget/FrameL
 	public final fun withLineStyle (I)Lcom/cinpe/deponder/DeponderRubberView;
 	public final fun withLineStyle (IF)Lcom/cinpe/deponder/DeponderRubberView;
 	public static synthetic fun withLineStyle$default (Lcom/cinpe/deponder/DeponderRubberView;IFILjava/lang/Object;)Lcom/cinpe/deponder/DeponderRubberView;
+	public final fun withPhysics (Lcom/cinpe/deponder/core/RubberPhysics;)Lcom/cinpe/deponder/DeponderRubberView;
 }
 
 public final class com/cinpe/deponder/DeponderRubberView$Companion {

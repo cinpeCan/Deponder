@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isUnspecified
 import androidx.compose.ui.unit.sp
 import com.cinpe.deponder.core.DeponderArrowMode
 import com.cinpe.deponder.core.DeponderDefaults
@@ -36,6 +37,7 @@ import kotlin.math.roundToInt
 
 private const val ARROW_HEIGHT_RATIO: Float = 1.35f
 private const val ARROW_STEM_INSET_RATIO: Float = 0.75f
+private const val MAX_STYLE_DIMENSION_PX: Float = 16_384f
 
 /**
  * Immutable visual style configuration for [DeponderDefaultRubber].
@@ -113,14 +115,25 @@ public class DeponderRubberStyle internal constructor(
             labelColor: Color = DefaultLabelColor,
             labelTextSize: TextUnit = DeponderDefaults.Rubber.DEFAULT_LABEL_TEXT_SIZE_SP.sp,
             labelBackgroundColor: Color = DefaultLabelBackgroundColor,
-        ): DeponderRubberStyle = DeponderRubberStyle(
-            lineColor = lineColor,
-            lineThickness = lineThickness,
-            arrowSize = arrowSize,
-            labelColor = labelColor,
-            labelTextSize = labelTextSize,
-            labelBackgroundColor = labelBackgroundColor,
-        )
+        ): DeponderRubberStyle {
+            require(!lineThickness.isUnspecified && lineThickness.value.isFinite() && lineThickness.value >= 0f) {
+                "lineThickness must be specified and >= 0.dp, but was $lineThickness"
+            }
+            require(!arrowSize.isUnspecified && arrowSize.value.isFinite() && arrowSize.value >= 0f) {
+                "arrowSize must be specified and >= 0.dp, but was $arrowSize"
+            }
+            require(!labelTextSize.isUnspecified && labelTextSize.value.isFinite() && labelTextSize.value > 0f) {
+                "labelTextSize must be specified and > 0.sp, but was $labelTextSize"
+            }
+            return DeponderRubberStyle(
+                lineColor = lineColor,
+                lineThickness = lineThickness,
+                arrowSize = arrowSize,
+                labelColor = labelColor,
+                labelTextSize = labelTextSize,
+                labelBackgroundColor = labelBackgroundColor,
+            )
+        }
     }
 }
 
@@ -174,8 +187,13 @@ public fun DeponderDefaultRubber(
     }
 
     val stemBaseWidthPx = max(1, with(density) { 4.dp.roundToPx() })
-    val lineThicknessPx = max(1, with(density) { style.lineThickness.roundToPx() })
-    val arrowLengthPx = with(density) { style.arrowSize.toPx() }.coerceAtLeast(0f)
+    val rawThicknessPx = with(density) { style.lineThickness.toPx() }
+    val lineThicknessPx = (if (rawThicknessPx.isFinite()) rawThicknessPx else 0f)
+        .coerceIn(1f, MAX_STYLE_DIMENSION_PX)
+        .roundToInt()
+    val rawArrowPx = with(density) { style.arrowSize.toPx() }
+    val arrowLengthPx = (if (rawArrowPx.isFinite()) rawArrowPx else 0f)
+        .coerceIn(0f, MAX_STYLE_DIMENSION_PX)
     val arrowWidthPx = max(1, ceil(arrowLengthPx).toInt())
     val arrowHeightPx = max(1, ceil(arrowLengthPx * ARROW_HEIGHT_RATIO).toInt())
     val labelOffsetPx = with(density) { DeponderDefaults.Rubber.DEFAULT_LABEL_OFFSET_DP.dp.toPx() }
@@ -204,11 +222,19 @@ public fun DeponderDefaultRubber(
     } else {
         0
     }
-    val activeArrowsWidth = (if (hasStartArrow) arrowWidthPx else 0) + (if (hasEndArrow) arrowWidthPx else 0)
+    val effectiveArrowMetricW = if (arrowLengthPx > 0f) arrowWidthPx else 0
+    val activeArrowsWidth = (if (hasStartArrow) effectiveArrowMetricW else 0) +
+        (if (hasEndArrow) effectiveArrowMetricW else 0)
+    val declaredArrowsCount = when (arrowMode) {
+        DeponderArrowMode.NONE -> 0
+        DeponderArrowMode.END, DeponderArrowMode.START -> 1
+        DeponderArrowMode.BOTH -> 2
+    }
+    val adaptiveContentWidthPx = pillWidthPx + declaredArrowsCount * effectiveArrowMetricW
     val containerWidth = max(stemBaseWidthPx, max(pillWidthPx, activeArrowsWidth))
     val containerHeight = max(
         lineThicknessPx,
-        max(if (hasStartArrow || hasEndArrow) arrowHeightPx else 0, symmetricLabelHeight),
+        max(if ((hasStartArrow || hasEndArrow) && arrowLengthPx > 0f) arrowHeightPx else 0, symmetricLabelHeight),
     )
 
     val holder = remember { RubberRefHolder() }
@@ -216,7 +242,7 @@ public fun DeponderDefaultRubber(
     Layout(
         modifier = modifier
             .deponderRubber(startId = startId, endId = endId, physics = physics, insets = insets)
-            .then(DefaultRubberBindingElement(holder, pillWidthPx)),
+            .then(DefaultRubberBindingElement(holder, pillWidthPx, adaptiveContentWidthPx)),
         content = {
             // Child 0: Direct stretched line stem (never wrapped in CompositingStrategy.Offscreen!)
             Layout(modifier = SolidRectDrawElement(style.lineColor)) { _, _ ->
@@ -407,35 +433,48 @@ private class RubberRefHolder {
 private data class DefaultRubberBindingElement(
     val holder: RubberRefHolder,
     val nonStretchedWidthPx: Int,
+    val adaptiveContentWidthPx: Int,
 ) : ModifierNodeElement<DefaultRubberBindingNode>() {
-    override fun create(): DefaultRubberBindingNode = DefaultRubberBindingNode(holder, nonStretchedWidthPx)
+    override fun create(): DefaultRubberBindingNode =
+        DefaultRubberBindingNode(holder, nonStretchedWidthPx, adaptiveContentWidthPx)
 
     override fun update(node: DefaultRubberBindingNode) {
-        node.update(holder, nonStretchedWidthPx)
+        node.update(holder, nonStretchedWidthPx, adaptiveContentWidthPx)
     }
 }
 
 private class DefaultRubberBindingNode(
     var holder: RubberRefHolder,
     var nonStretchedWidthPx: Int,
+    var adaptiveContentWidthPx: Int,
 ) : Modifier.Node() {
     override fun onAttach() {
         val rubber = findNearestAncestor(DeponderRubberTraverseKey) as? DeponderRubberNode
         holder.rubberNode = rubber
-        rubber?.explicitNonStretchedWidthPx = nonStretchedWidthPx
+        if (rubber != null) {
+            rubber.explicitNonStretchedWidthPx = nonStretchedWidthPx
+            rubber.explicitAdaptiveContentWidthPx = adaptiveContentWidthPx
+            rubber.attachedState?.syncRubberAdaptiveLength(rubber)
+        }
     }
 
-    fun update(newHolder: RubberRefHolder, newWidthPx: Int) {
+    fun update(newHolder: RubberRefHolder, newWidthPx: Int, newAdaptiveWidthPx: Int) {
         holder = newHolder
         nonStretchedWidthPx = newWidthPx
+        adaptiveContentWidthPx = newAdaptiveWidthPx
         val rubber = findNearestAncestor(DeponderRubberTraverseKey) as? DeponderRubberNode
         holder.rubberNode = rubber
-        rubber?.explicitNonStretchedWidthPx = newWidthPx
-        rubber?.attachedState?.notifyFrameChanged()
+        if (rubber != null) {
+            rubber.explicitNonStretchedWidthPx = newWidthPx
+            rubber.explicitAdaptiveContentWidthPx = newAdaptiveWidthPx
+            rubber.attachedState?.syncRubberAdaptiveLength(rubber)
+            rubber.attachedState?.notifyFrameChanged()
+        }
     }
 
     override fun onDetach() {
         holder.rubberNode?.explicitNonStretchedWidthPx = -1
+        holder.rubberNode?.explicitAdaptiveContentWidthPx = -1
         holder.rubberNode = null
     }
 }

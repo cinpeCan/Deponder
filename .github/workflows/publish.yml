@@ -29,6 +29,20 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: Verify Release Tag Matches Project Version
+        if: github.event_name == 'release'
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          BUILD_VERSION="$(grep -E 'val deponderVersion\s*=' build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')"
+          echo "Release tag version: $TAG_VERSION, build.gradle.kts version: $BUILD_VERSION"
+          if [ "$TAG_VERSION" != "$BUILD_VERSION" ]; then
+            echo "Mismatch between release tag ($TAG_VERSION) and deponderVersion ($BUILD_VERSION)" >&2
+            exit 1
+          fi
+
+      - name: Run Tests & ABI Verification
+        run: ./gradlew :deponder-core:jvmTest :deponder-core:checkKotlinAbi :deponder-compose:desktopTest :deponder-compose:checkKotlinAbi :deponder:testDebugUnitTest :deponder:apiCheck
+
       - name: Publish and Release to Maven Central Portal
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}

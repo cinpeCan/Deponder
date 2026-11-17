@@ -9,6 +9,7 @@ public final class com/cinpe/deponder/core/DeponderArrowMode : java/lang/Enum {
 }
 
 public final class com/cinpe/deponder/core/DeponderDefaults {
+	public static final field AUTO_LENGTH F
 	public static final field INFINITE_RANGE F
 	public static final field INSTANCE Lcom/cinpe/deponder/core/DeponderDefaults;
 }
@@ -59,6 +60,7 @@ public final class com/cinpe/deponder/core/DeponderDefaults$Root {
 	public static final field INSTANCE Lcom/cinpe/deponder/core/DeponderDefaults$Root;
 	public static final field MAX_SCALE F
 	public static final field MIN_SCALE F
+	public static final field UNFOLD_ENABLED Z
 	public static final field WALL_ELASTICITY_BOTTOM F
 	public static final field WALL_ELASTICITY_END F
 	public static final field WALL_ELASTICITY_START F
@@ -67,6 +69,7 @@ public final class com/cinpe/deponder/core/DeponderDefaults$Root {
 }
 
 public final class com/cinpe/deponder/core/DeponderDefaults$Rubber {
+	public static final field CONTENT_PADDING_DP F
 	public static final field DEFAULT_ARROW_SIZE_DP F
 	public static final field DEFAULT_ENDPOINT_GAP_DP F
 	public static final field DEFAULT_LABEL_OFFSET_DP F
@@ -210,6 +213,7 @@ public final class com/cinpe/deponder/core/EnvironmentSpec {
 	public final fun getRestAccelPxPerSecSq ()F
 	public final fun getRestSpeedPxPerSec ()F
 	public final fun getSettleDurationSeconds ()F
+	public final fun getUnfoldEnabled ()Z
 	public final fun getWallElasticityBottom ()F
 	public final fun getWallElasticityEnd ()F
 	public final fun getWallElasticityStart ()F
@@ -217,6 +221,9 @@ public final class com/cinpe/deponder/core/EnvironmentSpec {
 	public final fun getWallRepulsionPx ()F
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+	public final fun withUnfold ()Lcom/cinpe/deponder/core/EnvironmentSpec;
+	public final fun withUnfold (Z)Lcom/cinpe/deponder/core/EnvironmentSpec;
+	public static synthetic fun withUnfold$default (Lcom/cinpe/deponder/core/EnvironmentSpec;ZILjava/lang/Object;)Lcom/cinpe/deponder/core/EnvironmentSpec;
 }
 
 public final class com/cinpe/deponder/core/NodePair {
@@ -325,6 +332,7 @@ public final class com/cinpe/deponder/core/RootPhysics {
 	public final fun getInitScale ()F
 	public final fun getMaxScale ()F
 	public final fun getMinScale ()F
+	public final fun getUnfoldEnabled ()Z
 	public final fun getWallElasticityBottom ()F
 	public final fun getWallElasticityEnd ()F
 	public final fun getWallElasticityStart ()F
@@ -337,6 +345,9 @@ public final class com/cinpe/deponder/core/RootPhysics {
 	public final fun withCooling (ZF)Lcom/cinpe/deponder/core/RootPhysics;
 	public static synthetic fun withCooling$default (Lcom/cinpe/deponder/core/RootPhysics;ZFILjava/lang/Object;)Lcom/cinpe/deponder/core/RootPhysics;
 	public final fun withScaleBounds (FFF)Lcom/cinpe/deponder/core/RootPhysics;
+	public final fun withUnfold ()Lcom/cinpe/deponder/core/RootPhysics;
+	public final fun withUnfold (Z)Lcom/cinpe/deponder/core/RootPhysics;
+	public static synthetic fun withUnfold$default (Lcom/cinpe/deponder/core/RootPhysics;ZILjava/lang/Object;)Lcom/cinpe/deponder/core/RootPhysics;
 	public final fun withWallRepulsionDp (F)Lcom/cinpe/deponder/core/RootPhysics;
 }
 
@@ -347,25 +358,59 @@ public final class com/cinpe/deponder/core/RootPhysics$Companion {
 public final class com/cinpe/deponder/core/RubberPhysics {
 	public static final field Companion Lcom/cinpe/deponder/core/RubberPhysics$Companion;
 	public fun <init> ()V
+	public fun <init> (F)V
 	public fun <init> (FF)V
 	public synthetic fun <init> (FFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public static final fun auto ()Lcom/cinpe/deponder/core/RubberPhysics;
+	public static final fun auto (F)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static final fun auto (FF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static final fun auto (FFF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static final fun auto (FFFF)Lcom/cinpe/deponder/core/RubberPhysics;
 	public final fun component1 ()F
 	public final fun component2 ()F
 	public final fun copy (FF)Lcom/cinpe/deponder/core/RubberPhysics;
 	public static synthetic fun copy$default (Lcom/cinpe/deponder/core/RubberPhysics;FFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPhysics;
 	public fun equals (Ljava/lang/Object;)Z
+	public static final fun fixed (F)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static final fun fixed (FF)Lcom/cinpe/deponder/core/RubberPhysics;
 	public static final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun getContentPaddingDp ()F
 	public final fun getElasticity ()F
+	public final fun getMaxLengthDp ()F
+	public final fun getMinLengthDp ()F
 	public final fun getNaturalLengthDp ()F
 	public fun hashCode ()I
+	public final fun isAutoLength ()Z
+	public final fun resolveNaturalLengthDp ()F
+	public final fun resolveNaturalLengthDp (F)F
+	public static synthetic fun resolveNaturalLengthDp$default (Lcom/cinpe/deponder/core/RubberPhysics;FILjava/lang/Object;)F
+	public final fun resolveNaturalLengthPx (F)F
+	public final fun resolveNaturalLengthPx (FF)F
+	public static synthetic fun resolveNaturalLengthPx$default (Lcom/cinpe/deponder/core/RubberPhysics;FFILjava/lang/Object;)F
 	public final fun toRubberSpec (Ljava/lang/String;Ljava/lang/String;F)Lcom/cinpe/deponder/core/RubberSpec;
+	public final fun toRubberSpec (Ljava/lang/String;Ljava/lang/String;FF)Lcom/cinpe/deponder/core/RubberSpec;
 	public fun toString ()Ljava/lang/String;
+	public final fun withAutoLength ()Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun withAutoLength (F)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun withAutoLength (FF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun withAutoLength (FFF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static synthetic fun withAutoLength$default (Lcom/cinpe/deponder/core/RubberPhysics;FFFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPhysics;
 	public final fun withElasticity (F)Lcom/cinpe/deponder/core/RubberPhysics;
 	public final fun withNaturalLengthDp (F)Lcom/cinpe/deponder/core/RubberPhysics;
 }
 
 public final class com/cinpe/deponder/core/RubberPhysics$Companion {
+	public final fun auto ()Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun auto (F)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun auto (FF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun auto (FFF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun auto (FFFF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static synthetic fun auto$default (Lcom/cinpe/deponder/core/RubberPhysics$Companion;FFFFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun fixed (F)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun fixed (FF)Lcom/cinpe/deponder/core/RubberPhysics;
+	public static synthetic fun fixed$default (Lcom/cinpe/deponder/core/RubberPhysics$Companion;FFILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPhysics;
 	public final fun fromPreset (Lcom/cinpe/deponder/core/DeponderDefaults$Preset;)Lcom/cinpe/deponder/core/RubberPhysics;
+	public final fun getDefault ()Lcom/cinpe/deponder/core/RubberPhysics;
 }
 
 public final class com/cinpe/deponder/core/RubberPose {
@@ -447,6 +492,9 @@ public final class com/cinpe/deponder/core/SimulationWorld {
 	public static synthetic fun upsertPlanet$default (Lcom/cinpe/deponder/core/SimulationWorld;Lcom/cinpe/deponder/core/PlanetSpec;FFFILjava/lang/Object;)V
 	public final fun upsertRubber (Lcom/cinpe/deponder/core/RubberSpec;F)Lcom/cinpe/deponder/core/RubberPose;
 	public static synthetic fun upsertRubber$default (Lcom/cinpe/deponder/core/SimulationWorld;Lcom/cinpe/deponder/core/RubberSpec;FILjava/lang/Object;)Lcom/cinpe/deponder/core/RubberPose;
+	public final fun wake ()V
+	public final fun wake (F)V
+	public static synthetic fun wake$default (Lcom/cinpe/deponder/core/SimulationWorld;FILjava/lang/Object;)V
 }
 
 public final class com/cinpe/deponder/core/SimulationWorld$Companion {

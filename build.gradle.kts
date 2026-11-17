@@ -22,7 +22,7 @@ plugins {
 }
 
 val deponderGroupId = "io.github.cinpecan"
-val deponderVersion = "0.5.0"
+val deponderVersion = "0.6.0"
 
 subprojects {
     group = deponderGroupId

@@ -1,7 +1,9 @@
 package com.cinpe.deponder;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 import android.app.Activity;
 import android.graphics.Color;
@@ -31,8 +33,14 @@ public class DeponderJavaInteropTest {
         activity.setContentView(root, new FrameLayout.LayoutParams(600, 600));
         root.layout(0, 0, 600, 600);
 
+        assertFalse(new RootPhysics().getUnfoldEnabled());
+        assertFalse(new com.cinpe.deponder.core.EnvironmentSpec().getUnfoldEnabled());
         RootPhysics rootPhysics = RootPhysics.fromPreset(DeponderDefaults.Presets.INSTANCE.getBalanced())
                 .withScaleBounds(1.0f, 0.5f, 1.8f);
+        assertFalse(rootPhysics.getUnfoldEnabled());
+        RootPhysics unfoldedRoot = rootPhysics.withUnfold();
+        assertTrue(unfoldedRoot.getUnfoldEnabled());
+        assertFalse(unfoldedRoot.withUnfold(false).getUnfoldEnabled());
         DeponderController controller = DeponderViews.deponderRoot(root, null, rootPhysics);
         assertNotNull(controller);
 
@@ -56,11 +64,19 @@ public class DeponderJavaInteropTest {
         root.addView(rubberView, new FrameLayout.LayoutParams(120, 28));
         rubberView.layout(0, 0, 120, 28);
 
+        RubberPhysics defaultAuto = new RubberPhysics();
+        assertTrue(defaultAuto.isAutoLength());
+        RubberPhysics customAuto = RubberPhysics.auto(72f, 96f, 240f, 2.0f);
+        assertTrue(customAuto.isAutoLength());
+        assertEquals(172f, customAuto.resolveNaturalLengthDp(100f), 1e-4f);
+        RubberPhysics fixedJava = RubberPhysics.fixed(110f);
+        assertFalse(fixedJava.isAutoLength());
+
         DeponderViews.deponderRubber(
                 rubberView,
                 "java_a",
                 "java_b",
-                new RubberPhysics().withNaturalLengthDp(110f)
+                customAuto
         );
         assertEquals(DeponderRubberInsets.endOnly(4f), rubberView.getInsets());
 
@@ -76,6 +92,14 @@ public class DeponderJavaInteropTest {
         assertEquals("depends on", rubberView.getLabel());
         assertEquals(DeponderArrowMode.END, rubberView.getArrowMode());
         assertEquals(Color.TRANSPARENT, rubberView.getLabelBackgroundColor());
+
+        DeponderViews.clearDeponderRubber(rubberView);
+        DeponderRubberView fluentPhysicsRubber = new DeponderRubberView(activity)
+                .withPhysics(RubberPhysics.fixed(135f));
+        root.addView(fluentPhysicsRubber, new FrameLayout.LayoutParams(120, 28));
+        fluentPhysicsRubber.layout(0, 0, 120, 28);
+        DeponderViews.deponderRubber(fluentPhysicsRubber, "java_a", "java_b");
+        assertEquals(135f, fluentPhysicsRubber.getPhysics().getNaturalLengthDp(), 1e-4f);
 
         controller.cancel();
         activityController.destroy();

@@ -46,15 +46,24 @@ public class SimulationWorld(
     public var alpha: Float = DeponderDefaults.Simulation.INITIAL_ALPHA
         private set
 
+    private sealed interface CausalIntent {
+        class BodyPoseOverride(val id: String, var x: Float, var y: Float) : CausalIntent
+        data class BodyVelocityZero(val id: String) : CausalIntent
+        data class ElevateAlpha(val minAlpha: Float) : CausalIntent
+    }
+
     private var settleTimeSeconds: Float = 0f
     private var perturbationCounter: Int = 0
-    private var topologyVersion: Long = 0L
+    private var asyncStepInFlight: Boolean = false
+    private val inFlightJournal = ArrayList<CausalIntent>(4)
+
+    private val unfolder = TopologicalUnfolder()
+    private var unfoldDirty: Boolean = false
+    private var unfoldRemainingSeconds: Float = 0f
 
     private val bodiesById = LinkedHashMap<String, PlanetBody>()
     private val bodyList = ArrayList<PlanetBody>()
     private val indexById = HashMap<String, Int>()
-    private val bodyMutationStampById = HashMap<String, Long>()
-    private var mutationClock: Long = 0L
 
     private val declaredRubbersByKey = LinkedHashMap<EdgeKey, RubberPose>()
     private val rubberList = ArrayList<RubberPose>()
@@ -71,6 +80,15 @@ public class SimulationWorld(
     private var accumEdgeFy = FloatArray(bufCap)
     private var frameStartX = FloatArray(bufCap)
     private var frameStartY = FloatArray(bufCap)
+    private var unfoldTargetX = FloatArray(bufCap)
+    private var unfoldTargetY = FloatArray(bufCap)
+    private var unfoldLocked = BooleanArray(bufCap)
+    private var unfoldEstablished = BooleanArray(bufCap)
+
+    private var unfoldEdgeCap = 64
+    private var unfoldEdgeStart = IntArray(unfoldEdgeCap)
+    private var unfoldEdgeEnd = IntArray(unfoldEdgeCap)
+    private var unfoldEdgeLen = FloatArray(unfoldEdgeCap)
 
     private val quadtree = HybridQuadtree()
     private val workerStacks = Array(DeponderDefaults.Simulation.PARALLEL_WORKER_CHUNKS) {
@@ -87,25 +105,134 @@ public class SimulationWorld(
 
     public fun rubberOf(key: EdgeKey): RubberPose? = declaredRubbersByKey[key]
 
-    private fun markBodyMutated(id: String) {
-        mutationClock += 1L
-        bodyMutationStampById[id] = mutationClock
+    private fun removeInFlightBodyEntries(id: String) {
+        var i = inFlightJournal.size - 1
+        while (i >= 0) {
+            when (val entry = inFlightJournal[i]) {
+                is CausalIntent.BodyPoseOverride -> if (entry.id == id) inFlightJournal.removeAt(i)
+                is CausalIntent.BodyVelocityZero -> if (entry.id == id) inFlightJournal.removeAt(i)
+                is CausalIntent.ElevateAlpha -> Unit
+            }
+            i -= 1
+        }
+    }
+
+    private fun recordBodyPoseOverride(id: String, x: Float, y: Float) {
+        val last = inFlightJournal.lastOrNull()
+        if (last is CausalIntent.BodyPoseOverride && last.id == id) {
+            last.x = x
+            last.y = y
+            return
+        }
+        removeInFlightBodyEntries(id)
+        inFlightJournal.add(CausalIntent.BodyPoseOverride(id, x, y))
+    }
+
+    private fun recordBodyVelocityZero(id: String) {
+        val last = inFlightJournal.lastOrNull()
+        if ((last is CausalIntent.BodyVelocityZero && last.id == id) ||
+            (last is CausalIntent.BodyPoseOverride && last.id == id)
+        ) {
+            return
+        }
+        inFlightJournal.add(CausalIntent.BodyVelocityZero(id))
+    }
+
+    private fun recordElevateAlpha(minAlpha: Float) {
+        val last = inFlightJournal.lastOrNull()
+        if (last is CausalIntent.ElevateAlpha) {
+            if (minAlpha > last.minAlpha) {
+                inFlightJournal[inFlightJournal.size - 1] = CausalIntent.ElevateAlpha(minAlpha)
+            }
+            return
+        }
+        inFlightJournal.add(CausalIntent.ElevateAlpha(minAlpha))
+    }
+
+    private fun reduceReheat(minAlpha: Float) {
+        val clamped = minAlpha.coerceIn(0f, 1f)
+        if (alpha < clamped) {
+            alpha = clamped
+        }
+        settleTimeSeconds = 0f
+        if (asyncStepInFlight) {
+            recordElevateAlpha(clamped)
+        }
+    }
+
+    private fun reduceLockBodyPose(body: PlanetBody, x: Float, y: Float) {
+        body.x = x
+        body.y = y
+        body.vx = 0f
+        body.vy = 0f
+        body.hasEstablishedPose = true
+        body.hasUserPose = true
+        if (body.isPressed) {
+            unfoldRemainingSeconds = 0f
+        }
+        indexById[body.spec.id]?.let { idx ->
+            if (idx < unfoldTargetX.size) {
+                unfoldTargetX[idx] = x
+                unfoldTargetY[idx] = y
+            }
+        }
+        if (asyncStepInFlight) {
+            recordBodyPoseOverride(body.spec.id, x, y)
+        }
+    }
+
+    private fun reduceZeroBodyVelocity(body: PlanetBody) {
+        body.vx = 0f
+        body.vy = 0f
+        if (asyncStepInFlight) {
+            recordBodyVelocityZero(body.spec.id)
+        }
+    }
+
+    private fun clampScale(scale: Float): Float {
+        val fallback = environment.initScale.coerceIn(environment.minScale, environment.maxScale)
+        return if (scale.isFinite()) scale.coerceIn(environment.minScale, environment.maxScale) else fallback
     }
 
     public fun updateEnvironment(spec: EnvironmentSpec, reheatSimulation: Boolean = true) {
         if (environment != spec) {
+            val wasUnfold = environment.unfoldEnabled
             environment = spec
-            if (reheatSimulation) reheat()
+            if (!wasUnfold && spec.unfoldEnabled) {
+                unfoldDirty = true
+                reduceReheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
+            } else if (wasUnfold && !spec.unfoldEnabled) {
+                unfoldDirty = false
+                unfoldRemainingSeconds = 0f
+            }
+            if (reheatSimulation) {
+                reduceReheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
+            } else if (asyncStepInFlight) {
+                recordElevateAlpha(alpha)
+            }
         }
     }
 
     public fun updateViewport(widthPx: Float, heightPx: Float) {
+        if (!widthPx.isFinite() || !heightPx.isFinite()) return
         val w = max(0f, widthPx)
         val h = max(0f, heightPx)
         if (viewportWidthPx != w || viewportHeightPx != h) {
+            val wasEmpty = viewportWidthPx <= 0f && viewportHeightPx <= 0f
             viewportWidthPx = w
             viewportHeightPx = h
-            reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+            if (wasEmpty && (w > 0f || h > 0f)) {
+                for (i in bodyList.indices) {
+                    val b = bodyList[i]
+                    if (!b.hasUserPose && !b.spec.pinned && !b.isPressed) {
+                        b.hasEstablishedPose = false
+                    }
+                }
+                if (environment.unfoldEnabled) {
+                    unfoldDirty = true
+                }
+            }
+            reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
         }
     }
 
@@ -113,11 +240,21 @@ public class SimulationWorld(
      * Reheats simulated annealing temperature and resets the sleep timer so the simulation wakes immediately.
      */
     public fun reheat(minAlpha: Float = DeponderDefaults.Simulation.INITIAL_ALPHA) {
-        val clamped = minAlpha.coerceIn(0f, 1f)
-        if (alpha < clamped) {
-            alpha = clamped
+        require(minAlpha.isFinite()) { "minAlpha must be finite, but was $minAlpha" }
+        if (environment.unfoldEnabled) {
+            unfoldDirty = true
         }
-        settleTimeSeconds = 0f
+        reduceReheat(minAlpha)
+    }
+
+    /**
+     * Wakes the simulation loop and elevates `alpha` to at least [minAlpha] without re-running
+     * topological unfolding (suitable for continuous parameter updates such as zoom scale changes).
+     */
+    @kotlin.jvm.JvmOverloads
+    public fun wake(minAlpha: Float = DeponderDefaults.Simulation.INTERACTION_ALPHA) {
+        require(minAlpha.isFinite()) { "minAlpha must be finite, but was $minAlpha" }
+        reduceReheat(minAlpha)
     }
 
     private fun resolveInitialPosition(rawX: Float, rawY: Float, pinned: Boolean): Vec2 {
@@ -198,6 +335,27 @@ public class SimulationWorld(
         return false
     }
 
+    private fun validatePlanetSpec(spec: PlanetSpec) {
+        require(spec.mass.isFinite() && spec.mass > 0f) {
+            "PlanetSpec.mass must be finite and > 0f, but was ${spec.mass}"
+        }
+        require(spec.repulsionRadiusPx.isFinite()) {
+            "PlanetSpec.repulsionRadiusPx must be finite, but was ${spec.repulsionRadiusPx}"
+        }
+        require(spec.elasticity.isFinite()) {
+            "PlanetSpec.elasticity must be finite, but was ${spec.elasticity}"
+        }
+    }
+
+    private fun validateRubberSpec(spec: RubberSpec) {
+        require(spec.elasticity.isFinite()) {
+            "RubberSpec.elasticity must be finite, but was ${spec.elasticity}"
+        }
+        require(spec.naturalLengthPx.isFinite() && spec.naturalLengthPx >= 0f) {
+            "RubberSpec.naturalLengthPx must be finite and >= 0f, but was ${spec.naturalLengthPx}"
+        }
+    }
+
     /**
      * Registers or updates a single point-mass planet incrementally, preserving velocity and position
      * if `spec.id` is already active, or applying deterministic golden-angle symmetry breaking if stacked.
@@ -208,23 +366,35 @@ public class SimulationWorld(
         initialY: Float,
         scale: Float = environment.initScale,
     ) {
+        validatePlanetSpec(spec)
+        require(initialX.isFinite() && initialY.isFinite()) {
+            "Planet initial coordinates must be finite, but were ($initialX, $initialY)"
+        }
         val existing = bodiesById[spec.id]
         if (existing != null) {
+            if (existing.spec.pinned != spec.pinned) {
+                unfoldDirty = true
+            }
             existing.spec = spec
             if (spec.pinned) {
-                existing.vx = 0f
-                existing.vy = 0f
-                markBodyMutated(spec.id)
+                existing.hasEstablishedPose = true
+                existing.hasUserPose = true
+                reduceZeroBodyVelocity(existing)
             }
         } else {
             val resolved = resolveInitialPosition(initialX, initialY, spec.pinned)
             val created = PlanetBody(spec, resolved.x, resolved.y)
+            created.hasEstablishedPose = spec.pinned
+            created.hasUserPose = spec.pinned
             bodiesById[spec.id] = created
             bodyList.add(created)
-            markBodyMutated(spec.id)
+            unfoldDirty = true
+            if (asyncStepInFlight) {
+                recordBodyPoseOverride(created.spec.id, resolved.x, resolved.y)
+            }
         }
         rebuildTopologyIndex(scale)
-        reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
     }
 
     /**
@@ -232,9 +402,12 @@ public class SimulationWorld(
      */
     public fun removePlanet(id: String, scale: Float = environment.initScale): Boolean {
         if (bodiesById.remove(id) == null) return false
-        bodyMutationStampById.remove(id)
+        unfoldDirty = true
+        if (asyncStepInFlight) {
+            removeInFlightBodyEntries(id)
+        }
         rebuildTopologyIndex(scale)
-        reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
         return true
     }
 
@@ -246,23 +419,37 @@ public class SimulationWorld(
         spec: RubberSpec,
         scale: Float = environment.initScale,
     ): RubberPose {
+        validateRubberSpec(spec)
         val key = spec.key
         val existing = declaredRubbersByKey[key]
         if (existing != null &&
             existing.spec.startId == spec.startId &&
             existing.spec.endId == spec.endId
         ) {
+            if (abs(existing.spec.naturalLengthPx - spec.naturalLengthPx) > 1.0f ||
+                (existing.spec.elasticity <= 0f) != (spec.elasticity <= 0f)
+            ) {
+                unfoldDirty = true
+            }
             existing.spec = spec
             existing.dirty = true
             refreshRubberPoses(scale)
-            reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+            reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
             return existing
+        }
+        if (existing == null ||
+            existing.spec.startId != spec.startId ||
+            existing.spec.endId != spec.endId ||
+            abs(existing.spec.naturalLengthPx - spec.naturalLengthPx) > 1.0f ||
+            (existing.spec.elasticity <= 0f) != (spec.elasticity <= 0f)
+        ) {
+            unfoldDirty = true
         }
         val pose = declaredRubbersByKey.getOrPut(key) { RubberPose(spec) }
         pose.spec = spec
         pose.dirty = true
         rebuildTopologyIndex(scale)
-        reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
         return pose
     }
 
@@ -271,8 +458,9 @@ public class SimulationWorld(
      */
     public fun removeRubber(key: EdgeKey, scale: Float = environment.initScale): Boolean {
         if (declaredRubbersByKey.remove(key) == null) return false
+        unfoldDirty = true
         rebuildTopologyIndex(scale)
-        reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
         return true
     }
 
@@ -284,39 +472,72 @@ public class SimulationWorld(
         edges: List<RubberSpec>,
         initialPositionProvider: (PlanetSpec) -> Vec2,
     ) {
+        // Validate all incoming specs & initial coordinates upfront so invalid inputs fail atomically.
+        var pendingNewPositions: ArrayList<Vec2>? = null
+        for (i in planets.indices) {
+            val spec = planets[i]
+            validatePlanetSpec(spec)
+            if (!bodiesById.containsKey(spec.id)) {
+                val rawPos = initialPositionProvider(spec)
+                require(rawPos.x.isFinite() && rawPos.y.isFinite()) {
+                    "Planet initial coordinates must be finite, but were (${rawPos.x}, ${rawPos.y})"
+                }
+                val list = pendingNewPositions ?: ArrayList<Vec2>().also { pendingNewPositions = it }
+                list.add(rawPos)
+            }
+        }
+        for (i in edges.indices) {
+            validateRubberSpec(edges[i])
+        }
+
         val nextIds = HashSet<String>(planets.size * 2)
         for (spec in planets) {
             nextIds.add(spec.id)
         }
 
+        var topologyChanged = false
+
         val iter = bodiesById.entries.iterator()
         while (iter.hasNext()) {
             val entry = iter.next()
             if (entry.key !in nextIds) {
-                bodyMutationStampById.remove(entry.key)
+                if (asyncStepInFlight) {
+                    removeInFlightBodyEntries(entry.key)
+                }
                 iter.remove()
+                topologyChanged = true
             }
         }
 
         bodyList.clear()
         bodyList.addAll(bodiesById.values)
 
+        var newPosIdx = 0
         for (spec in planets) {
             val existing = bodiesById[spec.id]
             if (existing != null) {
+                if (existing.spec.pinned != spec.pinned) {
+                    topologyChanged = true
+                }
                 existing.spec = spec
                 if (spec.pinned) {
-                    existing.vx = 0f
-                    existing.vy = 0f
-                    markBodyMutated(spec.id)
+                    existing.hasEstablishedPose = true
+                    existing.hasUserPose = true
+                    reduceZeroBodyVelocity(existing)
                 }
             } else {
-                val rawPos = initialPositionProvider(spec)
+                topologyChanged = true
+                val rawPos = pendingNewPositions!![newPosIdx]
+                newPosIdx += 1
                 val resolved = resolveInitialPosition(rawPos.x, rawPos.y, spec.pinned)
                 val created = PlanetBody(spec, resolved.x, resolved.y)
+                created.hasEstablishedPose = spec.pinned
+                created.hasUserPose = spec.pinned
                 bodiesById[spec.id] = created
                 bodyList.add(created)
-                markBodyMutated(spec.id)
+                if (asyncStepInFlight) {
+                    recordBodyPoseOverride(created.spec.id, resolved.x, resolved.y)
+                }
             }
         }
 
@@ -326,10 +547,19 @@ public class SimulationWorld(
             if (!nextKeys.add(key)) continue
             val existingPose = declaredRubbersByKey[key]
             if (existingPose != null) {
+                val prevSpec = existingPose.spec
+                if (prevSpec.startId != edge.startId ||
+                    prevSpec.endId != edge.endId ||
+                    abs(prevSpec.naturalLengthPx - edge.naturalLengthPx) > 1.0f ||
+                    (prevSpec.elasticity <= 0f) != (edge.elasticity <= 0f)
+                ) {
+                    topologyChanged = true
+                }
                 existingPose.spec = edge
                 existingPose.dirty = true
             } else {
                 declaredRubbersByKey[key] = RubberPose(edge)
+                topologyChanged = true
             }
         }
 
@@ -337,16 +567,19 @@ public class SimulationWorld(
         while (rIter.hasNext()) {
             if (rIter.next().key !in nextKeys) {
                 rIter.remove()
+                topologyChanged = true
             }
         }
 
+        if (topologyChanged) {
+            unfoldDirty = true
+        }
         rebuildTopologyIndex(environment.initScale)
-        reheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
+        reduceReheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
     }
 
     private fun rebuildTopologyIndex(scale: Float) {
-        topologyVersion += 1L
-        val clampedScale = scale.coerceIn(environment.minScale, environment.maxScale)
+        val clampedScale = clampScale(scale)
         bodyList.clear()
         bodyList.addAll(bodiesById.values)
         indexById.clear()
@@ -518,6 +751,7 @@ public class SimulationWorld(
         heightPx: Float,
         scale: Float = environment.initScale,
     ) {
+        if (!widthPx.isFinite() || !heightPx.isFinite()) return
         val body = bodiesById[id] ?: return
         val halfW = max(0f, widthPx) * 0.5f
         val halfH = max(0f, heightPx) * 0.5f
@@ -532,6 +766,7 @@ public class SimulationWorld(
      * Updates the spring [elasticity] across all declared rubbers and wakes the simulation at full strength.
      */
     public fun updateAllRubbersElasticity(elasticity: Float) {
+        require(elasticity.isFinite()) { "elasticity must be finite, but was $elasticity" }
         var changed = false
         for (i in rubberList.indices) {
             val pose = rubberList[i]
@@ -541,7 +776,7 @@ public class SimulationWorld(
             }
         }
         if (changed) {
-            reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+            reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
         }
     }
 
@@ -550,15 +785,12 @@ public class SimulationWorld(
      * connected neighbors at full interaction strength.
      */
     public fun setBodyPosition(id: String, x: Float, y: Float, scale: Float = environment.initScale) {
+        require(x.isFinite() && y.isFinite()) { "Body position must be finite, but were ($x, $y)" }
         val body = bodiesById[id] ?: return
         if (body.x != x || body.y != y) {
-            body.x = x
-            body.y = y
-            body.vx = 0f
-            body.vy = 0f
-            markBodyMutated(id)
+            reduceLockBodyPose(body, x, y)
             refreshRubberPoses(scale)
-            reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+            reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
         }
     }
 
@@ -566,36 +798,32 @@ public class SimulationWorld(
      * Offsets planet [id] by `(dx, dy)` in root pixel coordinates and wakes the simulation at full strength.
      */
     public fun offsetBodyPosition(id: String, dx: Float, dy: Float, scale: Float = environment.initScale) {
+        require(dx.isFinite() && dy.isFinite()) { "Body offset must be finite, but were ($dx, $dy)" }
         if (dx == 0f && dy == 0f) return
         val body = bodiesById[id] ?: return
-        body.x += dx
-        body.y += dy
-        body.vx = 0f
-        body.vy = 0f
-        markBodyMutated(id)
+        reduceLockBodyPose(body, body.x + dx, body.y + dy)
         refreshRubberPoses(scale)
-        reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
     }
 
     public fun setBodyPressed(id: String, pressed: Boolean) {
         val body = bodiesById[id] ?: return
         body.isPressed = pressed
-        body.vx = 0f
-        body.vy = 0f
-        markBodyMutated(id)
-        reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        reduceZeroBodyVelocity(body)
+        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
     }
 
     public fun setBodyPinned(id: String, pinned: Boolean) {
         val body = bodiesById[id] ?: return
         if (body.spec.pinned != pinned) {
             body.spec = body.spec.copy(pinned = pinned)
-            markBodyMutated(id)
+            unfoldDirty = true
             if (pinned) {
-                body.vx = 0f
-                body.vy = 0f
+                body.hasEstablishedPose = true
+                body.hasUserPose = true
+                reduceZeroBodyVelocity(body)
             } else {
-                reheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+                reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
             }
         }
     }
@@ -604,7 +832,7 @@ public class SimulationWorld(
      * Synchronizes all active [RubberPose] transforms immediately for the given [scale].
      */
     public fun refreshRubberPoses(scale: Float) {
-        val clampedScale = scale.coerceIn(environment.minScale, environment.maxScale)
+        val clampedScale = clampScale(scale)
         for (i in rubberList.indices) {
             val pose = rubberList[i]
             val spec = pose.spec
@@ -647,6 +875,49 @@ public class SimulationWorld(
         accumEdgeFy = FloatArray(bufCap)
         frameStartX = FloatArray(bufCap)
         frameStartY = FloatArray(bufCap)
+        unfoldTargetX = FloatArray(bufCap)
+        unfoldTargetY = FloatArray(bufCap)
+        unfoldLocked = BooleanArray(bufCap)
+        unfoldEstablished = BooleanArray(bufCap)
+    }
+
+    private fun ensureUnfoldEdgeCapacity(m: Int) {
+        if (m <= unfoldEdgeCap) return
+        unfoldEdgeCap = max(m, unfoldEdgeCap * 2)
+        unfoldEdgeStart = IntArray(unfoldEdgeCap)
+        unfoldEdgeEnd = IntArray(unfoldEdgeCap)
+        unfoldEdgeLen = FloatArray(unfoldEdgeCap)
+    }
+
+    private fun collectUnfoldInputs(n: Int, clampedScale: Float): Int {
+        for (i in 0 until n) {
+            val b = bodyList[i]
+            snapPx[i] = b.x
+            snapPy[i] = b.y
+            unfoldLocked[i] = b.isPressed || b.spec.pinned
+            unfoldEstablished[i] = b.hasEstablishedPose
+        }
+        val rTotal = rubberList.size
+        ensureUnfoldEdgeCapacity(rTotal)
+        var edgeCount = 0
+        for (rIdx in 0 until rTotal) {
+            val spec = rubberList[rIdx].spec
+            if (spec.startId == spec.endId || spec.elasticity <= 0f) continue
+            val sIdx = indexById[spec.startId] ?: continue
+            val eIdx = indexById[spec.endId] ?: continue
+            if (sIdx == eIdx) continue
+            unfoldEdgeStart[edgeCount] = sIdx
+            unfoldEdgeEnd[edgeCount] = eIdx
+            unfoldEdgeLen[edgeCount] = spec.naturalLengthPx * clampedScale
+            edgeCount += 1
+        }
+        return edgeCount
+    }
+
+    private fun computeUnfoldAlpha(remainingSeconds: Float): Float {
+        if (remainingSeconds <= 0f) return 0f
+        val u = (remainingSeconds / UNFOLD_DURATION_SECONDS).coerceIn(0f, 1f)
+        return u * u * (3f - 2f * u)
     }
 
     /**
@@ -661,12 +932,17 @@ public class SimulationWorld(
      *         [EnvironmentSpec.settleDurationSeconds] so the caller can suspend at 0% CPU.
      */
     public suspend fun step(dtSeconds: Float, scale: Float): Boolean {
+        if (asyncStepInFlight) return true
         val n = bodyList.size
         if (n == 0) return false
         ensureBuffers(n)
 
-        val clampedDt = dtSeconds.coerceIn(1e-4f, DeponderDefaults.Simulation.MAX_DT_SECONDS)
-        val clampedScale = scale.coerceIn(environment.minScale, environment.maxScale)
+        val clampedDt = if (dtSeconds.isFinite()) {
+            dtSeconds.coerceIn(1e-4f, DeponderDefaults.Simulation.MAX_DT_SECONDS)
+        } else {
+            1e-4f
+        }
+        val clampedScale = clampScale(scale)
         val env = environment
 
         val subSteps = ceil(clampedDt / DeponderDefaults.Simulation.MAX_SUBSTEP_DT_SECONDS)
@@ -691,12 +967,9 @@ public class SimulationWorld(
 
         if (n >= DeponderDefaults.Simulation.PARALLEL_DISPATCH_THRESHOLD) {
             // Tier 3 (N >= 256): Capture an immutable-structure primitive snapshot on the caller thread
-            // BEFORE suspending to Dispatchers.Default so UI-thread mutations while step() is suspended
-            // never race on bodyList, rubberList, indexById, or shared buffers.
-            val capturedTopoVersion = topologyVersion
-            val capturedClockBefore = mutationClock
+            // BEFORE suspending to Dispatchers.Default, and replay any caller-thread CausalIntents recorded
+            // during the async window strictly in FIFO order upon return.
             val ids = Array(n) { i -> bodyList[i].spec.id }
-            val stamps = LongArray(n) { i -> bodyMutationStampById[ids[i]] ?: 0L }
             val startX = FloatArray(n) { i -> bodyList[i].x }
             val startY = FloatArray(n) { i -> bodyList[i].y }
             val px = startX.copyOf()
@@ -739,40 +1012,78 @@ public class SimulationWorld(
             val vpW = viewportWidthPx
             val vpH = viewportHeightPx
             val initialAlpha = alpha
-
-            val tier3Metrics = withContext(Dispatchers.Default) {
-                runTier3ParallelSubsteps(
-                    n = n,
-                    subSteps = subSteps,
-                    subDt = subDt,
-                    clampedScale = clampedScale,
-                    vpW = vpW,
-                    vpH = vpH,
-                    env = env,
-                    anyPressed = anyPressed,
-                    initialAlpha = initialAlpha,
-                    px = px,
-                    py = py,
-                    vx = vx,
-                    vy = vy,
-                    invMass = invMass,
-                    locked = locked,
-                    effR = effR,
-                    ec = ec,
-                    activeSprings = activeSprings,
-                    sIdxArr = sIdxArr,
-                    eIdxArr = eIdxArr,
-                    natLenArr = natLenArr,
-                    rElastArr = rElastArr,
-                )
+            val needUnfoldSolve = env.unfoldEnabled && unfoldDirty
+            if (needUnfoldSolve) {
+                unfoldDirty = false
+            }
+            val established = BooleanArray(n) { i -> bodyList[i].hasEstablishedPose }
+            val massArr = FloatArray(n) { i -> bodyList[i].spec.mass }
+            val initialUnfoldRem = if (env.unfoldEnabled) unfoldRemainingSeconds else 0f
+            val snapTargetX = FloatArray(n) { i ->
+                if (i < unfoldTargetX.size) unfoldTargetX[i] else bodyList[i].x
+            }
+            val snapTargetY = FloatArray(n) { i ->
+                if (i < unfoldTargetY.size) unfoldTargetY[i] else bodyList[i].y
             }
 
-            // Commit snapshot results back on the caller thread, skipping any body that was removed,
-            // pressed, pinned, or explicitly moved on the UI thread while Dispatchers.Default was running.
-            if (topologyVersion == capturedTopoVersion && mutationClock == capturedClockBefore) {
+            inFlightJournal.clear()
+            asyncStepInFlight = true
+            val tier3Metrics = try {
+                withContext(Dispatchers.Default) {
+                    runTier3ParallelSubsteps(
+                        n = n,
+                        subSteps = subSteps,
+                        subDt = subDt,
+                        clampedScale = clampedScale,
+                        vpW = vpW,
+                        vpH = vpH,
+                        env = env,
+                        anyPressed = anyPressed,
+                        initialAlpha = initialAlpha,
+                        needUnfoldSolve = needUnfoldSolve,
+                        initialUnfoldRem = initialUnfoldRem,
+                        established = established,
+                        massArr = massArr,
+                        targetX = snapTargetX,
+                        targetY = snapTargetY,
+                        px = px,
+                        py = py,
+                        vx = vx,
+                        vy = vy,
+                        invMass = invMass,
+                        locked = locked,
+                        effR = effR,
+                        ec = ec,
+                        activeSprings = activeSprings,
+                        sIdxArr = sIdxArr,
+                        eIdxArr = eIdxArr,
+                        natLenArr = natLenArr,
+                        rElastArr = rElastArr,
+                    )
+                }
+            } catch (t: Throwable) {
+                if (needUnfoldSolve && environment.unfoldEnabled) {
+                    unfoldDirty = true
+                }
+                inFlightJournal.clear()
+                throw t
+            } finally {
+                asyncStepInFlight = false
+            }
+
+            // Commit pure Tier-3 frame results on the caller thread, then replay any in-flight causal
+            // intents recorded during suspension in strict FIFO order.
+            val liveUnfoldEnabled = environment.unfoldEnabled
+            if (inFlightJournal.isEmpty()) {
                 alpha = tier3Metrics.finalAlpha
+                unfoldRemainingSeconds = if (liveUnfoldEnabled) tier3Metrics.finalUnfoldRem else 0f
                 for (i in 0 until n) {
                     val b = bodyList[i]
+                    if (liveUnfoldEnabled) {
+                        unfoldTargetX[i] = tier3Metrics.targetX[i]
+                        unfoldTargetY[i] = tier3Metrics.targetY[i]
+                    }
+                    b.hasEstablishedPose = true
                     if (b.isPressed || b.spec.pinned) {
                         b.vx = 0f
                         b.vy = 0f
@@ -788,31 +1099,123 @@ public class SimulationWorld(
                     }
                 }
             } else {
-                if (tier3Metrics.finalAlpha > alpha) {
-                    alpha = tier3Metrics.finalAlpha
-                }
+                alpha = tier3Metrics.finalAlpha
+                unfoldRemainingSeconds = if (liveUnfoldEnabled) tier3Metrics.finalUnfoldRem else 0f
                 for (i in 0 until n) {
-                    val id = ids[i]
-                    val currentBody = bodiesById[id] ?: continue
-                    val currentStamp = bodyMutationStampById[id] ?: 0L
-                    if (currentStamp != stamps[i] || currentBody.isPressed || currentBody.spec.pinned) {
-                        continue
+                    val currentBody = bodiesById[ids[i]] ?: continue
+                    currentBody.hasEstablishedPose = true
+                    if (liveUnfoldEnabled) {
+                        val idx = indexById[ids[i]]
+                        if (idx != null && idx < unfoldTargetX.size) {
+                            unfoldTargetX[idx] = tier3Metrics.targetX[i]
+                            unfoldTargetY[idx] = tier3Metrics.targetY[i]
+                        }
                     }
-                    currentBody.x = px[i]
-                    currentBody.y = py[i]
-                    currentBody.vx = vx[i]
-                    currentBody.vy = vy[i]
-                    currentBody.dx = px[i] - startX[i]
-                    currentBody.dy = py[i] - startY[i]
+                    if (currentBody.isPressed || currentBody.spec.pinned) {
+                        currentBody.vx = 0f
+                        currentBody.vy = 0f
+                        currentBody.dx = 0f
+                        currentBody.dy = 0f
+                    } else {
+                        currentBody.x = px[i]
+                        currentBody.y = py[i]
+                        currentBody.vx = vx[i]
+                        currentBody.vy = vy[i]
+                        currentBody.dx = px[i] - startX[i]
+                        currentBody.dy = py[i] - startY[i]
+                    }
                 }
-                refreshRubberPoses(scale.coerceIn(environment.minScale, environment.maxScale))
-                return true
+                var keepAwakeFromIntent = false
+                for (idx in 0 until inFlightJournal.size) {
+                    when (val entry = inFlightJournal[idx]) {
+                        is CausalIntent.BodyPoseOverride -> {
+                            bodiesById[entry.id]?.let { b ->
+                                b.x = entry.x
+                                b.y = entry.y
+                                b.vx = 0f
+                                b.vy = 0f
+                                b.dx = 0f
+                                b.dy = 0f
+                                b.hasEstablishedPose = true
+                                b.hasUserPose = true
+                                if (b.isPressed) {
+                                    unfoldRemainingSeconds = 0f
+                                }
+                                indexById[entry.id]?.let { bodyIdx ->
+                                    if (bodyIdx < unfoldTargetX.size) {
+                                        unfoldTargetX[bodyIdx] = entry.x
+                                        unfoldTargetY[bodyIdx] = entry.y
+                                    }
+                                }
+                            }
+                            settleTimeSeconds = 0f
+                            keepAwakeFromIntent = true
+                        }
+
+                        is CausalIntent.BodyVelocityZero -> {
+                            bodiesById[entry.id]?.let { b ->
+                                b.vx = 0f
+                                b.vy = 0f
+                                b.dx = 0f
+                                b.dy = 0f
+                            }
+                        }
+
+                        is CausalIntent.ElevateAlpha -> {
+                            if (alpha < entry.minAlpha) {
+                                alpha = entry.minAlpha
+                            }
+                            settleTimeSeconds = 0f
+                            keepAwakeFromIntent = true
+                        }
+                    }
+                }
+                inFlightJournal.clear()
+                if (bodyList.isEmpty()) {
+                    return false
+                }
+                if (keepAwakeFromIntent) {
+                    refreshRubberPoses(clampedScale)
+                    return true
+                }
             }
 
             maxSpeedSq = tier3Metrics.maxSpeedSq
             maxAccelSq = tier3Metrics.maxAccelSq
         } else {
             // Tier 1 (N < 64) & Tier 2 (64 <= N < 256): Zero coroutine context-switch overhead.
+            if (!env.unfoldEnabled) {
+                unfoldRemainingSeconds = 0f
+            } else if (unfoldDirty) {
+                unfoldDirty = false
+                val edgeCount = collectUnfoldInputs(n, clampedScale)
+                val solved = unfolder.solve(
+                    n = n,
+                    curX = snapPx,
+                    curY = snapPy,
+                    locked = unfoldLocked,
+                    established = unfoldEstablished,
+                    edgeCount = edgeCount,
+                    edgeStart = unfoldEdgeStart,
+                    edgeEnd = unfoldEdgeEnd,
+                    edgeLength = unfoldEdgeLen,
+                    viewportWidth = viewportWidthPx,
+                    viewportHeight = viewportHeightPx,
+                    wallRepulsionPx = env.wallRepulsionPx,
+                    clampedScale = clampedScale,
+                    outTargetX = unfoldTargetX,
+                    outTargetY = unfoldTargetY,
+                )
+                if (solved) {
+                    unfoldRemainingSeconds = UNFOLD_DURATION_SECONDS
+                    for (i in 0 until n) {
+                        bodyList[i].hasEstablishedPose = true
+                    }
+                } else {
+                    unfoldRemainingSeconds = 0f
+                }
+            }
+
             var lastSpeedSq = 0f
             var lastAccelSq = 0f
             for (sub in 0 until subSteps) {
@@ -832,15 +1235,25 @@ public class SimulationWorld(
                 val b = bodyList[i]
                 b.dx = b.x - frameStartX[i]
                 b.dy = b.y - frameStartY[i]
+                b.hasEstablishedPose = true
             }
             maxSpeedSq = lastSpeedSq
             maxAccelSq = lastAccelSq
+        }
+
+        if (bodyList.isEmpty()) {
+            return false
         }
 
         // Update visual rubber poses once at the end of the VSYNC step.
         refreshRubberPoses(clampedScale)
 
         if (anyPressed || bodyList.any { it.isPressed }) {
+            settleTimeSeconds = 0f
+            return true
+        }
+
+        if (environment.unfoldEnabled && unfoldRemainingSeconds > 0f) {
             settleTimeSeconds = 0f
             return true
         }
@@ -874,6 +1287,9 @@ public class SimulationWorld(
         val finalAlpha: Float,
         val maxSpeedSq: Float,
         val maxAccelSq: Float,
+        val finalUnfoldRem: Float,
+        val targetX: FloatArray,
+        val targetY: FloatArray,
     )
 
     private suspend fun runTier3ParallelSubsteps(
@@ -886,6 +1302,12 @@ public class SimulationWorld(
         env: EnvironmentSpec,
         anyPressed: Boolean,
         initialAlpha: Float,
+        needUnfoldSolve: Boolean,
+        initialUnfoldRem: Float,
+        established: BooleanArray,
+        massArr: FloatArray,
+        targetX: FloatArray,
+        targetY: FloatArray,
         px: FloatArray,
         py: FloatArray,
         vx: FloatArray,
@@ -910,10 +1332,48 @@ public class SimulationWorld(
         val stepX = FloatArray(n)
         val stepY = FloatArray(n)
 
+        var curUnfoldRem = if (env.unfoldEnabled) initialUnfoldRem else 0f
+        if (env.unfoldEnabled && needUnfoldSolve) {
+            var unfoldEdgeCount = 0
+            for (r in 0 until activeSprings) {
+                if (rElastArr[r] > 0f) unfoldEdgeCount += 1
+            }
+            val uStart = IntArray(unfoldEdgeCount)
+            val uEnd = IntArray(unfoldEdgeCount)
+            val uLen = FloatArray(unfoldEdgeCount)
+            var uCursor = 0
+            for (r in 0 until activeSprings) {
+                if (rElastArr[r] > 0f) {
+                    uStart[uCursor] = sIdxArr[r]
+                    uEnd[uCursor] = eIdxArr[r]
+                    uLen[uCursor] = natLenArr[r]
+                    uCursor += 1
+                }
+            }
+            val localUnfolder = TopologicalUnfolder()
+            val solved = localUnfolder.solve(
+                n = n,
+                curX = px,
+                curY = py,
+                locked = locked,
+                established = established,
+                edgeCount = unfoldEdgeCount,
+                edgeStart = uStart,
+                edgeEnd = uEnd,
+                edgeLength = uLen,
+                viewportWidth = vpW,
+                viewportHeight = vpH,
+                wallRepulsionPx = env.wallRepulsionPx,
+                clampedScale = clampedScale,
+                outTargetX = targetX,
+                outTargetY = targetY,
+            )
+            curUnfoldRem = if (solved) UNFOLD_DURATION_SECONDS else 0f
+        }
+
         val infStrength = env.infiniteChargeStrength * clampedScale
         val softeningSq = DeponderDefaults.Simulation.COULOMB_SOFTENING_SQ
         val thetaSq = DeponderDefaults.Simulation.BARNES_HUT_THETA * DeponderDefaults.Simulation.BARNES_HUT_THETA
-        val dampFactor = exp(-max(0f, env.airDamping) * subDt)
         val chunkSize = (n + chunks - 1) / chunks
 
         var curAlpha = initialAlpha
@@ -921,6 +1381,14 @@ public class SimulationWorld(
         var lastMaxAccelSq = 0f
 
         for (sub in 0 until subSteps) {
+            val alphaUnfold = if (env.unfoldEnabled) computeUnfoldAlpha(curUnfoldRem) else 0f
+            if (env.unfoldEnabled && curUnfoldRem > 0f) {
+                curUnfoldRem = max(0f, curUnfoldRem - subDt)
+            }
+            val repScale = if (alphaUnfold > 0f) 1f - UNFOLD_REPULSION_ATTENUATION * alphaUnfold else 1f
+            val effectiveDamping = max(0f, env.airDamping) + UNFOLD_EXTRA_DAMPING * alphaUnfold
+            val dampFactor = exp(-effectiveDamping * subDt)
+
             for (i in 0 until n) {
                 stepX[i] = px[i]
                 stepY[i] = py[i]
@@ -1003,8 +1471,18 @@ public class SimulationWorld(
                     height = vpH,
                     env = env,
                 )
-                val totalFx = wallF.x + edgeFx[i] + pairFx[i]
-                val totalFy = wallF.y + edgeFy[i] + pairFy[i]
+                val guideFx: Float
+                val guideFy: Float
+                if (alphaUnfold > 0f) {
+                    val guideScale = massArr[i] * UNFOLD_GUIDE_OMEGA_SQ * alphaUnfold
+                    guideFx = (targetX[i] - stepX[i]) * guideScale
+                    guideFy = (targetY[i] - stepY[i]) * guideScale
+                } else {
+                    guideFx = 0f
+                    guideFy = 0f
+                }
+                val totalFx = wallF.x + edgeFx[i] + pairFx[i] * repScale + guideFx
+                val totalFy = wallF.y + edgeFy[i] + pairFy[i] * repScale + guideFy
                 val ax = totalFx * invMass[i] * effectiveAlpha
                 val ay = totalFy * invMass[i] * effectiveAlpha
 
@@ -1038,6 +1516,9 @@ public class SimulationWorld(
             finalAlpha = curAlpha,
             maxSpeedSq = lastMaxSpeedSq,
             maxAccelSq = lastMaxAccelSq,
+            finalUnfoldRem = curUnfoldRem,
+            targetX = targetX,
+            targetY = targetY,
         )
     }
 
@@ -1180,7 +1661,13 @@ public class SimulationWorld(
         env: EnvironmentSpec,
         anyPressed: Boolean,
     ): Vec2 {
-        val dampFactor = exp(-max(0f, env.airDamping) * subDt)
+        val alphaUnfold = if (env.unfoldEnabled) computeUnfoldAlpha(unfoldRemainingSeconds) else 0f
+        if (env.unfoldEnabled && unfoldRemainingSeconds > 0f) {
+            unfoldRemainingSeconds = max(0f, unfoldRemainingSeconds - subDt)
+        }
+        val repScale = if (alphaUnfold > 0f) 1f - UNFOLD_REPULSION_ATTENUATION * alphaUnfold else 1f
+        val effectiveDamping = max(0f, env.airDamping) + UNFOLD_EXTRA_DAMPING * alphaUnfold
+        val dampFactor = exp(-effectiveDamping * subDt)
         val effectiveAlpha = if (env.coolingEnabled) alpha else 1f
 
         var maxSpeedSq = 0f
@@ -1203,8 +1690,18 @@ public class SimulationWorld(
                 env = env,
             )
 
-            val totalFx = wallF.x + accumEdgeFx[i] + outPairFx[i]
-            val totalFy = wallF.y + accumEdgeFy[i] + outPairFy[i]
+            val guideFx: Float
+            val guideFy: Float
+            if (alphaUnfold > 0f) {
+                val guideScale = b.spec.mass * UNFOLD_GUIDE_OMEGA_SQ * alphaUnfold
+                guideFx = (unfoldTargetX[i] - snapPx[i]) * guideScale
+                guideFy = (unfoldTargetY[i] - snapPy[i]) * guideScale
+            } else {
+                guideFx = 0f
+                guideFy = 0f
+            }
+            val totalFx = wallF.x + accumEdgeFx[i] + outPairFx[i] * repScale + guideFx
+            val totalFy = wallF.y + accumEdgeFy[i] + outPairFy[i] * repScale + guideFy
             val invMass = 1f / max(1e-4f, b.spec.mass)
 
             val ax = totalFx * invMass * effectiveAlpha
@@ -1241,6 +1738,10 @@ public class SimulationWorld(
         private const val ROUNDED_CONTOUR_RATIO: Float = 0.35f
         private const val COLLINEAR_BAND_PX: Float = 6.0f
         private const val COLLINEAR_NUDGE_PX: Float = 3.5f
+        private const val UNFOLD_DURATION_SECONDS: Float = 0.85f
+        private const val UNFOLD_GUIDE_OMEGA_SQ: Float = 110.0f
+        private const val UNFOLD_EXTRA_DAMPING: Float = 16.0f
+        private const val UNFOLD_REPULSION_ATTENUATION: Float = 0.85f
 
         /**
          * Computes viewport boundary force on `(px, py)`.

@@ -1,6 +1,9 @@
 package com.cinpe.deponder.core
 
+import kotlin.jvm.JvmOverloads
 import kotlin.math.max
+
+private fun normalizeSpecZero(value: Float): Float = if (value == 0f) 0f else value
 
 /**
  * Resolved pixel-space environment configuration consumed by [SimulationWorld].
@@ -8,25 +11,238 @@ import kotlin.math.max
  * All distance fields are already scaled to target viewport pixels (`dp * density`).
  * Pass a negative [wallRepulsionPx] (such as [DeponderDefaults.INFINITE_RANGE]) for unbounded centering walls.
  */
-public data class EnvironmentSpec(
-    public val initScale: Float = DeponderDefaults.Root.INIT_SCALE,
-    public val maxScale: Float = DeponderDefaults.Root.MAX_SCALE,
-    public val minScale: Float = DeponderDefaults.Root.MIN_SCALE,
-    public val airDamping: Float = DeponderDefaults.Root.AIR_DAMPING,
-    public val wallRepulsionPx: Float = DeponderDefaults.Root.WALL_REPULSION_DP,
-    public val wallElasticityStart: Float = DeponderDefaults.Root.WALL_ELASTICITY_START,
-    public val wallElasticityTop: Float = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
-    public val wallElasticityEnd: Float = DeponderDefaults.Root.WALL_ELASTICITY_END,
-    public val wallElasticityBottom: Float = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
-    public val degreeRadiusIncrementPx: Float = DeponderDefaults.Planet.DEGREE_RADIUS_INCREMENT_DP,
-    public val infiniteChargeStrength: Float = DeponderDefaults.Planet.INFINITE_CHARGE_STRENGTH,
-    public val coolingEnabled: Boolean = DeponderDefaults.Root.COOLING_ENABLED,
-    public val alphaDecay: Float = DeponderDefaults.Simulation.ALPHA_DECAY,
-    public val alphaMin: Float = DeponderDefaults.Simulation.ALPHA_MIN,
-    public val restSpeedPxPerSec: Float = DeponderDefaults.Simulation.REST_SPEED_PX_PER_SEC,
-    public val restAccelPxPerSecSq: Float = DeponderDefaults.Simulation.REST_ACCEL_PX_PER_SEC_SQ,
-    public val settleDurationSeconds: Float = DeponderDefaults.Simulation.SETTLE_DURATION_SECONDS,
-)
+public class EnvironmentSpec internal constructor(
+    initScale: Float,
+    maxScale: Float,
+    minScale: Float,
+    airDamping: Float,
+    wallRepulsionPx: Float,
+    wallElasticityStart: Float,
+    wallElasticityTop: Float,
+    wallElasticityEnd: Float,
+    wallElasticityBottom: Float,
+    degreeRadiusIncrementPx: Float,
+    infiniteChargeStrength: Float,
+    public val coolingEnabled: Boolean,
+    alphaDecay: Float,
+    alphaMin: Float,
+    restSpeedPxPerSec: Float,
+    restAccelPxPerSecSq: Float,
+    settleDurationSeconds: Float,
+    public val unfoldEnabled: Boolean,
+) {
+    public val initScale: Float = normalizeSpecZero(initScale)
+    public val maxScale: Float = normalizeSpecZero(maxScale)
+    public val minScale: Float = normalizeSpecZero(minScale)
+    public val airDamping: Float = normalizeSpecZero(airDamping)
+    public val wallRepulsionPx: Float = normalizeSpecZero(wallRepulsionPx)
+    public val wallElasticityStart: Float = normalizeSpecZero(wallElasticityStart)
+    public val wallElasticityTop: Float = normalizeSpecZero(wallElasticityTop)
+    public val wallElasticityEnd: Float = normalizeSpecZero(wallElasticityEnd)
+    public val wallElasticityBottom: Float = normalizeSpecZero(wallElasticityBottom)
+    public val degreeRadiusIncrementPx: Float = normalizeSpecZero(degreeRadiusIncrementPx)
+    public val infiniteChargeStrength: Float = normalizeSpecZero(infiniteChargeStrength)
+    public val alphaDecay: Float = normalizeSpecZero(alphaDecay)
+    public val alphaMin: Float = normalizeSpecZero(alphaMin)
+    public val restSpeedPxPerSec: Float = normalizeSpecZero(restSpeedPxPerSec)
+    public val restAccelPxPerSecSq: Float = normalizeSpecZero(restAccelPxPerSecSq)
+    public val settleDurationSeconds: Float = normalizeSpecZero(settleDurationSeconds)
+
+    public constructor() : this(
+        initScale = DeponderDefaults.Root.INIT_SCALE,
+        maxScale = DeponderDefaults.Root.MAX_SCALE,
+        minScale = DeponderDefaults.Root.MIN_SCALE,
+        airDamping = DeponderDefaults.Root.AIR_DAMPING,
+        wallRepulsionPx = DeponderDefaults.Root.WALL_REPULSION_DP,
+        wallElasticityStart = DeponderDefaults.Root.WALL_ELASTICITY_START,
+        wallElasticityTop = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
+        wallElasticityEnd = DeponderDefaults.Root.WALL_ELASTICITY_END,
+        wallElasticityBottom = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
+        degreeRadiusIncrementPx = DeponderDefaults.Planet.DEGREE_RADIUS_INCREMENT_DP,
+        infiniteChargeStrength = DeponderDefaults.Planet.INFINITE_CHARGE_STRENGTH,
+        coolingEnabled = DeponderDefaults.Root.COOLING_ENABLED,
+        alphaDecay = DeponderDefaults.Simulation.ALPHA_DECAY,
+        alphaMin = DeponderDefaults.Simulation.ALPHA_MIN,
+        restSpeedPxPerSec = DeponderDefaults.Simulation.REST_SPEED_PX_PER_SEC,
+        restAccelPxPerSecSq = DeponderDefaults.Simulation.REST_ACCEL_PX_PER_SEC_SQ,
+        settleDurationSeconds = DeponderDefaults.Simulation.SETTLE_DURATION_SECONDS,
+        unfoldEnabled = DeponderDefaults.Root.UNFOLD_ENABLED,
+    )
+
+    public constructor(
+        initScale: Float = DeponderDefaults.Root.INIT_SCALE,
+        maxScale: Float = DeponderDefaults.Root.MAX_SCALE,
+        minScale: Float = DeponderDefaults.Root.MIN_SCALE,
+        airDamping: Float = DeponderDefaults.Root.AIR_DAMPING,
+        wallRepulsionPx: Float = DeponderDefaults.Root.WALL_REPULSION_DP,
+        wallElasticityStart: Float = DeponderDefaults.Root.WALL_ELASTICITY_START,
+        wallElasticityTop: Float = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
+        wallElasticityEnd: Float = DeponderDefaults.Root.WALL_ELASTICITY_END,
+        wallElasticityBottom: Float = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
+        degreeRadiusIncrementPx: Float = DeponderDefaults.Planet.DEGREE_RADIUS_INCREMENT_DP,
+        infiniteChargeStrength: Float = DeponderDefaults.Planet.INFINITE_CHARGE_STRENGTH,
+        coolingEnabled: Boolean = DeponderDefaults.Root.COOLING_ENABLED,
+        alphaDecay: Float = DeponderDefaults.Simulation.ALPHA_DECAY,
+        alphaMin: Float = DeponderDefaults.Simulation.ALPHA_MIN,
+        restSpeedPxPerSec: Float = DeponderDefaults.Simulation.REST_SPEED_PX_PER_SEC,
+        restAccelPxPerSecSq: Float = DeponderDefaults.Simulation.REST_ACCEL_PX_PER_SEC_SQ,
+        settleDurationSeconds: Float = DeponderDefaults.Simulation.SETTLE_DURATION_SECONDS,
+    ) : this(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionPx = wallRepulsionPx,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
+        degreeRadiusIncrementPx = degreeRadiusIncrementPx,
+        infiniteChargeStrength = infiniteChargeStrength,
+        coolingEnabled = coolingEnabled,
+        alphaDecay = alphaDecay,
+        alphaMin = alphaMin,
+        restSpeedPxPerSec = restSpeedPxPerSec,
+        restAccelPxPerSecSq = restAccelPxPerSecSq,
+        settleDurationSeconds = settleDurationSeconds,
+        unfoldEnabled = DeponderDefaults.Root.UNFOLD_ENABLED,
+    )
+
+    public operator fun component1(): Float = initScale
+    public operator fun component2(): Float = maxScale
+    public operator fun component3(): Float = minScale
+    public operator fun component4(): Float = airDamping
+    public operator fun component5(): Float = wallRepulsionPx
+    public operator fun component6(): Float = wallElasticityStart
+    public operator fun component7(): Float = wallElasticityTop
+    public operator fun component8(): Float = wallElasticityEnd
+    public operator fun component9(): Float = wallElasticityBottom
+    public operator fun component10(): Float = degreeRadiusIncrementPx
+    public operator fun component11(): Float = infiniteChargeStrength
+    public operator fun component12(): Boolean = coolingEnabled
+    public operator fun component13(): Float = alphaDecay
+    public operator fun component14(): Float = alphaMin
+    public operator fun component15(): Float = restSpeedPxPerSec
+    public operator fun component16(): Float = restAccelPxPerSecSq
+    public operator fun component17(): Float = settleDurationSeconds
+
+    public fun copy(
+        initScale: Float = this.initScale,
+        maxScale: Float = this.maxScale,
+        minScale: Float = this.minScale,
+        airDamping: Float = this.airDamping,
+        wallRepulsionPx: Float = this.wallRepulsionPx,
+        wallElasticityStart: Float = this.wallElasticityStart,
+        wallElasticityTop: Float = this.wallElasticityTop,
+        wallElasticityEnd: Float = this.wallElasticityEnd,
+        wallElasticityBottom: Float = this.wallElasticityBottom,
+        degreeRadiusIncrementPx: Float = this.degreeRadiusIncrementPx,
+        infiniteChargeStrength: Float = this.infiniteChargeStrength,
+        coolingEnabled: Boolean = this.coolingEnabled,
+        alphaDecay: Float = this.alphaDecay,
+        alphaMin: Float = this.alphaMin,
+        restSpeedPxPerSec: Float = this.restSpeedPxPerSec,
+        restAccelPxPerSecSq: Float = this.restAccelPxPerSecSq,
+        settleDurationSeconds: Float = this.settleDurationSeconds,
+    ): EnvironmentSpec = EnvironmentSpec(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionPx = wallRepulsionPx,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
+        degreeRadiusIncrementPx = degreeRadiusIncrementPx,
+        infiniteChargeStrength = infiniteChargeStrength,
+        coolingEnabled = coolingEnabled,
+        alphaDecay = alphaDecay,
+        alphaMin = alphaMin,
+        restSpeedPxPerSec = restSpeedPxPerSec,
+        restAccelPxPerSecSq = restAccelPxPerSecSq,
+        settleDurationSeconds = settleDurationSeconds,
+        unfoldEnabled = this.unfoldEnabled,
+    )
+
+    @JvmOverloads
+    public fun withUnfold(unfoldEnabled: Boolean = true): EnvironmentSpec = EnvironmentSpec(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionPx = wallRepulsionPx,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
+        degreeRadiusIncrementPx = degreeRadiusIncrementPx,
+        infiniteChargeStrength = infiniteChargeStrength,
+        coolingEnabled = coolingEnabled,
+        alphaDecay = alphaDecay,
+        alphaMin = alphaMin,
+        restSpeedPxPerSec = restSpeedPxPerSec,
+        restAccelPxPerSecSq = restAccelPxPerSecSq,
+        settleDurationSeconds = settleDurationSeconds,
+        unfoldEnabled = unfoldEnabled,
+    )
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is EnvironmentSpec) return false
+        return initScale == other.initScale &&
+            maxScale == other.maxScale &&
+            minScale == other.minScale &&
+            airDamping == other.airDamping &&
+            wallRepulsionPx == other.wallRepulsionPx &&
+            wallElasticityStart == other.wallElasticityStart &&
+            wallElasticityTop == other.wallElasticityTop &&
+            wallElasticityEnd == other.wallElasticityEnd &&
+            wallElasticityBottom == other.wallElasticityBottom &&
+            degreeRadiusIncrementPx == other.degreeRadiusIncrementPx &&
+            infiniteChargeStrength == other.infiniteChargeStrength &&
+            coolingEnabled == other.coolingEnabled &&
+            alphaDecay == other.alphaDecay &&
+            alphaMin == other.alphaMin &&
+            restSpeedPxPerSec == other.restSpeedPxPerSec &&
+            restAccelPxPerSecSq == other.restAccelPxPerSecSq &&
+            settleDurationSeconds == other.settleDurationSeconds &&
+            unfoldEnabled == other.unfoldEnabled
+    }
+
+    override fun hashCode(): Int {
+        var result = initScale.hashCode()
+        result = 31 * result + maxScale.hashCode()
+        result = 31 * result + minScale.hashCode()
+        result = 31 * result + airDamping.hashCode()
+        result = 31 * result + wallRepulsionPx.hashCode()
+        result = 31 * result + wallElasticityStart.hashCode()
+        result = 31 * result + wallElasticityTop.hashCode()
+        result = 31 * result + wallElasticityEnd.hashCode()
+        result = 31 * result + wallElasticityBottom.hashCode()
+        result = 31 * result + degreeRadiusIncrementPx.hashCode()
+        result = 31 * result + infiniteChargeStrength.hashCode()
+        result = 31 * result + coolingEnabled.hashCode()
+        result = 31 * result + alphaDecay.hashCode()
+        result = 31 * result + alphaMin.hashCode()
+        result = 31 * result + restSpeedPxPerSec.hashCode()
+        result = 31 * result + restAccelPxPerSecSq.hashCode()
+        result = 31 * result + settleDurationSeconds.hashCode()
+        result = 31 * result + unfoldEnabled.hashCode()
+        return result
+    }
+
+    override fun toString(): String =
+        "EnvironmentSpec(initScale=$initScale, maxScale=$maxScale, minScale=$minScale, " +
+            "airDamping=$airDamping, wallRepulsionPx=$wallRepulsionPx, " +
+            "wallElasticityStart=$wallElasticityStart, wallElasticityTop=$wallElasticityTop, " +
+            "wallElasticityEnd=$wallElasticityEnd, wallElasticityBottom=$wallElasticityBottom, " +
+            "degreeRadiusIncrementPx=$degreeRadiusIncrementPx, " +
+            "infiniteChargeStrength=$infiniteChargeStrength, coolingEnabled=$coolingEnabled, " +
+            "alphaDecay=$alphaDecay, alphaMin=$alphaMin, restSpeedPxPerSec=$restSpeedPxPerSec, " +
+            "restAccelPxPerSecSq=$restAccelPxPerSecSq, " +
+            "settleDurationSeconds=$settleDurationSeconds, unfoldEnabled=$unfoldEnabled)"
+}
 
 /**
  * Pure point-mass node specification in resolved pixel units.
@@ -85,6 +301,8 @@ public class PlanetBody internal constructor(
         internal set
     public var degree: Int = 0
         internal set
+    internal var hasEstablishedPose: Boolean = false
+    internal var hasUserPose: Boolean = false
 }
 
 /**
@@ -127,7 +345,7 @@ public class RubberPose internal constructor(
      */
     public fun resolvedStartInsetPx(insets: DeponderRubberInsets, density: Float): Float {
         if (!isActive || centerDistance <= 1e-4f) return 0f
-        val safeDensity = max(1e-3f, density)
+        val safeDensity = if (density.isFinite()) max(1e-3f, density) else 1f
         return when (insets.startMode) {
             DeponderRubberInsets.Mode.NONE -> 0f
             DeponderRubberInsets.Mode.CONTOUR -> {
@@ -146,7 +364,7 @@ public class RubberPose internal constructor(
      */
     public fun resolvedEndInsetPx(insets: DeponderRubberInsets, density: Float): Float {
         if (!isActive || centerDistance <= 1e-4f) return 0f
-        val safeDensity = max(1e-3f, density)
+        val safeDensity = if (density.isFinite()) max(1e-3f, density) else 1f
         return when (insets.endMode) {
             DeponderRubberInsets.Mode.NONE -> 0f
             DeponderRubberInsets.Mode.CONTOUR -> {
