@@ -20,13 +20,13 @@ Deponder 是面向 **Compose Multiplatform**（Android / iOS / Desktop / Web Was
 
 Compose 与 Android View 两端基于同一套无 UI 依赖的 `deponder-core` 物理内核，对外提供一致的 5 个核心接入接口：
 
-| 能力 | Compose 接口 | Android View 接口 | 说明 |
+| 算子 | Compose | Android View | 作用 |
 | :--- | :--- | :--- | :--- |
-| **物理场域（Root）** | `Modifier.deponderRoot(state)` | `viewGroup.deponderRoot(lifecycleOwner, physics)` | 在宿主容器上建立仿真坐标系并管理帧循环 |
-| **物理节点（Planet）** | `Modifier.deponderPlanet(id, physics)` | `view.deponderPlanet(id, physics)` | 将组件注册为具备质量、斥力半径和固定状态的节点 |
-| **弹簧连线（Rubber）** | `Modifier.deponderRubber(startId, endId, physics, insets)` | `view.deponderRubber(startId, endId, physics, insets)` | 连接两个节点 ID，建立胡克弹簧力与端点安全区避让 |
-| **连线形变（Stretch）** | `Modifier.deponderStretch(enabled)` | `view.deponderStretch(enabled)` | 使自定义连线（或内部指定子组件）跟随节点间距动态拉伸 |
-| **拖拽手势（Drag）** | `Modifier.deponderDrag(enabled, bringToFrontOnPress)` | `view.deponderDrag(enabled, bringToFrontOnPress)` | 按需启用物理拖拽，并通过 `touchSlop` 保留原有点击能力 |
+| **Root** | `Modifier.deponderRoot` | `ViewGroup.deponderRoot` | 建立仿真坐标系并驱动帧循环 |
+| **Planet** | `Modifier.deponderPlanet` | `View.deponderPlanet` | 注册具备质量、斥力半径与固定状态的节点 |
+| **Rubber** | `Modifier.deponderRubber` | `View.deponderRubber` | 连接两端节点 ID，建立弹簧力与端点安全区裁剪 |
+| **Stretch** | `Modifier.deponderStretch` | `View.deponderStretch` | 使自定义连线或内部线条子元素随间距拉伸 |
+| **Drag** | `Modifier.deponderDrag` | `View.deponderDrag` | 启用物理拖拽，并通过 `touchSlop` 保留点击事件 |
 
 - **视图层级约定**：在 Compose 中，`deponderPlanet` 与 `deponderRubber` 可放置于 `deponderRoot` 内部任意静态嵌套深度，无向连线建议使用对称且无冲突的 `EdgeKey(a, b)` 作为 `key(...)`。在 Android View 中，`deponderPlanet` 与 `deponderRubber` 必须是 `deponderRoot` 容器的**直接子 View**；绑定信息保存在私有资源 tag ID 中，不覆盖业务方 `View.getTag()`、子视图顺序或宿主 `clipChildren` 设置。
 - **手势共存**：`deponderDrag` 在手指位移超过 `touchSlop` 后才接管事件，保持原有的 `.clickable {}`、`OnClickListener`、`OnLongClickListener` 与点击水波纹反馈正常工作；拖拽修饰符既可直接加在节点本体，也可加在节点内部的指定手柄区域。
@@ -34,12 +34,14 @@ Compose 与 Android View 两端基于同一套无 UI 依赖的 `deponder-core` �
 
 ## 依赖引入
 
-| Maven 构件 | 适用场景 | 支持平台 | 传递依赖 |
-| :--- | :--- | :--- | :--- |
-| `io.github.cinpecan:deponder-compose:0.6.1` | Compose Multiplatform 与 Jetpack Compose | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) | `deponder-core`、`compose-runtime`、`compose-ui`（无 `compose-foundation` 与 Material 依赖） |
-| `io.github.cinpecan:deponder:0.6.1` | 传统 Android `View` / `ViewGroup` | Android（`minSdk 23`, JVM 17） | `deponder-core`、`lifecycle-common` |
-| `io.github.cinpecan:deponder-core:0.6.1` | 纯 Kotlin Multiplatform 无 UI 仿真或自绘 `Canvas` | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) | `kotlin-stdlib`、`kotlinx-coroutines-core` |
-| `io.github.cinpecan:deponder-bom:0.6.1` | 跨模块版本对齐 BOM | 全平台 | — |
+| Maven 构件 | 适用场景 | 支持平台 |
+| :--- | :--- | :--- |
+| `deponder-compose` | Compose Multiplatform 与 Jetpack Compose | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
+| `deponder` | Android 原生 `View` / `ViewGroup` | Android（`minSdk 23`, JVM 17） |
+| `deponder-core` | 无 UI 物理仿真或自绘 `Canvas` | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
+| `deponder-bom` | 跨模块版本对齐 BOM | 全平台 |
+
+所有构件均发布在 `io.github.cinpecan` 下。`deponder-compose` 仅依赖 `compose-runtime` 与 `compose-ui`（不引入 `compose-foundation` 或 Material）；`deponder` 仅依赖 `lifecycle-common`。
 
 **Compose Multiplatform（`commonMain`）或 Jetpack Compose：**
 
@@ -162,11 +164,11 @@ Java 调用方可通过 `DeponderViews` 静态方法（`deponderRoot`、`deponde
 
 `DeponderDefaults.Presets` 提供三组常用参数预设：
 
-| 预设 | `airDamping` | `wallRepulsionDp` | `planetRepulsionDp` | `rubberElasticity` | 适用特征 |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `Balanced` | `1.45f` | `110f` | `80f` | `1.68f` | 通用均衡阻尼，带一次轻度弹性回弹后稳定 |
-| `Crisp` | `2.6f` | `110f` | `80f` | `2.4f` | 较高阻尼与更硬的弹簧，收敛更快 |
-| `GalaxyInfinite` | `1.6f` | `INFINITE_RANGE` (`-1f`) | `INFINITE_RANGE` (`-1f`) | `1.5f` | 全画布居中边界力与全局平方反比斥力 |
+| 预设 | 阻尼 | 边界 / 节点范围 | 弹簧刚度 | 适用特征 |
+| :--- | :--- | :--- | :--- | :--- |
+| `Balanced` | `1.45f` | `110dp` / `80dp` | `1.68f` | 通用均衡阻尼，一次轻度回弹后稳定 |
+| `Crisp` | `2.6f` | `110dp` / `80dp` | `2.4f` | 更高阻尼与弹簧刚度，快速收敛 |
+| `GalaxyInfinite` | `1.6f` | `INFINITE_RANGE` | `1.5f` | 全视口居中边界力与全局 `1/r²` 斥力 |
 
 ```kotlin
 val preset = DeponderDefaults.Presets.Balanced
@@ -217,13 +219,13 @@ Deponder 将物理内核的力学平衡与 UI 渲染层的视觉裁剪正交拆�
 
 ### `DeponderRubberInsets` 安全区模式
 
-| 预设 / 工厂方法 | 起点安全区 | 终点安全区 | 行为说明 |
-| :--- | :--- | :--- | :--- |
-| `DeponderRubberInsets.Default` / `contour(gapDp = 4f)` | `CONTOUR` + `gapDp` | `CONTOUR` + `gapDp` | 沿连线方向做圆角矩形轮廓投影并外扩 `gapDp` 呼吸间距（支持双侧独立 `contour(startGapDp, endGapDp)` 与负值向内微调） |
-| `DeponderRubberInsets.None` / `none()` | `NONE`（`0dp`） | `NONE`（`0dp`） | 直接从节点中心连线；内置连线会在 `NONE` 端自动隐藏箭头 |
-| `DeponderRubberInsets.fixed(insetDp)` / `fixed(startDp, endDp)` | `FIXED` | `FIXED` | 按传入的固定 `dp` 距离从节点中心向外让出安全区（单侧传 `0f` 规范化为 `NONE`） |
-| `DeponderRubberInsets.startOnly(gapDp = 4f)` | `CONTOUR` + `gapDp` | `NONE` | 起点从轮廓外缘断开，终点直连节点中心 |
-| `DeponderRubberInsets.endOnly(gapDp = 4f)` | `NONE` | `CONTOUR` + `gapDp` | 起点直连中心，终点箭头停在目标节点轮廓边缘 |
+| 预设 / 工厂方法 | 起点 → 终点 | 行为说明 |
+| :--- | :--- | :--- |
+| `Default` / `contour(gapDp)` | `CONTOUR` → `CONTOUR` | 沿圆角矩形轮廓裁切并外扩 `gapDp`（默认 `4dp`，亦支持 `contour(startDp, endDp)`） |
+| `None` / `none()` | `NONE` → `NONE` | 直接连接两端节点中心；内置连线在 `NONE` 端不绘制箭头 |
+| `fixed(insetDp)` | `FIXED` → `FIXED` | 按距节点中心的固定 `dp` 距离裁切（亦支持 `fixed(startDp, endDp)`） |
+| `startOnly(gapDp)` | `CONTOUR` → `NONE` | 起点在轮廓外缘断开，终点直连节点中心 |
+| `endOnly(gapDp)` | `NONE` → `CONTOUR` | 起点直连中心，终点箭头停在目标节点轮廓边缘 |
 
 需要混合不同端点的模式时，可使用 `withStartNone()`、`withEndNone()`、`withStartContour(gapDp)`、`withEndContour(gapDp)`、`withStartFixed(insetDp)` 与 `withEndFixed(insetDp)` 单独调整。
 

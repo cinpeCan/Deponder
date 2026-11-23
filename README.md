@@ -20,13 +20,13 @@ Deponder is a force-directed physics interaction library for **Compose Multiplat
 
 Both UI toolkits share the same five-operator model backed by a single UI-agnostic `deponder-core` kernel:
 
-| Operator | Compose API | Android View API | Role |
+| Operator | Compose | Android View | Role |
 | :--- | :--- | :--- | :--- |
-| **Root** | `Modifier.deponderRoot(state)` | `viewGroup.deponderRoot(lifecycleOwner, physics)` | Defines the simulation coordinate space and drives the frame loop |
-| **Planet** | `Modifier.deponderPlanet(id, physics)` | `view.deponderPlanet(id, physics)` | Registers a node body with mass, repulsion range, and pinning state |
-| **Rubber** | `Modifier.deponderRubber(startId, endId, physics, insets)` | `view.deponderRubber(startId, endId, physics, insets)` | Connects two node IDs with a Hooke spring and endpoint safe-area geometry |
-| **Stretch** | `Modifier.deponderStretch(enabled)` | `view.deponderStretch(enabled)` | Stretches a custom link (or inner child element) along the resolved span |
-| **Drag** | `Modifier.deponderDrag(enabled, bringToFrontOnPress)` | `view.deponderDrag(enabled, bringToFrontOnPress)` | Enables pointer dragging with `touchSlop` click preservation |
+| **Root** | `Modifier.deponderRoot` | `ViewGroup.deponderRoot` | Simulation coordinate space and frame loop |
+| **Planet** | `Modifier.deponderPlanet` | `View.deponderPlanet` | Point-mass node with repulsion range and pinning |
+| **Rubber** | `Modifier.deponderRubber` | `View.deponderRubber` | Hooke spring link with endpoint safe-area trimming |
+| **Stretch** | `Modifier.deponderStretch` | `View.deponderStretch` | Stretches a custom link or inner child along the span |
+| **Drag** | `Modifier.deponderDrag` | `View.deponderDrag` | Pointer dragging with `touchSlop` click preservation |
 
 - **Hierarchy rules**: In Compose, `deponderPlanet` and `deponderRubber` can live at any static nesting depth inside `deponderRoot`; use `EdgeKey(a, b)` as a symmetric, collision-free `key(...)` for undirected links. In Android Views, `deponderPlanet` and `deponderRubber` views must be **direct children** of the `deponderRoot` `ViewGroup` (bindings store private keyed tag IDs and never alter `View.getTag()`, child order, or `clipChildren`).
 - **Gesture coexistence**: `deponderDrag` defers interception until pointer movement exceeds `touchSlop`, keeping `.clickable {}`, `OnClickListener`, `OnLongClickListener`, and touch ripples intact. It can be attached to the planet component itself or to an inner drag-handle child.
@@ -34,12 +34,14 @@ Both UI toolkits share the same five-operator model backed by a single UI-agnost
 
 ## Installation
 
-| Artifact | UI Target | Supported Platforms | Transitive Dependencies |
-| :--- | :--- | :--- | :--- |
-| `io.github.cinpecan:deponder-compose:0.6.1` | Compose Multiplatform & Jetpack Compose | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) | `deponder-core`, `compose-runtime`, `compose-ui` (no `compose-foundation` or Material) |
-| `io.github.cinpecan:deponder:0.6.1` | Android `View` / `ViewGroup` | Android (`minSdk 23`, JVM 17) | `deponder-core`, `lifecycle-common` |
-| `io.github.cinpecan:deponder-core:0.6.1` | Headless / custom `Canvas` engines | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) | `kotlin-stdlib`, `kotlinx-coroutines-core` |
-| `io.github.cinpecan:deponder-bom:0.6.1` | Version alignment BOM | All | — |
+| Artifact | Target | Platforms |
+| :--- | :--- | :--- |
+| `deponder-compose` | Compose Multiplatform & Jetpack Compose | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
+| `deponder` | Android `View` / `ViewGroup` | Android (`minSdk 23`, JVM 17) |
+| `deponder-core` | Headless simulation / custom `Canvas` | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
+| `deponder-bom` | Maven BOM for version alignment | All |
+
+All artifacts are published under `io.github.cinpecan`. `deponder-compose` depends only on `compose-runtime` and `compose-ui` (no `compose-foundation` or Material); `deponder` depends only on `lifecycle-common`.
 
 **Compose Multiplatform (`commonMain`) or Jetpack Compose:**
 
@@ -162,11 +164,11 @@ Java callers can use static methods on `DeponderViews` (`deponderRoot`, `deponde
 
 `DeponderDefaults.Presets` provides three ready-to-use configurations:
 
-| Preset | `airDamping` | `wallRepulsionDp` | `planetRepulsionDp` | `rubberElasticity` | Characteristics |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| `Balanced` | `1.45f` | `110f` | `80f` | `1.68f` | General-purpose damping with one mild elastic rebound |
-| `Crisp` | `2.6f` | `110f` | `80f` | `2.4f` | Higher damping and stiffer springs for faster settling |
-| `GalaxyInfinite` | `1.6f` | `INFINITE_RANGE` (`-1f`) | `INFINITE_RANGE` (`-1f`) | `1.5f` | Continuous viewport centering and inverse-square repulsion |
+| Preset | Damping | Wall / Node Range | Spring | Characteristics |
+| :--- | :--- | :--- | :--- | :--- |
+| `Balanced` | `1.45f` | `110dp` / `80dp` | `1.68f` | General-purpose damping with one mild rebound |
+| `Crisp` | `2.6f` | `110dp` / `80dp` | `2.4f` | Higher damping and stiffer springs for fast settling |
+| `GalaxyInfinite` | `1.6f` | `INFINITE_RANGE` | `1.5f` | Full-viewport centering and `1/r²` repulsion |
 
 Apply a preset consistently across all three config objects:
 
@@ -219,13 +221,13 @@ Deponder separates physical equilibrium in `deponder-core` from endpoint visual 
 
 ### `DeponderRubberInsets` Modes
 
-| Preset / Factory | Start Endpoint | End Endpoint | Behavior |
-| :--- | :--- | :--- | :--- |
-| `DeponderRubberInsets.Default` / `contour(gapDp = 4f)` | `CONTOUR` + `gapDp` | `CONTOUR` + `gapDp` | Estimates rounded-box boundary along the link ray and adds `gapDp` clearance (supports asymmetric `contour(startGapDp, endGapDp)` and negative inward offsets) |
-| `DeponderRubberInsets.None` / `none()` | `NONE` (`0dp`) | `NONE` (`0dp`) | Connects directly to planet centers; built-in arrowheads are omitted on `NONE` endpoints |
-| `DeponderRubberInsets.fixed(insetDp)` / `fixed(startDp, endDp)` | `FIXED` | `FIXED` | Trims by explicit `dp` distances from each planet center (`0f` normalizes to `NONE`) |
-| `DeponderRubberInsets.startOnly(gapDp = 4f)` | `CONTOUR` + `gapDp` | `NONE` | Trims at `startId` boundary while anchoring directly to `endId`'s center |
-| `DeponderRubberInsets.endOnly(gapDp = 4f)` | `NONE` | `CONTOUR` + `gapDp` | Anchors to `startId`'s center while stopping arrowheads cleanly at `endId`'s boundary |
+| Preset / Factory | Start → End | Behavior |
+| :--- | :--- | :--- |
+| `Default` / `contour(gapDp)` | `CONTOUR` → `CONTOUR` | Trims at rounded-box contours plus `gapDp` (`4dp` default; also `contour(startDp, endDp)`) |
+| `None` / `none()` | `NONE` → `NONE` | Connects center-to-center; omits built-in arrowheads on `NONE` endpoints |
+| `fixed(insetDp)` | `FIXED` → `FIXED` | Trims by explicit `dp` distances from each planet center (also `fixed(startDp, endDp)`) |
+| `startOnly(gapDp)` | `CONTOUR` → `NONE` | Trims at `startId` contour and anchors to `endId` center |
+| `endOnly(gapDp)` | `NONE` → `CONTOUR` | Anchors to `startId` center and stops arrowheads at `endId` contour |
 
 Use per-side builders (`withStartNone()`, `withEndNone()`, `withStartContour(gapDp)`, `withEndContour(gapDp)`, `withStartFixed(insetDp)`, `withEndFixed(insetDp)`) to mix modes independently.
 
