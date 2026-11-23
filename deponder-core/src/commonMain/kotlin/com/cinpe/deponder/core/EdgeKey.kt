@@ -30,8 +30,12 @@ public value class Vec2(public val packed: Long) {
 }
 
 /**
- * Platform-independent endpoint ID pair (`startId -> endId`) preserving user-specified visual direction.
+ * Deprecated since 0.6.1: unused endpoint pair carrier retained for 0.6.0 binary compatibility.
+ * Use [EdgeKey] for symmetric undirected edge identity or [RubberSpec] for link specifications.
  */
+@Deprecated(
+    message = "Unused carrier retained for 0.6.0 compatibility; use EdgeKey for undirected edge keys or RubberSpec for link specifications.",
+)
 public data class NodePair(
     public val startId: String,
     public val endId: String,

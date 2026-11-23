@@ -734,30 +734,38 @@ class DeponderOperatorsTest {
     }
 
     @Test
-    fun controllerSubmitScale_wakesWithoutUnfolding_whileReheatUnfoldsCrossedCycle() = runTest {
+    fun controllerUnfold_worksPreLayoutAndAtRuntime_whileSubmitScaleAndReheatPreserveManualLayout() = runTest {
         val activityController = Robolectric.buildActivity(Activity::class.java).setup()
         val activity = activityController.get()
         val root = FrameLayout(activity)
         activity.setContentView(root, FrameLayout.LayoutParams(600, 600))
-        ShadowLooper.idleMainLooper(16, TimeUnit.MILLISECONDS)
-        root.layout(0, 0, 600, 600)
 
-        val ctrl = root.deponderRoot(physics = RootPhysics().withUnfold(true))
+        // Bind root + views + call unfold() BEFORE the first Android layout pass (onCreate style).
+        val ctrl = root.deponderRoot()
         val views = (0 until 4).map { idx ->
             View(activity).also { v ->
                 root.addView(v, FrameLayout.LayoutParams(40, 40))
-                v.layout(200, 200, 240, 240)
                 v.deponderPlanet("n$idx", PlanetPhysics())
             }
         }
         val links = listOf(0 to 1, 1 to 2, 2 to 3, 3 to 0).map { (u, v) ->
             DeponderRubberView(activity).also { rv ->
                 root.addView(rv, FrameLayout.LayoutParams(80, 20))
-                rv.layout(0, 0, 80, 20)
                 rv.deponderRubber("n$u", "n$v", RubberPhysics.fixed(120f))
             }
         }
         assertTrue(views.size == 4 && links.size == 4)
+        ctrl.unfold()
+
+        // Now deliver initial layout bounds with a crossed bowtie placement.
+        ShadowLooper.idleMainLooper(16, TimeUnit.MILLISECONDS)
+        root.layout(0, 0, 600, 600)
+        val initialCenters = listOf(200 to 200, 400 to 400, 200 to 400, 400 to 200)
+        views.forEachIndexed { idx, v ->
+            val (cx, cy) = initialCenters[idx]
+            v.layout(cx - 20, cy - 20, cx + 20, cy + 20)
+        }
+        links.forEach { it.layout(0, 0, 80, 20) }
 
         var active = true
         var guard = 0
@@ -766,20 +774,6 @@ class DeponderOperatorsTest {
             guard += 1
         }
         assertFalse(active)
-
-        // Manually arrange into a crossed bowtie and drag Scale slider -> must NOT wipe manual arrangement.
-        ctrl.moveTo("n0", 200f, 200f)
-        ctrl.moveTo("n1", 400f, 400f)
-        ctrl.moveTo("n2", 200f, 400f)
-        ctrl.moveTo("n3", 400f, 200f)
-        ctrl.submitScale(1.25f)
-        var scaleActive = true
-        var scaleGuard = 0
-        while (scaleActive && scaleGuard < 1800) {
-            scaleActive = ctrl.stepSingleFrame(0.016f)
-            scaleGuard += 1
-        }
-        assertFalse(scaleActive)
 
         val b0 = ctrl.world.bodyOf("n0")!!
         val b1 = ctrl.world.bodyOf("n1")!!
@@ -796,17 +790,91 @@ class DeponderOperatorsTest {
                     (orient(b3.x, b3.y, b0.x, b0.y, b1.x, b1.y) * orient(b3.x, b3.y, b0.x, b0.y, b2.x, b2.y) < 0f)
             return c0123 || c1230
         }
+        assertFalse("Pre-layout controller.unfold() must untangle crossed cycle", hasCrossing())
+
+        // Manually arrange into a crossed bowtie and verify submitScale() & deprecated reheat() preserve manual arrangement.
+        ctrl.moveTo("n0", 200f, 200f)
+        ctrl.moveTo("n1", 400f, 400f)
+        ctrl.moveTo("n2", 200f, 400f)
+        ctrl.moveTo("n3", 400f, 200f)
+        ctrl.submitScale(1.25f)
+        var scaleActive = true
+        var scaleGuard = 0
+        while (scaleActive && scaleGuard < 1800) {
+            scaleActive = ctrl.stepSingleFrame(0.016f)
+            scaleGuard += 1
+        }
+        assertFalse(scaleActive)
         assertTrue("submitScale() must preserve manual layout without triggering unfold", hasCrossing())
 
+        @Suppress("DEPRECATION")
         ctrl.reheat()
-        var reheatActive = true
-        var reheatGuard = 0
-        while (reheatActive && reheatGuard < 1800) {
-            reheatActive = ctrl.stepSingleFrame(0.016f)
-            reheatGuard += 1
+        assertFalse(ctrl.isAwake)
+        assertTrue("deprecated reheat() no-op must preserve manual layout", hasCrossing())
+
+        ctrl.unfold()
+        var unfoldActive = true
+        var unfoldGuard = 0
+        while (unfoldActive && unfoldGuard < 1800) {
+            unfoldActive = ctrl.stepSingleFrame(0.016f)
+            unfoldGuard += 1
         }
-        assertFalse(reheatActive)
-        assertFalse("reheat() must untangle crossed cycle", hasCrossing())
+        assertFalse(unfoldActive)
+        assertFalse("controller.unfold() must untangle crossed cycle", hasCrossing())
+
+        ctrl.cancel()
+        activityController.destroy()
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun controllerDeprecatedWithUnfoldFlag_preservesTransitionalBehavior() = runTest {
+        val activityController = Robolectric.buildActivity(Activity::class.java).setup()
+        val activity = activityController.get()
+        val root = FrameLayout(activity)
+        activity.setContentView(root, FrameLayout.LayoutParams(600, 600))
+        ShadowLooper.idleMainLooper(16, TimeUnit.MILLISECONDS)
+        root.layout(0, 0, 600, 600)
+
+        val ctrl = root.deponderRoot(physics = RootPhysics().withUnfold(true))
+        val initialCenters = listOf(200 to 200, 400 to 400, 200 to 400, 400 to 200)
+        (0 until 4).forEach { idx ->
+            View(activity).also { v ->
+                val (cx, cy) = initialCenters[idx]
+                root.addView(v, FrameLayout.LayoutParams(40, 40))
+                v.layout(cx - 20, cy - 20, cx + 20, cy + 20)
+                v.deponderPlanet("n$idx", PlanetPhysics())
+            }
+        }
+        listOf(0 to 1, 1 to 2, 2 to 3, 3 to 0).forEach { (u, v) ->
+            DeponderRubberView(activity).also { rv ->
+                root.addView(rv, FrameLayout.LayoutParams(80, 20))
+                rv.layout(0, 0, 80, 20)
+                rv.deponderRubber("n$u", "n$v", RubberPhysics.fixed(120f))
+            }
+        }
+
+        var active = true
+        var guard = 0
+        while (active && guard < 1800) {
+            active = ctrl.stepSingleFrame(0.016f)
+            guard += 1
+        }
+        assertFalse(active)
+
+        val b0 = ctrl.world.bodyOf("n0")!!
+        val b1 = ctrl.world.bodyOf("n1")!!
+        val b2 = ctrl.world.bodyOf("n2")!!
+        val b3 = ctrl.world.bodyOf("n3")!!
+        fun orient(ax: Float, ay: Float, bx: Float, by: Float, cx: Float, cy: Float): Float =
+            (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+        val c0123 =
+            (orient(b0.x, b0.y, b1.x, b1.y, b2.x, b2.y) * orient(b0.x, b0.y, b1.x, b1.y, b3.x, b3.y) < 0f) &&
+                (orient(b2.x, b2.y, b3.x, b3.y, b0.x, b0.y) * orient(b2.x, b2.y, b3.x, b3.y, b1.x, b1.y) < 0f)
+        val c1230 =
+            (orient(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y) * orient(b1.x, b1.y, b2.x, b2.y, b0.x, b0.y) < 0f) &&
+                (orient(b3.x, b3.y, b0.x, b0.y, b1.x, b1.y) * orient(b3.x, b3.y, b0.x, b0.y, b2.x, b2.y) < 0f)
+        assertFalse("Legacy RootPhysics().withUnfold(true) must remain functional", c0123 || c1230)
 
         ctrl.cancel()
         activityController.destroy()

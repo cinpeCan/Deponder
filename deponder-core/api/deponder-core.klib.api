@@ -256,7 +256,9 @@ final class com.cinpe.deponder.core/PlanetSpec { // com.cinpe.deponder.core/Plan
 
 final class com.cinpe.deponder.core/RootPhysics { // com.cinpe.deponder.core/RootPhysics|null[0]
     constructor <init>() // com.cinpe.deponder.core/RootPhysics.<init>|<init>(){}[0]
-    constructor <init>(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Boolean = ..., kotlin/Float = ...) // com.cinpe.deponder.core/RootPhysics.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Boolean;kotlin.Float){}[0]
+    constructor <init>(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ...) // com.cinpe.deponder.core/RootPhysics.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+    constructor <init>(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Boolean, kotlin/Float = ...) // com.cinpe.deponder.core/RootPhysics.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Boolean;kotlin.Float){}[0]
+    constructor <init>(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float) // com.cinpe.deponder.core/RootPhysics.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
 
     final val airDamping // com.cinpe.deponder.core/RootPhysics.airDamping|{}airDamping[0]
         final fun <get-airDamping>(): kotlin/Float // com.cinpe.deponder.core/RootPhysics.airDamping.<get-airDamping>|<get-airDamping>(){}[0]
@@ -294,7 +296,9 @@ final class com.cinpe.deponder.core/RootPhysics { // com.cinpe.deponder.core/Roo
     final fun component7(): kotlin/Float // com.cinpe.deponder.core/RootPhysics.component7|component7(){}[0]
     final fun component8(): kotlin/Float // com.cinpe.deponder.core/RootPhysics.component8|component8(){}[0]
     final fun component9(): kotlin/Float // com.cinpe.deponder.core/RootPhysics.component9|component9(){}[0]
-    final fun copy(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Boolean = ..., kotlin/Float = ...): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.copy|copy(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Boolean;kotlin.Float){}[0]
+    final fun copy(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ...): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.copy|copy(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+    final fun copy(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Boolean, kotlin/Float = ...): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.copy|copy(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Boolean;kotlin.Float){}[0]
+    final fun copy(kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float = ..., kotlin/Float): com.cinpe.deponder.core/RootPhysics // com.cinpe.deponder.core/RootPhysics.copy|copy(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
     final fun equals(kotlin/Any?): kotlin/Boolean // com.cinpe.deponder.core/RootPhysics.equals|equals(kotlin.Any?){}[0]
     final fun hashCode(): kotlin/Int // com.cinpe.deponder.core/RootPhysics.hashCode|hashCode(){}[0]
     final fun toEnvironmentSpec(kotlin/Float): com.cinpe.deponder.core/EnvironmentSpec // com.cinpe.deponder.core/RootPhysics.toEnvironmentSpec|toEnvironmentSpec(kotlin.Float){}[0]
@@ -438,6 +442,7 @@ final class com.cinpe.deponder.core/SimulationWorld { // com.cinpe.deponder.core
     final fun setBodyPressed(kotlin/String, kotlin/Boolean) // com.cinpe.deponder.core/SimulationWorld.setBodyPressed|setBodyPressed(kotlin.String;kotlin.Boolean){}[0]
     final fun setBodySize(kotlin/String, kotlin/Float, kotlin/Float, kotlin/Float = ...) // com.cinpe.deponder.core/SimulationWorld.setBodySize|setBodySize(kotlin.String;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
     final fun syncTopology(kotlin.collections/List<com.cinpe.deponder.core/PlanetSpec>, kotlin.collections/List<com.cinpe.deponder.core/RubberSpec>, kotlin/Function1<com.cinpe.deponder.core/PlanetSpec, com.cinpe.deponder.core/Vec2>) // com.cinpe.deponder.core/SimulationWorld.syncTopology|syncTopology(kotlin.collections.List<com.cinpe.deponder.core.PlanetSpec>;kotlin.collections.List<com.cinpe.deponder.core.RubberSpec>;kotlin.Function1<com.cinpe.deponder.core.PlanetSpec,com.cinpe.deponder.core.Vec2>){}[0]
+    final fun unfold() // com.cinpe.deponder.core/SimulationWorld.unfold|unfold(){}[0]
     final fun updateAllRubbersElasticity(kotlin/Float) // com.cinpe.deponder.core/SimulationWorld.updateAllRubbersElasticity|updateAllRubbersElasticity(kotlin.Float){}[0]
     final fun updateEnvironment(com.cinpe.deponder.core/EnvironmentSpec, kotlin/Boolean = ...) // com.cinpe.deponder.core/SimulationWorld.updateEnvironment|updateEnvironment(com.cinpe.deponder.core.EnvironmentSpec;kotlin.Boolean){}[0]
     final fun updateViewport(kotlin/Float, kotlin/Float) // com.cinpe.deponder.core/SimulationWorld.updateViewport|updateViewport(kotlin.Float;kotlin.Float){}[0]
@@ -482,6 +487,7 @@ final object com.cinpe.deponder.core/DeponderDefaults { // com.cinpe.deponder.co
         final fun <get-INFINITE_RANGE>(): kotlin/Float // com.cinpe.deponder.core/DeponderDefaults.INFINITE_RANGE.<get-INFINITE_RANGE>|<get-INFINITE_RANGE>(){}[0]
 
     final class Preset { // com.cinpe.deponder.core/DeponderDefaults.Preset|null[0]
+        constructor <init>(kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Float) // com.cinpe.deponder.core/DeponderDefaults.Preset.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
         constructor <init>(kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Float, kotlin/Float) // com.cinpe.deponder.core/DeponderDefaults.Preset.<init>|<init>(kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
 
         final val airDamping // com.cinpe.deponder.core/DeponderDefaults.Preset.airDamping|{}airDamping[0]

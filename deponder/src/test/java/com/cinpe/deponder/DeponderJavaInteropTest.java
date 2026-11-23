@@ -33,14 +33,8 @@ public class DeponderJavaInteropTest {
         activity.setContentView(root, new FrameLayout.LayoutParams(600, 600));
         root.layout(0, 0, 600, 600);
 
-        assertFalse(new RootPhysics().getUnfoldEnabled());
-        assertFalse(new com.cinpe.deponder.core.EnvironmentSpec().getUnfoldEnabled());
         RootPhysics rootPhysics = RootPhysics.fromPreset(DeponderDefaults.Presets.INSTANCE.getBalanced())
                 .withScaleBounds(1.0f, 0.5f, 1.8f);
-        assertFalse(rootPhysics.getUnfoldEnabled());
-        RootPhysics unfoldedRoot = rootPhysics.withUnfold();
-        assertTrue(unfoldedRoot.getUnfoldEnabled());
-        assertFalse(unfoldedRoot.withUnfold(false).getUnfoldEnabled());
         DeponderController controller = DeponderViews.deponderRoot(root, null, rootPhysics);
         assertNotNull(controller);
 
@@ -86,6 +80,8 @@ public class DeponderJavaInteropTest {
         rubberView.setInsets(DeponderRubberInsets.none());
         assertEquals(DeponderRubberInsets.none(), rubberView.getInsets());
 
+        controller.unfold();
+        assertTrue(controller.isAwake());
         controller.submitScale(1.4f);
         controller.submitRubberElasticity(3.0f);
         assertEquals(1.4f, controller.getScale(), 1e-4f);
@@ -103,5 +99,25 @@ public class DeponderJavaInteropTest {
 
         controller.cancel();
         activityController.destroy();
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    public void javaLegacyDeprecatedWithUnfoldAndNoOpCoolingInterop_remainsCompatible() {
+        assertFalse(new RootPhysics().getUnfoldEnabled());
+        assertFalse(new RootPhysics().getCoolingEnabled());
+        assertEquals(0f, new RootPhysics().getAlphaDecay(), 0f);
+        assertFalse(new com.cinpe.deponder.core.EnvironmentSpec().getUnfoldEnabled());
+        assertFalse(DeponderDefaults.Root.COOLING_ENABLED);
+
+        RootPhysics rootPhysics = RootPhysics.fromPreset(DeponderDefaults.Presets.INSTANCE.getBalanced())
+                .withScaleBounds(1.0f, 0.5f, 1.8f)
+                .withCooling(true, 0.25f);
+        assertFalse(rootPhysics.getCoolingEnabled());
+        assertEquals(0f, rootPhysics.getAlphaDecay(), 0f);
+        assertFalse(rootPhysics.getUnfoldEnabled());
+        RootPhysics unfoldedRoot = rootPhysics.withUnfold();
+        assertTrue(unfoldedRoot.getUnfoldEnabled());
+        assertFalse(unfoldedRoot.withUnfold(false).getUnfoldEnabled());
     }
 }

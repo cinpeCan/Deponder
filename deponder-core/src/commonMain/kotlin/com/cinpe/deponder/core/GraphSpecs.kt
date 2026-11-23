@@ -11,6 +11,7 @@ private fun normalizeSpecZero(value: Float): Float = if (value == 0f) 0f else va
  * All distance fields are already scaled to target viewport pixels (`dp * density`).
  * Pass a negative [wallRepulsionPx] (such as [DeponderDefaults.INFINITE_RANGE]) for unbounded centering walls.
  */
+@Suppress("UNUSED_PARAMETER")
 public class EnvironmentSpec internal constructor(
     initScale: Float,
     maxScale: Float,
@@ -23,12 +24,15 @@ public class EnvironmentSpec internal constructor(
     wallElasticityBottom: Float,
     degreeRadiusIncrementPx: Float,
     infiniteChargeStrength: Float,
-    public val coolingEnabled: Boolean,
+    coolingEnabled: Boolean,
     alphaDecay: Float,
     alphaMin: Float,
     restSpeedPxPerSec: Float,
     restAccelPxPerSecSq: Float,
     settleDurationSeconds: Float,
+    @Deprecated(
+        message = "Topological unfolding is a transient one-shot action rather than a persistent environment property; invoke SimulationWorld.unfold() instead.",
+    )
     public val unfoldEnabled: Boolean,
 ) {
     public val initScale: Float = normalizeSpecZero(initScale)
@@ -40,14 +44,50 @@ public class EnvironmentSpec internal constructor(
     public val wallElasticityTop: Float = normalizeSpecZero(wallElasticityTop)
     public val wallElasticityEnd: Float = normalizeSpecZero(wallElasticityEnd)
     public val wallElasticityBottom: Float = normalizeSpecZero(wallElasticityBottom)
-    public val degreeRadiusIncrementPx: Float = normalizeSpecZero(degreeRadiusIncrementPx)
+
+    /**
+     * Deprecated (no-op `0f` since 0.6.1): implicit per-edge repulsion radius inflation has been
+     * retired so repulsion strictly honors [PlanetSpec.repulsionRadiusPx].
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: always 0f. Implicit degree-based radius inflation has been retired; configure PlanetPhysics.repulsionRadiusDp explicitly.",
+    )
+    public val degreeRadiusIncrementPx: Float = 0f
+
     public val infiniteChargeStrength: Float = normalizeSpecZero(infiniteChargeStrength)
-    public val alphaDecay: Float = normalizeSpecZero(alphaDecay)
-    public val alphaMin: Float = normalizeSpecZero(alphaMin)
+
+    /**
+     * Deprecated (no-op `false` since 0.6.1): simulated annealing has been retired in favor of
+     * pure Newtonian viscous drag ([airDamping]).
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: always false. Simulated annealing has been retired; configure airDamping instead.",
+    )
+    public val coolingEnabled: Boolean = false
+
+    /**
+     * Deprecated (no-op `0f` since 0.6.1): simulated annealing (`alpha` decay) has been retired in
+     * favor of pure Newtonian viscous drag ([airDamping]).
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: always 0f. Simulated annealing has been retired; configure airDamping instead.",
+    )
+    public val alphaDecay: Float = 0f
+
+    /**
+     * Deprecated (no-op `0f` since 0.6.1): simulated annealing (`alphaMin` gate) has been retired in
+     * favor of Global Kinetic-Force Sleep (`restSpeedPxPerSec` + `restAccelPxPerSecSq`).
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: always 0f. Simulated annealing has been retired; settling uses kinetic/acceleration thresholds instead.",
+    )
+    public val alphaMin: Float = 0f
+
     public val restSpeedPxPerSec: Float = normalizeSpecZero(restSpeedPxPerSec)
     public val restAccelPxPerSecSq: Float = normalizeSpecZero(restAccelPxPerSecSq)
     public val settleDurationSeconds: Float = normalizeSpecZero(settleDurationSeconds)
 
+    @Suppress("DEPRECATION")
     public constructor() : this(
         initScale = DeponderDefaults.Root.INIT_SCALE,
         maxScale = DeponderDefaults.Root.MAX_SCALE,
@@ -58,17 +98,18 @@ public class EnvironmentSpec internal constructor(
         wallElasticityTop = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
         wallElasticityEnd = DeponderDefaults.Root.WALL_ELASTICITY_END,
         wallElasticityBottom = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
-        degreeRadiusIncrementPx = DeponderDefaults.Planet.DEGREE_RADIUS_INCREMENT_DP,
+        degreeRadiusIncrementPx = 0f,
         infiniteChargeStrength = DeponderDefaults.Planet.INFINITE_CHARGE_STRENGTH,
-        coolingEnabled = DeponderDefaults.Root.COOLING_ENABLED,
-        alphaDecay = DeponderDefaults.Simulation.ALPHA_DECAY,
-        alphaMin = DeponderDefaults.Simulation.ALPHA_MIN,
+        coolingEnabled = false,
+        alphaDecay = 0f,
+        alphaMin = 0f,
         restSpeedPxPerSec = DeponderDefaults.Simulation.REST_SPEED_PX_PER_SEC,
         restAccelPxPerSecSq = DeponderDefaults.Simulation.REST_ACCEL_PX_PER_SEC_SQ,
         settleDurationSeconds = DeponderDefaults.Simulation.SETTLE_DURATION_SECONDS,
         unfoldEnabled = DeponderDefaults.Root.UNFOLD_ENABLED,
     )
 
+    @Suppress("DEPRECATION")
     public constructor(
         initScale: Float = DeponderDefaults.Root.INIT_SCALE,
         maxScale: Float = DeponderDefaults.Root.MAX_SCALE,
@@ -117,15 +158,30 @@ public class EnvironmentSpec internal constructor(
     public operator fun component7(): Float = wallElasticityTop
     public operator fun component8(): Float = wallElasticityEnd
     public operator fun component9(): Float = wallElasticityBottom
+
+    @Deprecated(message = "No-op since 0.6.1: degreeRadiusIncrementPx has been retired.")
+    @Suppress("DEPRECATION")
     public operator fun component10(): Float = degreeRadiusIncrementPx
+
     public operator fun component11(): Float = infiniteChargeStrength
+
+    @Deprecated(message = "No-op since 0.6.1: coolingEnabled has been retired.")
+    @Suppress("DEPRECATION")
     public operator fun component12(): Boolean = coolingEnabled
+
+    @Deprecated(message = "No-op since 0.6.1: alphaDecay has been retired.")
+    @Suppress("DEPRECATION")
     public operator fun component13(): Float = alphaDecay
+
+    @Deprecated(message = "No-op since 0.6.1: alphaMin has been retired.")
+    @Suppress("DEPRECATION")
     public operator fun component14(): Float = alphaMin
+
     public operator fun component15(): Float = restSpeedPxPerSec
     public operator fun component16(): Float = restAccelPxPerSecSq
     public operator fun component17(): Float = settleDurationSeconds
 
+    @Suppress("DEPRECATION")
     public fun copy(
         initScale: Float = this.initScale,
         maxScale: Float = this.maxScale,
@@ -165,7 +221,11 @@ public class EnvironmentSpec internal constructor(
         unfoldEnabled = this.unfoldEnabled,
     )
 
+    @Deprecated(
+        message = "Topological unfolding is a transient one-shot action rather than a persistent environment property; invoke SimulationWorld.unfold() instead.",
+    )
     @JvmOverloads
+    @Suppress("DEPRECATION")
     public fun withUnfold(unfoldEnabled: Boolean = true): EnvironmentSpec = EnvironmentSpec(
         initScale = initScale,
         maxScale = maxScale,
@@ -176,17 +236,18 @@ public class EnvironmentSpec internal constructor(
         wallElasticityTop = wallElasticityTop,
         wallElasticityEnd = wallElasticityEnd,
         wallElasticityBottom = wallElasticityBottom,
-        degreeRadiusIncrementPx = degreeRadiusIncrementPx,
+        degreeRadiusIncrementPx = 0f,
         infiniteChargeStrength = infiniteChargeStrength,
-        coolingEnabled = coolingEnabled,
-        alphaDecay = alphaDecay,
-        alphaMin = alphaMin,
+        coolingEnabled = false,
+        alphaDecay = 0f,
+        alphaMin = 0f,
         restSpeedPxPerSec = restSpeedPxPerSec,
         restAccelPxPerSecSq = restAccelPxPerSecSq,
         settleDurationSeconds = settleDurationSeconds,
         unfoldEnabled = unfoldEnabled,
     )
 
+    @Suppress("DEPRECATION")
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is EnvironmentSpec) return false
@@ -210,6 +271,7 @@ public class EnvironmentSpec internal constructor(
             unfoldEnabled == other.unfoldEnabled
     }
 
+    @Suppress("DEPRECATION")
     override fun hashCode(): Int {
         var result = initScale.hashCode()
         result = 31 * result + maxScale.hashCode()
@@ -232,6 +294,7 @@ public class EnvironmentSpec internal constructor(
         return result
     }
 
+    @Suppress("DEPRECATION")
     override fun toString(): String =
         "EnvironmentSpec(initScale=$initScale, maxScale=$maxScale, minScale=$minScale, " +
             "airDamping=$airDamping, wallRepulsionPx=$wallRepulsionPx, " +
@@ -277,10 +340,33 @@ public data class RubberSpec(
  * Mutable runtime state of a single point-mass planet inside [SimulationWorld].
  */
 public class PlanetBody internal constructor(
-    public var spec: PlanetSpec,
+    initialSpec: PlanetSpec,
     x: Float,
     y: Float,
 ) {
+    private var _spec: PlanetSpec = initialSpec
+
+    /**
+     * Current point-mass configuration for this planet.
+     *
+     * Reading [spec] returns the active configuration inside [SimulationWorld]; the public setter
+     * is `@Deprecated` and a strict no-op since `0.6.1` to prevent out-of-band mutations from
+     * bypassing topology validation and spatial indexing. Update node physics via
+     * `Modifier.deponderPlanet`, `view.deponderPlanet`, or [SimulationWorld.upsertPlanet] instead.
+     */
+    public var spec: PlanetSpec
+        get() = _spec
+        @Deprecated(
+            message = "No-op since 0.6.1: direct mutation of PlanetBody.spec bypasses topology validation and is ignored. Update node physics via Modifier.deponderPlanet, view.deponderPlanet, or SimulationWorld.upsertPlanet(...) instead.",
+        )
+        set(_) {
+            // Intentional no-op since 0.6.1 to preserve 0.6.0 JVM/Klib binary compatibility without mutating engine invariants.
+        }
+
+    internal fun updateSpecInternal(newSpec: PlanetSpec) {
+        _spec = newSpec
+    }
+
     public var x: Float = x
         internal set
     public var y: Float = y
@@ -315,8 +401,31 @@ public class PlanetBody internal constructor(
  * for a given [DeponderRubberInsets] without heap allocations.
  */
 public class RubberPose internal constructor(
-    public var spec: RubberSpec,
+    initialSpec: RubberSpec,
 ) {
+    private var _spec: RubberSpec = initialSpec
+
+    /**
+     * Current spring link configuration for this rubber edge.
+     *
+     * Reading [spec] returns the active specification inside [SimulationWorld]; the public setter is
+     * `@Deprecated` and a strict no-op since `0.6.1` so direct writes cannot desynchronize spring
+     * topology indices or wake scheduling. Update link physics via `Modifier.deponderRubber`,
+     * `view.deponderRubber`, or [SimulationWorld.upsertRubber] instead.
+     */
+    public var spec: RubberSpec
+        get() = _spec
+        @Deprecated(
+            message = "No-op since 0.6.1: direct mutation of RubberPose.spec bypasses spring topology indexing and is ignored. Update link physics via Modifier.deponderRubber, view.deponderRubber, or SimulationWorld.upsertRubber(...) instead.",
+        )
+        set(_) {
+            // Intentional no-op since 0.6.1 to preserve 0.6.0 JVM/Klib binary compatibility without mutating engine invariants.
+        }
+
+    internal fun updateSpecInternal(newSpec: RubberSpec) {
+        _spec = newSpec
+    }
+
     public var centerX: Float = 0f
         internal set
     public var centerY: Float = 0f

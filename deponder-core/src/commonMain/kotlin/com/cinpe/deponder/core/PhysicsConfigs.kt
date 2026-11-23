@@ -303,9 +303,12 @@ public class DeponderRubberInsets internal constructor(
  * Shared, immutable `dp`-based root container physics configuration used across both
  * Compose Multiplatform (`rememberDeponderState`) and Android Views (`viewGroup.deponderRoot`).
  *
- * Pass a negative [wallRepulsionDp] (such as [DeponderDefaults.INFINITE_RANGE]) for an unbounded
- * viewport-centering boundary field. Enable [unfoldEnabled] via [withUnfold] so tangled topologies
- * smoothly unfold before settling into Newtonian equilibrium.
+ * Energy dissipation is governed solely by viscous [airDamping] (`1/s`), controlling how quickly
+ * velocities settle into `0% CPU` idle sleep; passing `airDamping = 0f` yields undamped perpetual
+ * motion. Pass a negative [wallRepulsionDp] (such as [DeponderDefaults.INFINITE_RANGE]) for an
+ * unbounded viewport-centering boundary field. For tangled graphs, invoke `state.unfold()` (Compose)
+ * or `controller.unfold()` (Android View) to run a one-shot topological unfolding pass before settling
+ * into Newtonian equilibrium.
  */
 public class RootPhysics internal constructor(
     initScale: Float,
@@ -317,8 +320,9 @@ public class RootPhysics internal constructor(
     wallElasticityTop: Float,
     wallElasticityEnd: Float,
     wallElasticityBottom: Float,
-    public val coolingEnabled: Boolean,
-    alphaDecay: Float,
+    @Deprecated(
+        message = "Topological unfolding is a transient one-shot action rather than a persistent physics property; invoke state.unfold() (Compose) or controller.unfold() (Android View) instead.",
+    )
     public val unfoldEnabled: Boolean,
 ) {
     public val initScale: Float = normalizeZero(initScale)
@@ -330,7 +334,24 @@ public class RootPhysics internal constructor(
     public val wallElasticityTop: Float = normalizeZero(wallElasticityTop)
     public val wallElasticityEnd: Float = normalizeZero(wallElasticityEnd)
     public val wallElasticityBottom: Float = normalizeZero(wallElasticityBottom)
-    public val alphaDecay: Float = normalizeZero(alphaDecay)
+
+    /**
+     * Deprecated (no-op `false` since 0.6.1): simulated annealing (`alpha` cooling) has been
+     * retired so it never conflicts with viscous [airDamping]. Always `false`.
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: always false. Simulated annealing has been retired; configure airDamping instead (0f for perpetual motion).",
+    )
+    public val coolingEnabled: Boolean = false
+
+    /**
+     * Deprecated (no-op `0f` since 0.6.1): simulated annealing (`alpha` cooling) has been retired
+     * in favor of pure Newtonian [airDamping]. Always `0f`.
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: always 0f. Simulated annealing has been retired; configure airDamping instead.",
+    )
+    public val alphaDecay: Float = 0f
 
     public constructor() : this(
         initScale = DeponderDefaults.Root.INIT_SCALE,
@@ -342,9 +363,7 @@ public class RootPhysics internal constructor(
         wallElasticityTop = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
         wallElasticityEnd = DeponderDefaults.Root.WALL_ELASTICITY_END,
         wallElasticityBottom = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
-        coolingEnabled = DeponderDefaults.Root.COOLING_ENABLED,
-        alphaDecay = DeponderDefaults.Simulation.ALPHA_DECAY,
-        unfoldEnabled = DeponderDefaults.Root.UNFOLD_ENABLED,
+        unfoldEnabled = false,
     )
 
     public constructor(
@@ -357,8 +376,6 @@ public class RootPhysics internal constructor(
         wallElasticityTop: Float = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
         wallElasticityEnd: Float = DeponderDefaults.Root.WALL_ELASTICITY_END,
         wallElasticityBottom: Float = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
-        coolingEnabled: Boolean = DeponderDefaults.Root.COOLING_ENABLED,
-        alphaDecay: Float = DeponderDefaults.Simulation.ALPHA_DECAY,
     ) : this(
         initScale = initScale,
         maxScale = maxScale,
@@ -369,9 +386,64 @@ public class RootPhysics internal constructor(
         wallElasticityTop = wallElasticityTop,
         wallElasticityEnd = wallElasticityEnd,
         wallElasticityBottom = wallElasticityBottom,
-        coolingEnabled = coolingEnabled,
-        alphaDecay = alphaDecay,
-        unfoldEnabled = DeponderDefaults.Root.UNFOLD_ENABLED,
+        unfoldEnabled = false,
+    )
+
+    @Deprecated(
+        message = "coolingEnabled and alphaDecay are no-ops since 0.6.1; use the 9-parameter RootPhysics constructor and configure airDamping instead (0f for perpetual motion).",
+    )
+    @Suppress("UNUSED_PARAMETER")
+    public constructor(
+        initScale: Float = DeponderDefaults.Root.INIT_SCALE,
+        maxScale: Float = DeponderDefaults.Root.MAX_SCALE,
+        minScale: Float = DeponderDefaults.Root.MIN_SCALE,
+        airDamping: Float = DeponderDefaults.Root.AIR_DAMPING,
+        wallRepulsionDp: Float = DeponderDefaults.Root.WALL_REPULSION_DP,
+        wallElasticityStart: Float = DeponderDefaults.Root.WALL_ELASTICITY_START,
+        wallElasticityTop: Float = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
+        wallElasticityEnd: Float = DeponderDefaults.Root.WALL_ELASTICITY_END,
+        wallElasticityBottom: Float = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
+        coolingEnabled: Boolean,
+        alphaDecay: Float = 0f,
+    ) : this(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionDp = wallRepulsionDp,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
+        unfoldEnabled = false,
+    )
+
+    @Deprecated(
+        message = "alphaDecay is a no-op since 0.6.1; use the 9-parameter RootPhysics constructor and configure airDamping instead.",
+    )
+    @Suppress("UNUSED_PARAMETER")
+    public constructor(
+        initScale: Float = DeponderDefaults.Root.INIT_SCALE,
+        maxScale: Float = DeponderDefaults.Root.MAX_SCALE,
+        minScale: Float = DeponderDefaults.Root.MIN_SCALE,
+        airDamping: Float = DeponderDefaults.Root.AIR_DAMPING,
+        wallRepulsionDp: Float = DeponderDefaults.Root.WALL_REPULSION_DP,
+        wallElasticityStart: Float = DeponderDefaults.Root.WALL_ELASTICITY_START,
+        wallElasticityTop: Float = DeponderDefaults.Root.WALL_ELASTICITY_TOP,
+        wallElasticityEnd: Float = DeponderDefaults.Root.WALL_ELASTICITY_END,
+        wallElasticityBottom: Float = DeponderDefaults.Root.WALL_ELASTICITY_BOTTOM,
+        alphaDecay: Float,
+    ) : this(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionDp = wallRepulsionDp,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
+        unfoldEnabled = false,
     )
 
     init {
@@ -398,7 +470,6 @@ public class RootPhysics internal constructor(
         require(this.wallElasticityBottom.isFinite()) {
             "wallElasticityBottom must be finite, but was ${this.wallElasticityBottom}"
         }
-        require(this.alphaDecay.isFinite()) { "alphaDecay must be finite, but was ${this.alphaDecay}" }
     }
 
     public operator fun component1(): Float = initScale
@@ -410,9 +481,16 @@ public class RootPhysics internal constructor(
     public operator fun component7(): Float = wallElasticityTop
     public operator fun component8(): Float = wallElasticityEnd
     public operator fun component9(): Float = wallElasticityBottom
+
+    @Deprecated(message = "No-op since 0.6.1: coolingEnabled has been retired.")
+    @Suppress("DEPRECATION")
     public operator fun component10(): Boolean = coolingEnabled
+
+    @Deprecated(message = "No-op since 0.6.1: alphaDecay has been retired.")
+    @Suppress("DEPRECATION")
     public operator fun component11(): Float = alphaDecay
 
+    @Suppress("DEPRECATION")
     public fun copy(
         initScale: Float = this.initScale,
         maxScale: Float = this.maxScale,
@@ -423,8 +501,6 @@ public class RootPhysics internal constructor(
         wallElasticityTop: Float = this.wallElasticityTop,
         wallElasticityEnd: Float = this.wallElasticityEnd,
         wallElasticityBottom: Float = this.wallElasticityBottom,
-        coolingEnabled: Boolean = this.coolingEnabled,
-        alphaDecay: Float = this.alphaDecay,
     ): RootPhysics = RootPhysics(
         initScale = initScale,
         maxScale = maxScale,
@@ -435,8 +511,63 @@ public class RootPhysics internal constructor(
         wallElasticityTop = wallElasticityTop,
         wallElasticityEnd = wallElasticityEnd,
         wallElasticityBottom = wallElasticityBottom,
-        coolingEnabled = coolingEnabled,
-        alphaDecay = alphaDecay,
+        unfoldEnabled = this.unfoldEnabled,
+    )
+
+    @Deprecated(
+        message = "coolingEnabled and alphaDecay are no-ops since 0.6.1; use the 9-parameter copy(...) overload instead.",
+    )
+    @Suppress("DEPRECATION", "UNUSED_PARAMETER")
+    public fun copy(
+        initScale: Float = this.initScale,
+        maxScale: Float = this.maxScale,
+        minScale: Float = this.minScale,
+        airDamping: Float = this.airDamping,
+        wallRepulsionDp: Float = this.wallRepulsionDp,
+        wallElasticityStart: Float = this.wallElasticityStart,
+        wallElasticityTop: Float = this.wallElasticityTop,
+        wallElasticityEnd: Float = this.wallElasticityEnd,
+        wallElasticityBottom: Float = this.wallElasticityBottom,
+        coolingEnabled: Boolean,
+        alphaDecay: Float = 0f,
+    ): RootPhysics = RootPhysics(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionDp = wallRepulsionDp,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
+        unfoldEnabled = this.unfoldEnabled,
+    )
+
+    @Deprecated(
+        message = "alphaDecay is a no-op since 0.6.1; use the 9-parameter copy(...) overload instead.",
+    )
+    @Suppress("DEPRECATION", "UNUSED_PARAMETER")
+    public fun copy(
+        initScale: Float = this.initScale,
+        maxScale: Float = this.maxScale,
+        minScale: Float = this.minScale,
+        airDamping: Float = this.airDamping,
+        wallRepulsionDp: Float = this.wallRepulsionDp,
+        wallElasticityStart: Float = this.wallElasticityStart,
+        wallElasticityTop: Float = this.wallElasticityTop,
+        wallElasticityEnd: Float = this.wallElasticityEnd,
+        wallElasticityBottom: Float = this.wallElasticityBottom,
+        alphaDecay: Float,
+    ): RootPhysics = RootPhysics(
+        initScale = initScale,
+        maxScale = maxScale,
+        minScale = minScale,
+        airDamping = airDamping,
+        wallRepulsionDp = wallRepulsionDp,
+        wallElasticityStart = wallElasticityStart,
+        wallElasticityTop = wallElasticityTop,
+        wallElasticityEnd = wallElasticityEnd,
+        wallElasticityBottom = wallElasticityBottom,
         unfoldEnabled = this.unfoldEnabled,
     )
 
@@ -449,12 +580,25 @@ public class RootPhysics internal constructor(
     public fun withWallRepulsionDp(wallRepulsionDp: Float): RootPhysics =
         copy(wallRepulsionDp = wallRepulsionDp)
 
-    public fun withCooling(coolingEnabled: Boolean, alphaDecay: Float = this.alphaDecay): RootPhysics =
-        copy(coolingEnabled = coolingEnabled, alphaDecay = alphaDecay)
+    /**
+     * Deprecated (no-op since 0.6.1): simulated annealing (`alpha` cooling) has been retired so
+     * it cannot conflict with Newtonian viscous drag. Returns `this` unchanged; configure
+     * [withAirDamping] (`0f` for undamped perpetual motion) instead.
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: simulated annealing has been retired; use withAirDamping(airDamping) instead (0f for perpetual motion).",
+        replaceWith = ReplaceWith("this"),
+    )
+    @Suppress("DEPRECATION", "UNUSED_PARAMETER")
+    public fun withCooling(coolingEnabled: Boolean, alphaDecay: Float = this.alphaDecay): RootPhysics = this
 
     /**
-     * Returns a copy with opt-in topological unfolding enabled or disabled.
+     * Deprecated: topological unfolding is a transient one-shot action rather than a persistent
+     * physics property. Invoke `state.unfold()` (Compose) or `controller.unfold()` (Android View) instead.
      */
+    @Deprecated(
+        message = "Topological unfolding is a transient one-shot action rather than a persistent physics property; invoke state.unfold() (Compose) or controller.unfold() (Android View) instead.",
+    )
     @JvmOverloads
     public fun withUnfold(unfoldEnabled: Boolean = true): RootPhysics =
         RootPhysics(
@@ -467,14 +611,13 @@ public class RootPhysics internal constructor(
             wallElasticityTop = wallElasticityTop,
             wallElasticityEnd = wallElasticityEnd,
             wallElasticityBottom = wallElasticityBottom,
-            coolingEnabled = coolingEnabled,
-            alphaDecay = alphaDecay,
             unfoldEnabled = unfoldEnabled,
         )
 
     /**
      * Converts this `dp`-based configuration into pixel-space [EnvironmentSpec] for [density] (`px / dp`).
      */
+    @Suppress("DEPRECATION")
     public fun toEnvironmentSpec(density: Float): EnvironmentSpec {
         val safeDensity = safeDensityOrOne(density)
         val clampedInit = initScale.coerceIn(minScale, maxScale)
@@ -492,11 +635,11 @@ public class RootPhysics internal constructor(
             wallElasticityTop = wallElasticityTop,
             wallElasticityEnd = wallElasticityEnd,
             wallElasticityBottom = wallElasticityBottom,
-            degreeRadiusIncrementPx = DeponderDefaults.Planet.DEGREE_RADIUS_INCREMENT_DP * safeDensity,
+            degreeRadiusIncrementPx = 0f,
             infiniteChargeStrength = DeponderDefaults.Planet.INFINITE_CHARGE_STRENGTH,
-            coolingEnabled = coolingEnabled,
-            alphaDecay = alphaDecay,
-            alphaMin = DeponderDefaults.Simulation.ALPHA_MIN,
+            coolingEnabled = false,
+            alphaDecay = 0f,
+            alphaMin = 0f,
             restSpeedPxPerSec = DeponderDefaults.Simulation.REST_SPEED_PX_PER_SEC,
             restAccelPxPerSecSq = DeponderDefaults.Simulation.REST_ACCEL_PX_PER_SEC_SQ,
             settleDurationSeconds = DeponderDefaults.Simulation.SETTLE_DURATION_SECONDS,
@@ -504,6 +647,7 @@ public class RootPhysics internal constructor(
         )
     }
 
+    @Suppress("DEPRECATION")
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is RootPhysics) return false
@@ -516,11 +660,10 @@ public class RootPhysics internal constructor(
             wallElasticityTop == other.wallElasticityTop &&
             wallElasticityEnd == other.wallElasticityEnd &&
             wallElasticityBottom == other.wallElasticityBottom &&
-            coolingEnabled == other.coolingEnabled &&
-            alphaDecay == other.alphaDecay &&
             unfoldEnabled == other.unfoldEnabled
     }
 
+    @Suppress("DEPRECATION")
     override fun hashCode(): Int {
         var result = initScale.hashCode()
         result = 31 * result + maxScale.hashCode()
@@ -531,18 +674,17 @@ public class RootPhysics internal constructor(
         result = 31 * result + wallElasticityTop.hashCode()
         result = 31 * result + wallElasticityEnd.hashCode()
         result = 31 * result + wallElasticityBottom.hashCode()
-        result = 31 * result + coolingEnabled.hashCode()
-        result = 31 * result + alphaDecay.hashCode()
         result = 31 * result + unfoldEnabled.hashCode()
         return result
     }
 
+    @Suppress("DEPRECATION")
     override fun toString(): String =
         "RootPhysics(initScale=$initScale, maxScale=$maxScale, minScale=$minScale, " +
             "airDamping=$airDamping, wallRepulsionDp=$wallRepulsionDp, " +
             "wallElasticityStart=$wallElasticityStart, wallElasticityTop=$wallElasticityTop, " +
             "wallElasticityEnd=$wallElasticityEnd, wallElasticityBottom=$wallElasticityBottom, " +
-            "coolingEnabled=$coolingEnabled, alphaDecay=$alphaDecay, unfoldEnabled=$unfoldEnabled)"
+            "unfoldEnabled=$unfoldEnabled)"
 
     public companion object {
         @JvmStatic
@@ -550,7 +692,6 @@ public class RootPhysics internal constructor(
             RootPhysics(
                 airDamping = preset.airDamping,
                 wallRepulsionDp = preset.wallRepulsionDp,
-                alphaDecay = preset.alphaDecay,
             )
     }
 }

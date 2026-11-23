@@ -56,6 +56,7 @@ final class com.cinpe.deponder.compose/DeponderState { // com.cinpe.deponder.com
     final fun setPressed(kotlin/String, kotlin/Boolean) // com.cinpe.deponder.compose/DeponderState.setPressed|setPressed(kotlin.String;kotlin.Boolean){}[0]
     final fun submitRubberElasticity(kotlin/Float) // com.cinpe.deponder.compose/DeponderState.submitRubberElasticity|submitRubberElasticity(kotlin.Float){}[0]
     final fun submitScale(kotlin/Float) // com.cinpe.deponder.compose/DeponderState.submitScale|submitScale(kotlin.Float){}[0]
+    final fun unfold() // com.cinpe.deponder.compose/DeponderState.unfold|unfold(){}[0]
     final fun updatePhysics(com.cinpe.deponder.core/RootPhysics) // com.cinpe.deponder.compose/DeponderState.updatePhysics|updatePhysics(com.cinpe.deponder.core.RootPhysics){}[0]
 }
 

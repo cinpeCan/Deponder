@@ -264,10 +264,12 @@ class DeponderComposeOperatorsTest {
     }
 
     @Test
-    fun deponderState_propagatesUnfoldToggle_andUntanglesCrossedCycle() = runTest {
+    @Suppress("DEPRECATION")
+    fun deponderState_unfold_untanglesPreMountAndRuntimeCrossedCycle_whileWakeAndReheatPreserveLayout() = runTest {
         val state = DeponderState(RootPhysics())
-        assertFalse(state.physics.unfoldEnabled)
-        assertFalse(state.world.environment.unfoldEnabled)
+
+        // Pre-mount unfold() call before viewport or nodes are attached remains armed until first frame!
+        state.unfold()
 
         state.updateViewportSize(600, 600)
         state.updateDensity(1.0f)
@@ -290,10 +292,6 @@ class DeponderComposeOperatorsTest {
                 DeponderRubberNode(s, e, RubberPhysics.fixed(120f), DeponderRubberInsets.Default),
             )
         }
-
-        state.updatePhysics(state.physics.withUnfold(true))
-        assertTrue(state.physics.unfoldEnabled)
-        assertTrue(state.world.environment.unfoldEnabled)
         assertTrue(state.world.bodies.isNotEmpty())
 
         var active = true
@@ -310,16 +308,19 @@ class DeponderComposeOperatorsTest {
         val b3 = state.world.bodyOf("c3")!!
         fun orient(ax: Float, ay: Float, bx: Float, by: Float, cx: Float, cy: Float): Float =
             (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
-        val cross0123 =
-            (orient(b0.x, b0.y, b1.x, b1.y, b2.x, b2.y) * orient(b0.x, b0.y, b1.x, b1.y, b3.x, b3.y) < 0f) &&
-                (orient(b2.x, b2.y, b3.x, b3.y, b0.x, b0.y) * orient(b2.x, b2.y, b3.x, b3.y, b1.x, b1.y) < 0f)
-        val cross1230 =
-            (orient(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y) * orient(b1.x, b1.y, b2.x, b2.y, b0.x, b0.y) < 0f) &&
-                (orient(b3.x, b3.y, b0.x, b0.y, b1.x, b1.y) * orient(b3.x, b3.y, b0.x, b0.y, b2.x, b2.y) < 0f)
-        assertFalse(cross0123 || cross1230, "Unfolded cycle edges must not cross after settling")
+        fun hasCrossing(): Boolean {
+            val cross0123 =
+                (orient(b0.x, b0.y, b1.x, b1.y, b2.x, b2.y) * orient(b0.x, b0.y, b1.x, b1.y, b3.x, b3.y) < 0f) &&
+                    (orient(b2.x, b2.y, b3.x, b3.y, b0.x, b0.y) * orient(b2.x, b2.y, b3.x, b3.y, b1.x, b1.y) < 0f)
+            val cross1230 =
+                (orient(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y) * orient(b1.x, b1.y, b2.x, b2.y, b0.x, b0.y) < 0f) &&
+                    (orient(b3.x, b3.y, b0.x, b0.y, b1.x, b1.y) * orient(b3.x, b3.y, b0.x, b0.y, b2.x, b2.y) < 0f)
+            return cross0123 || cross1230
+        }
+        assertFalse(hasCrossing(), "Pre-mount state.unfold() must untangle cycle before settling")
 
-        // Verify submitScale(1.25f) preserves manual crossed arrangement (no unintended unfold),
-        // while explicit reheat() untangles it again.
+        // Verify both submitScale(1.25f) and reheat() preserve manual crossed arrangement,
+        // while explicit state.unfold() untangles it cleanly.
         state.moveTo("c0", 200f, 200f)
         state.moveTo("c1", 400f, 400f)
         state.moveTo("c2", 200f, 400f)
@@ -332,28 +333,74 @@ class DeponderComposeOperatorsTest {
             scaleGuard += 1
         }
         assertFalse(scaleActive)
-        val crossAfterScale0123 =
-            (orient(b0.x, b0.y, b1.x, b1.y, b2.x, b2.y) * orient(b0.x, b0.y, b1.x, b1.y, b3.x, b3.y) < 0f) &&
-                (orient(b2.x, b2.y, b3.x, b3.y, b0.x, b0.y) * orient(b2.x, b2.y, b3.x, b3.y, b1.x, b1.y) < 0f)
-        val crossAfterScale1230 =
-            (orient(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y) * orient(b1.x, b1.y, b2.x, b2.y, b0.x, b0.y) < 0f) &&
-                (orient(b3.x, b3.y, b0.x, b0.y, b1.x, b1.y) * orient(b3.x, b3.y, b0.x, b0.y, b2.x, b2.y) < 0f)
-        assertTrue(crossAfterScale0123 || crossAfterScale1230, "submitScale() must not erase manual layout via unfold")
+        assertTrue(hasCrossing(), "submitScale() must not erase manual layout via unfold")
 
+        // Deprecated no-op state.reheat() must preserve manual layout when unfold() is not invoked.
         state.reheat()
-        var reheatActive = true
-        var reheatGuard = 0
-        while (reheatActive && reheatGuard < 1800) {
-            reheatActive = state.stepFrame(0.016f)
-            reheatGuard += 1
+        assertFalse(state.isAwake)
+        assertTrue(hasCrossing(), "deprecated reheat() no-op must preserve manual layout")
+
+        state.unfold()
+        var unfoldActive = true
+        var unfoldGuard = 0
+        while (unfoldActive && unfoldGuard < 1800) {
+            unfoldActive = state.stepFrame(0.016f)
+            unfoldGuard += 1
         }
-        assertFalse(reheatActive)
-        val crossAfterReheat0123 =
+        assertFalse(unfoldActive)
+        assertFalse(hasCrossing(), "state.unfold() must untangle crossed cycle")
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun deponderState_deprecatedWithUnfoldToggle_preservesTransitionalBehavior() = runTest {
+        val state = DeponderState(RootPhysics())
+        assertFalse(state.physics.unfoldEnabled)
+        assertFalse(state.world.environment.unfoldEnabled)
+
+        state.updateViewportSize(600, 600)
+        state.updateDensity(1.0f)
+
+        val nodes = listOf(
+            DeponderPlanetNode("c0", PlanetPhysics()),
+            DeponderPlanetNode("c1", PlanetPhysics()),
+            DeponderPlanetNode("c2", PlanetPhysics()),
+            DeponderPlanetNode("c3", PlanetPhysics()),
+        )
+        nodes.forEach { state.registerPlanetNode(it) }
+        state.syncPlanetPlacement(nodes[0], 200f, 200f)
+        state.syncPlanetPlacement(nodes[1], 400f, 400f)
+        state.syncPlanetPlacement(nodes[2], 200f, 400f)
+        state.syncPlanetPlacement(nodes[3], 400f, 200f)
+        for ((s, e) in listOf("c0" to "c1", "c1" to "c2", "c2" to "c3", "c3" to "c0")) {
+            state.registerRubberNode(
+                DeponderRubberNode(s, e, RubberPhysics.fixed(120f), DeponderRubberInsets.Default),
+            )
+        }
+
+        state.updatePhysics(state.physics.withUnfold(true))
+        assertTrue(state.physics.unfoldEnabled)
+        assertTrue(state.world.environment.unfoldEnabled)
+
+        var active = true
+        var guard = 0
+        while (active && guard < 1800) {
+            active = state.stepFrame(0.016f)
+            guard += 1
+        }
+        assertFalse(active)
+        val b0 = state.world.bodyOf("c0")!!
+        val b1 = state.world.bodyOf("c1")!!
+        val b2 = state.world.bodyOf("c2")!!
+        val b3 = state.world.bodyOf("c3")!!
+        fun orient(ax: Float, ay: Float, bx: Float, by: Float, cx: Float, cy: Float): Float =
+            (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+        val cross0123 =
             (orient(b0.x, b0.y, b1.x, b1.y, b2.x, b2.y) * orient(b0.x, b0.y, b1.x, b1.y, b3.x, b3.y) < 0f) &&
                 (orient(b2.x, b2.y, b3.x, b3.y, b0.x, b0.y) * orient(b2.x, b2.y, b3.x, b3.y, b1.x, b1.y) < 0f)
-        val crossAfterReheat1230 =
+        val cross1230 =
             (orient(b1.x, b1.y, b2.x, b2.y, b3.x, b3.y) * orient(b1.x, b1.y, b2.x, b2.y, b0.x, b0.y) < 0f) &&
                 (orient(b3.x, b3.y, b0.x, b0.y, b1.x, b1.y) * orient(b3.x, b3.y, b0.x, b0.y, b2.x, b2.y) < 0f)
-        assertFalse(crossAfterReheat0123 || crossAfterReheat1230, "reheat() must untangle crossed cycle")
+        assertFalse(cross0123 || cross1230, "Deprecated withUnfold(true) toggle must remain functional")
     }
 }

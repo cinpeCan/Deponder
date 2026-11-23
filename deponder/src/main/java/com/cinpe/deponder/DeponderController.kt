@@ -6,7 +6,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.findViewTreeLifecycleOwner
-import com.cinpe.deponder.core.DeponderDefaults
 import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetBody
 import com.cinpe.deponder.core.RootPhysics
@@ -31,7 +30,7 @@ private sealed interface ControllerIntent
 private data class ControllerUpdatePhysics(val physics: RootPhysics) : ControllerIntent
 private data class ControllerSubmitScale(val scale: Float) : ControllerIntent
 private data class ControllerSubmitRubberElasticity(val elasticity: Float) : ControllerIntent
-private data object ControllerReheat : ControllerIntent
+private data object ControllerUnfold : ControllerIntent
 private data class ControllerSetPinned(val id: String, val pinned: Boolean) : ControllerIntent
 private data class ControllerSetPressed(val id: String, val pressed: Boolean) : ControllerIntent
 private data class ControllerBringToFront(val id: String) : ControllerIntent
@@ -294,7 +293,6 @@ public class DeponderController internal constructor(
                 if (scale != clamped) {
                     scale = clamped
                     world.refreshRubberPoses(clamped)
-                    world.wake(DeponderDefaults.Simulation.INTERACTION_ALPHA)
                     completeReduction(energized = true, projectPoses = true)
                 }
             }
@@ -317,8 +315,8 @@ public class DeponderController internal constructor(
                 }
             }
 
-            ControllerReheat -> {
-                world.reheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
+            ControllerUnfold -> {
+                world.unfold()
                 completeReduction(energized = true, projectPoses = false)
             }
 
@@ -503,10 +501,26 @@ public class DeponderController internal constructor(
     }
 
     /**
-     * Reheats simulated annealing and wakes the physics VSYNC loop if sleeping.
+     * Deprecated (no-op since 0.6.1): simulated annealing has been retired so energy dissipation is
+     * governed purely by [RootPhysics.airDamping] (`0f` for perpetual motion). Dragging, scale,
+     * elasticity, physics, and topology changes wake the VSYNC loop automatically; invoke [unfold]
+     * for one-shot topological untangling.
      */
+    @Deprecated(
+        message = "No-op since 0.6.1: simulated annealing has been retired. State and gesture mutations wake the loop automatically; invoke unfold() to untangle topology.",
+    )
     public fun reheat() {
-        dispatch(ControllerReheat)
+        // Intentional no-op since 0.6.1.
+    }
+
+    /**
+     * Triggers a one-shot sparse topological unfold pass and wakes the physics VSYNC loop if sleeping.
+     *
+     * Safe to invoke in `onCreate` before the first `View` layout pass completes; once the short guided
+     * untangling phase finishes, dynamics return completely to pure Newtonian spring physics and `0% CPU` idle sleep.
+     */
+    public fun unfold() {
+        dispatch(ControllerUnfold)
     }
 
     /**
@@ -517,7 +531,7 @@ public class DeponderController internal constructor(
     }
 
     /**
-     * Marks planet [id] as actively pressed/held (`pressed = true` locks velocity and elevates interaction alpha).
+     * Marks planet [id] as actively pressed/held (`pressed = true` locks velocity and resets idle sleep).
      */
     public fun setPressed(id: String, pressed: Boolean) {
         dispatch(ControllerSetPressed(id, pressed))

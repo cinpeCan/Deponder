@@ -9,7 +9,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.cinpe.deponder.core.DeponderDefaults
 import com.cinpe.deponder.core.EdgeKey
 import com.cinpe.deponder.core.PlanetBody
 import com.cinpe.deponder.core.PlanetPhysics
@@ -27,7 +26,7 @@ private sealed interface StateIntent
 private data class StateUpdatePhysics(val physics: RootPhysics) : StateIntent
 private data class StateSubmitScale(val scale: Float) : StateIntent
 private data class StateSubmitRubberElasticity(val elasticity: Float) : StateIntent
-private data object StateReheat : StateIntent
+private data object StateUnfold : StateIntent
 private data class StateSetPinned(val id: String, val pinned: Boolean) : StateIntent
 private data class StateSetPressed(val id: String, val pressed: Boolean) : StateIntent
 private data class StateBringToFront(val id: String) : StateIntent
@@ -139,7 +138,6 @@ public class DeponderState(
                 if (scale != clamped) {
                     scale = clamped
                     world.refreshRubberPoses(clamped)
-                    world.wake(DeponderDefaults.Simulation.INTERACTION_ALPHA)
                     completeReduction(energized = true, notifyFrame = true)
                 }
             }
@@ -162,8 +160,8 @@ public class DeponderState(
                 }
             }
 
-            StateReheat -> {
-                world.reheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
+            StateUnfold -> {
+                world.unfold()
                 completeReduction(energized = true, notifyFrame = false)
             }
 
@@ -269,10 +267,26 @@ public class DeponderState(
     }
 
     /**
-     * Reheats simulated annealing and wakes the physics frame loop if sleeping.
+     * Deprecated (no-op since 0.6.1): simulated annealing has been retired so energy dissipation is
+     * governed purely by [RootPhysics.airDamping] (`0f` for perpetual motion). Dragging, scale,
+     * elasticity, physics, and topology changes wake the frame loop automatically; invoke [unfold]
+     * for one-shot topological untangling.
      */
+    @Deprecated(
+        message = "No-op since 0.6.1: simulated annealing has been retired. State and gesture mutations wake the loop automatically; invoke unfold() to untangle topology.",
+    )
     public fun reheat() {
-        dispatch(StateReheat)
+        // Intentional no-op since 0.6.1.
+    }
+
+    /**
+     * Triggers a one-shot sparse topological unfold pass and wakes the physics frame loop if sleeping.
+     *
+     * Safe to invoke before initial layout completes; once the short guided untangling phase finishes,
+     * dynamics return completely to pure Newtonian spring physics and `0% CPU` idle sleep.
+     */
+    public fun unfold() {
+        dispatch(StateUnfold)
     }
 
     /**
@@ -283,7 +297,7 @@ public class DeponderState(
     }
 
     /**
-     * Marks planet [id] as actively pressed/held (`pressed = true` locks velocity and elevates interaction alpha).
+     * Marks planet [id] as actively pressed/held (`pressed = true` locks velocity and resets idle sleep).
      */
     public fun setPressed(id: String, pressed: Boolean) {
         dispatch(StateSetPressed(id, pressed))

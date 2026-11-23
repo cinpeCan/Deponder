@@ -12,7 +12,6 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 import kotlin.math.sin
 import kotlin.math.sqrt
 
@@ -29,8 +28,8 @@ import kotlin.math.sqrt
  *   2. Medium graphs (`64 <= N < 256`): single-thread zero-allocation [HybridQuadtree] without coroutine dispatch overhead.
  *   3. Large graphs (`N >= 256`): single outer [Dispatchers.Default] switch per VSYNC wrapping all substeps
  *      operating exclusively on isolated primitive snapshots (zero cross-thread collection/body access).
- * - Adaptive `1/120s` exact-division sub-stepping (`MAX_SUBSTEPS = 4`), exponential viscous air damping,
- *   full-strength `alpha = 1.0f` interaction response, and frame-rate-independent Global Kinetic-Force Sleep.
+ * - Adaptive `1/120s` exact-division sub-stepping (`MAX_SUBSTEPS = 4`), pure Newtonian viscous air
+ *   damping (`airDamping`, `0f` for undamped perpetual motion), and frame-rate-independent Global Kinetic-Force Sleep.
  */
 public class SimulationWorld(
     environment: EnvironmentSpec = EnvironmentSpec(),
@@ -43,23 +42,35 @@ public class SimulationWorld(
     public var viewportHeightPx: Float = 0f
         private set
 
-    public var alpha: Float = DeponderDefaults.Simulation.INITIAL_ALPHA
+    /**
+     * Deprecated (constant `1.0f` since 0.6.1): simulated annealing temperature scaling has been
+     * retired so forces always act at full Newtonian strength; energy dissipation is governed solely
+     * by [EnvironmentSpec.airDamping].
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: always 1.0f. Simulated annealing has been retired; configure airDamping instead.",
+    )
+    public var alpha: Float = 1.0f
         private set
 
     private sealed interface CausalIntent {
         class BodyPoseOverride(val id: String, var x: Float, var y: Float) : CausalIntent
         data class BodyVelocityZero(val id: String) : CausalIntent
-        data class ElevateAlpha(val minAlpha: Float) : CausalIntent
+        data object ResetSettle : CausalIntent
     }
 
     private var settleTimeSeconds: Float = 0f
+    private var lastRefreshedScale: Float = Float.NaN
     private var perturbationCounter: Int = 0
     private var asyncStepInFlight: Boolean = false
     private val inFlightJournal = ArrayList<CausalIntent>(4)
 
     private val unfolder = TopologicalUnfolder()
+    private var unfoldRequested: Boolean = false
+    private var unfoldAwaitingViewport: Boolean = false
     private var unfoldDirty: Boolean = false
     private var unfoldRemainingSeconds: Float = 0f
+    private var cancelInFlightUnfold: Boolean = false
 
     private val bodiesById = LinkedHashMap<String, PlanetBody>()
     private val bodyList = ArrayList<PlanetBody>()
@@ -111,7 +122,7 @@ public class SimulationWorld(
             when (val entry = inFlightJournal[i]) {
                 is CausalIntent.BodyPoseOverride -> if (entry.id == id) inFlightJournal.removeAt(i)
                 is CausalIntent.BodyVelocityZero -> if (entry.id == id) inFlightJournal.removeAt(i)
-                is CausalIntent.ElevateAlpha -> Unit
+                CausalIntent.ResetSettle -> Unit
             }
             i -= 1
         }
@@ -138,25 +149,13 @@ public class SimulationWorld(
         inFlightJournal.add(CausalIntent.BodyVelocityZero(id))
     }
 
-    private fun recordElevateAlpha(minAlpha: Float) {
-        val last = inFlightJournal.lastOrNull()
-        if (last is CausalIntent.ElevateAlpha) {
-            if (minAlpha > last.minAlpha) {
-                inFlightJournal[inFlightJournal.size - 1] = CausalIntent.ElevateAlpha(minAlpha)
-            }
-            return
-        }
-        inFlightJournal.add(CausalIntent.ElevateAlpha(minAlpha))
-    }
-
-    private fun reduceReheat(minAlpha: Float) {
-        val clamped = minAlpha.coerceIn(0f, 1f)
-        if (alpha < clamped) {
-            alpha = clamped
-        }
+    private fun resetSettleTimer() {
         settleTimeSeconds = 0f
         if (asyncStepInFlight) {
-            recordElevateAlpha(clamped)
+            val last = inFlightJournal.lastOrNull()
+            if (last !is CausalIntent.ResetSettle) {
+                inFlightJournal.add(CausalIntent.ResetSettle)
+            }
         }
     }
 
@@ -169,6 +168,7 @@ public class SimulationWorld(
         body.hasUserPose = true
         if (body.isPressed) {
             unfoldRemainingSeconds = 0f
+            unfoldAwaitingViewport = false
         }
         indexById[body.spec.id]?.let { idx ->
             if (idx < unfoldTargetX.size) {
@@ -196,19 +196,26 @@ public class SimulationWorld(
 
     public fun updateEnvironment(spec: EnvironmentSpec, reheatSimulation: Boolean = true) {
         if (environment != spec) {
+            @Suppress("DEPRECATION")
             val wasUnfold = environment.unfoldEnabled
+            @Suppress("DEPRECATION")
+            val nextUnfold = spec.unfoldEnabled
             environment = spec
-            if (!wasUnfold && spec.unfoldEnabled) {
+            if (!wasUnfold && nextUnfold) {
                 unfoldDirty = true
-                reduceReheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
-            } else if (wasUnfold && !spec.unfoldEnabled) {
+                cancelInFlightUnfold = false
+                resetSettleTimer()
+            } else if (wasUnfold && !nextUnfold) {
                 unfoldDirty = false
-                unfoldRemainingSeconds = 0f
+                if (!unfoldRequested) {
+                    unfoldRemainingSeconds = 0f
+                    if (asyncStepInFlight) {
+                        cancelInFlightUnfold = true
+                    }
+                }
             }
             if (reheatSimulation) {
-                reduceReheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
-            } else if (asyncStepInFlight) {
-                recordElevateAlpha(alpha)
+                resetSettleTimer()
             }
         }
     }
@@ -228,33 +235,60 @@ public class SimulationWorld(
                         b.hasEstablishedPose = false
                     }
                 }
+                @Suppress("DEPRECATION")
                 if (environment.unfoldEnabled) {
                     unfoldDirty = true
                 }
+                if (unfoldAwaitingViewport) {
+                    unfoldAwaitingViewport = false
+                    unfoldRequested = true
+                }
             }
-            reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+            resetSettleTimer()
         }
     }
 
     /**
-     * Reheats simulated annealing temperature and resets the sleep timer so the simulation wakes immediately.
+     * Deprecated (no-op since 0.6.1): simulated annealing (`alpha` reheating) has been retired so
+     * Hooke springs obey pure Newtonian mechanics governed solely by [EnvironmentSpec.airDamping].
+     * Real topology, physics, viewport, scale, and drag mutations reset idle sleep automatically;
+     * invoke [unfold] when untangling graph topology.
      */
+    @Deprecated(
+        message = "No-op since 0.6.1: simulated annealing has been retired. Real mutations wake the world automatically; invoke unfold() to untangle topology.",
+    )
+    @Suppress("DEPRECATION", "UNUSED_PARAMETER")
     public fun reheat(minAlpha: Float = DeponderDefaults.Simulation.INITIAL_ALPHA) {
-        require(minAlpha.isFinite()) { "minAlpha must be finite, but was $minAlpha" }
-        if (environment.unfoldEnabled) {
-            unfoldDirty = true
-        }
-        reduceReheat(minAlpha)
+        // Intentional no-op since 0.6.1.
     }
 
     /**
-     * Wakes the simulation loop and elevates `alpha` to at least [minAlpha] without re-running
-     * topological unfolding (suitable for continuous parameter updates such as zoom scale changes).
+     * Schedules a one-shot sparse topological unfold pass on the next simulation frame and wakes
+     * the simulation immediately.
+     *
+     * Safe to call before planets, rubbers, or non-zero viewport bounds are laid out: the request
+     * remains armed until the next active frame (and re-aligns once initial `0x0` viewport bounds
+     * resolve before user interaction), then fades out completely into pure Newtonian spring physics.
      */
+    public fun unfold() {
+        unfoldRequested = true
+        unfoldAwaitingViewport = viewportWidthPx <= 0f && viewportHeightPx <= 0f
+        cancelInFlightUnfold = false
+        resetSettleTimer()
+    }
+
+    /**
+     * Deprecated (no-op since 0.6.1): manual annealing temperature wakeups have been retired.
+     * Real mutations (`upsertPlanet`, `upsertRubber`, `updateEnvironment`, `updateViewport`,
+     * scale-changing [refreshRubberPoses], and pointer drags) wake the simulation automatically.
+     */
+    @Deprecated(
+        message = "No-op since 0.6.1: manual alpha wakeups have been retired; topology, physics, scale, and drag updates wake the world automatically.",
+    )
+    @Suppress("DEPRECATION", "UNUSED_PARAMETER")
     @kotlin.jvm.JvmOverloads
     public fun wake(minAlpha: Float = DeponderDefaults.Simulation.INTERACTION_ALPHA) {
-        require(minAlpha.isFinite()) { "minAlpha must be finite, but was $minAlpha" }
-        reduceReheat(minAlpha)
+        // Intentional no-op since 0.6.1.
     }
 
     private fun resolveInitialPosition(rawX: Float, rawY: Float, pinned: Boolean): Vec2 {
@@ -375,7 +409,7 @@ public class SimulationWorld(
             if (existing.spec.pinned != spec.pinned) {
                 unfoldDirty = true
             }
-            existing.spec = spec
+            existing.updateSpecInternal(spec)
             if (spec.pinned) {
                 existing.hasEstablishedPose = true
                 existing.hasUserPose = true
@@ -394,7 +428,7 @@ public class SimulationWorld(
             }
         }
         rebuildTopologyIndex(scale)
-        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        resetSettleTimer()
     }
 
     /**
@@ -407,7 +441,7 @@ public class SimulationWorld(
             removeInFlightBodyEntries(id)
         }
         rebuildTopologyIndex(scale)
-        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        resetSettleTimer()
         return true
     }
 
@@ -431,10 +465,10 @@ public class SimulationWorld(
             ) {
                 unfoldDirty = true
             }
-            existing.spec = spec
+            existing.updateSpecInternal(spec)
             existing.dirty = true
             refreshRubberPoses(scale)
-            reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+            resetSettleTimer()
             return existing
         }
         if (existing == null ||
@@ -446,10 +480,10 @@ public class SimulationWorld(
             unfoldDirty = true
         }
         val pose = declaredRubbersByKey.getOrPut(key) { RubberPose(spec) }
-        pose.spec = spec
+        pose.updateSpecInternal(spec)
         pose.dirty = true
         rebuildTopologyIndex(scale)
-        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        resetSettleTimer()
         return pose
     }
 
@@ -460,7 +494,7 @@ public class SimulationWorld(
         if (declaredRubbersByKey.remove(key) == null) return false
         unfoldDirty = true
         rebuildTopologyIndex(scale)
-        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        resetSettleTimer()
         return true
     }
 
@@ -519,7 +553,7 @@ public class SimulationWorld(
                 if (existing.spec.pinned != spec.pinned) {
                     topologyChanged = true
                 }
-                existing.spec = spec
+                existing.updateSpecInternal(spec)
                 if (spec.pinned) {
                     existing.hasEstablishedPose = true
                     existing.hasUserPose = true
@@ -555,7 +589,7 @@ public class SimulationWorld(
                 ) {
                     topologyChanged = true
                 }
-                existingPose.spec = edge
+                existingPose.updateSpecInternal(edge)
                 existingPose.dirty = true
             } else {
                 declaredRubbersByKey[key] = RubberPose(edge)
@@ -575,7 +609,7 @@ public class SimulationWorld(
             unfoldDirty = true
         }
         rebuildTopologyIndex(environment.initScale)
-        reduceReheat(DeponderDefaults.Simulation.INITIAL_ALPHA)
+        resetSettleTimer()
     }
 
     private fun rebuildTopologyIndex(scale: Float) {
@@ -763,7 +797,7 @@ public class SimulationWorld(
     }
 
     /**
-     * Updates the spring [elasticity] across all declared rubbers and wakes the simulation at full strength.
+     * Updates the spring [elasticity] across all declared rubbers and wakes the simulation.
      */
     public fun updateAllRubbersElasticity(elasticity: Float) {
         require(elasticity.isFinite()) { "elasticity must be finite, but was $elasticity" }
@@ -771,18 +805,18 @@ public class SimulationWorld(
         for (i in rubberList.indices) {
             val pose = rubberList[i]
             if (pose.spec.elasticity != elasticity) {
-                pose.spec = pose.spec.copy(elasticity = elasticity)
+                pose.updateSpecInternal(pose.spec.copy(elasticity = elasticity))
                 changed = true
             }
         }
         if (changed) {
-            reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+            resetSettleTimer()
         }
     }
 
     /**
      * Moves planet [id] directly to `(x, y)` in root pixel coordinates, zeroing its velocity and waking
-     * connected neighbors at full interaction strength.
+     * connected neighbors.
      */
     public fun setBodyPosition(id: String, x: Float, y: Float, scale: Float = environment.initScale) {
         require(x.isFinite() && y.isFinite()) { "Body position must be finite, but were ($x, $y)" }
@@ -790,12 +824,12 @@ public class SimulationWorld(
         if (body.x != x || body.y != y) {
             reduceLockBodyPose(body, x, y)
             refreshRubberPoses(scale)
-            reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+            resetSettleTimer()
         }
     }
 
     /**
-     * Offsets planet [id] by `(dx, dy)` in root pixel coordinates and wakes the simulation at full strength.
+     * Offsets planet [id] by `(dx, dy)` in root pixel coordinates and wakes the simulation.
      */
     public fun offsetBodyPosition(id: String, dx: Float, dy: Float, scale: Float = environment.initScale) {
         require(dx.isFinite() && dy.isFinite()) { "Body offset must be finite, but were ($dx, $dy)" }
@@ -803,36 +837,41 @@ public class SimulationWorld(
         val body = bodiesById[id] ?: return
         reduceLockBodyPose(body, body.x + dx, body.y + dy)
         refreshRubberPoses(scale)
-        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        resetSettleTimer()
     }
 
     public fun setBodyPressed(id: String, pressed: Boolean) {
         val body = bodiesById[id] ?: return
         body.isPressed = pressed
         reduceZeroBodyVelocity(body)
-        reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+        resetSettleTimer()
     }
 
     public fun setBodyPinned(id: String, pinned: Boolean) {
         val body = bodiesById[id] ?: return
         if (body.spec.pinned != pinned) {
-            body.spec = body.spec.copy(pinned = pinned)
+            body.updateSpecInternal(body.spec.copy(pinned = pinned))
             unfoldDirty = true
             if (pinned) {
                 body.hasEstablishedPose = true
                 body.hasUserPose = true
                 reduceZeroBodyVelocity(body)
             } else {
-                reduceReheat(DeponderDefaults.Simulation.INTERACTION_ALPHA)
+                resetSettleTimer()
             }
         }
     }
 
     /**
      * Synchronizes all active [RubberPose] transforms immediately for the given [scale].
+     * When [scale] changes across updates, resets the sleep settle timer automatically.
      */
     public fun refreshRubberPoses(scale: Float) {
         val clampedScale = clampScale(scale)
+        if (!lastRefreshedScale.isNaN() && lastRefreshedScale != clampedScale) {
+            resetSettleTimer()
+        }
+        lastRefreshedScale = clampedScale
         for (i in rubberList.indices) {
             val pose = rubberList[i]
             val spec = pose.spec
@@ -958,10 +997,6 @@ public class SimulationWorld(
             if (b.isPressed) anyPressed = true
         }
 
-        if (anyPressed && alpha < DeponderDefaults.Simulation.INTERACTION_ALPHA) {
-            alpha = DeponderDefaults.Simulation.INTERACTION_ALPHA
-        }
-
         val maxSpeedSq: Float
         val maxAccelSq: Float
 
@@ -979,14 +1014,13 @@ public class SimulationWorld(
             val invMass = FloatArray(n) { i -> 1f / max(1e-4f, bodyList[i].spec.mass) }
             val locked = BooleanArray(n) { i -> bodyList[i].isPressed || bodyList[i].spec.pinned }
             val effR = FloatArray(n) { i ->
-                val b = bodyList[i]
-                val rawR = b.spec.repulsionRadiusPx
+                val rawR = bodyList[i].spec.repulsionRadiusPx
                 if (rawR < 0f) {
                     DeponderDefaults.INFINITE_RANGE
                 } else if (rawR == 0f) {
                     0f
                 } else {
-                    (rawR + b.degree * env.degreeRadiusIncrementPx) * clampedScale
+                    rawR * clampedScale
                 }
             }
             val ec = FloatArray(n) { i -> bodyList[i].spec.elasticity }
@@ -1011,14 +1045,20 @@ public class SimulationWorld(
 
             val vpW = viewportWidthPx
             val vpH = viewportHeightPx
-            val initialAlpha = alpha
-            val needUnfoldSolve = env.unfoldEnabled && unfoldDirty
-            if (needUnfoldSolve) {
-                unfoldDirty = false
+            val wasExplicitUnfold = unfoldRequested
+            @Suppress("DEPRECATION")
+            val wasLegacyAutoUnfold = env.unfoldEnabled && unfoldDirty
+            val needUnfoldSolve = wasExplicitUnfold || wasLegacyAutoUnfold
+            if (wasExplicitUnfold) unfoldRequested = false
+            if (wasLegacyAutoUnfold) unfoldDirty = false
+            if (needUnfoldSolve && (vpW > 0f || vpH > 0f)) {
+                unfoldAwaitingViewport = false
             }
             val established = BooleanArray(n) { i -> bodyList[i].hasEstablishedPose }
             val massArr = FloatArray(n) { i -> bodyList[i].spec.mass }
-            val initialUnfoldRem = if (env.unfoldEnabled) unfoldRemainingSeconds else 0f
+            val initialUnfoldRem = unfoldRemainingSeconds
+            val hadUnfoldWork = needUnfoldSolve || initialUnfoldRem > 0f
+            cancelInFlightUnfold = false
             val snapTargetX = FloatArray(n) { i ->
                 if (i < unfoldTargetX.size) unfoldTargetX[i] else bodyList[i].x
             }
@@ -1038,8 +1078,6 @@ public class SimulationWorld(
                         vpW = vpW,
                         vpH = vpH,
                         env = env,
-                        anyPressed = anyPressed,
-                        initialAlpha = initialAlpha,
                         needUnfoldSolve = needUnfoldSolve,
                         initialUnfoldRem = initialUnfoldRem,
                         established = established,
@@ -1062,7 +1100,14 @@ public class SimulationWorld(
                     )
                 }
             } catch (t: Throwable) {
-                if (needUnfoldSolve && environment.unfoldEnabled) {
+                if (wasExplicitUnfold) {
+                    unfoldRequested = true
+                    if (vpW <= 0f && vpH <= 0f) {
+                        unfoldAwaitingViewport = true
+                    }
+                }
+                @Suppress("DEPRECATION")
+                if (wasLegacyAutoUnfold && environment.unfoldEnabled) {
                     unfoldDirty = true
                 }
                 inFlightJournal.clear()
@@ -1073,13 +1118,18 @@ public class SimulationWorld(
 
             // Commit pure Tier-3 frame results on the caller thread, then replay any in-flight causal
             // intents recorded during suspension in strict FIFO order.
-            val liveUnfoldEnabled = environment.unfoldEnabled
+            val canceledUnfold = cancelInFlightUnfold
+            cancelInFlightUnfold = false
+            val shouldCommitUnfold = !canceledUnfold && hadUnfoldWork
             if (inFlightJournal.isEmpty()) {
-                alpha = tier3Metrics.finalAlpha
-                unfoldRemainingSeconds = if (liveUnfoldEnabled) tier3Metrics.finalUnfoldRem else 0f
+                if (canceledUnfold) {
+                    unfoldRemainingSeconds = 0f
+                } else if (hadUnfoldWork) {
+                    unfoldRemainingSeconds = tier3Metrics.finalUnfoldRem
+                }
                 for (i in 0 until n) {
                     val b = bodyList[i]
-                    if (liveUnfoldEnabled) {
+                    if (shouldCommitUnfold) {
                         unfoldTargetX[i] = tier3Metrics.targetX[i]
                         unfoldTargetY[i] = tier3Metrics.targetY[i]
                     }
@@ -1099,12 +1149,15 @@ public class SimulationWorld(
                     }
                 }
             } else {
-                alpha = tier3Metrics.finalAlpha
-                unfoldRemainingSeconds = if (liveUnfoldEnabled) tier3Metrics.finalUnfoldRem else 0f
+                if (canceledUnfold) {
+                    unfoldRemainingSeconds = 0f
+                } else if (hadUnfoldWork) {
+                    unfoldRemainingSeconds = tier3Metrics.finalUnfoldRem
+                }
                 for (i in 0 until n) {
                     val currentBody = bodiesById[ids[i]] ?: continue
                     currentBody.hasEstablishedPose = true
-                    if (liveUnfoldEnabled) {
+                    if (shouldCommitUnfold) {
                         val idx = indexById[ids[i]]
                         if (idx != null && idx < unfoldTargetX.size) {
                             unfoldTargetX[idx] = tier3Metrics.targetX[i]
@@ -1140,6 +1193,7 @@ public class SimulationWorld(
                                 b.hasUserPose = true
                                 if (b.isPressed) {
                                     unfoldRemainingSeconds = 0f
+                                    unfoldAwaitingViewport = false
                                 }
                                 indexById[entry.id]?.let { bodyIdx ->
                                     if (bodyIdx < unfoldTargetX.size) {
@@ -1161,10 +1215,7 @@ public class SimulationWorld(
                             }
                         }
 
-                        is CausalIntent.ElevateAlpha -> {
-                            if (alpha < entry.minAlpha) {
-                                alpha = entry.minAlpha
-                            }
+                        CausalIntent.ResetSettle -> {
                             settleTimeSeconds = 0f
                             keepAwakeFromIntent = true
                         }
@@ -1184,10 +1235,17 @@ public class SimulationWorld(
             maxAccelSq = tier3Metrics.maxAccelSq
         } else {
             // Tier 1 (N < 64) & Tier 2 (64 <= N < 256): Zero coroutine context-switch overhead.
-            if (!env.unfoldEnabled) {
-                unfoldRemainingSeconds = 0f
-            } else if (unfoldDirty) {
-                unfoldDirty = false
+            val wasExplicitUnfold = unfoldRequested
+            @Suppress("DEPRECATION")
+            val wasLegacyAutoUnfold = env.unfoldEnabled && unfoldDirty
+            if (wasExplicitUnfold || wasLegacyAutoUnfold) {
+                unfoldRequested = false
+                if (wasLegacyAutoUnfold) {
+                    unfoldDirty = false
+                }
+                if (viewportWidthPx > 0f || viewportHeightPx > 0f) {
+                    unfoldAwaitingViewport = false
+                }
                 val edgeCount = collectUnfoldInputs(n, clampedScale)
                 val solved = unfolder.solve(
                     n = n,
@@ -1224,7 +1282,6 @@ public class SimulationWorld(
                     subDt = subDt,
                     clampedScale = clampedScale,
                     env = env,
-                    anyPressed = anyPressed,
                 )
                 if (sub == subSteps - 1) {
                     lastSpeedSq = metrics.x
@@ -1253,7 +1310,7 @@ public class SimulationWorld(
             return true
         }
 
-        if (environment.unfoldEnabled && unfoldRemainingSeconds > 0f) {
+        if (unfoldRemainingSeconds > 0f) {
             settleTimeSeconds = 0f
             return true
         }
@@ -1262,13 +1319,6 @@ public class SimulationWorld(
         val restAccel = env.restAccelPxPerSecSq * clampedScale
         val isKineticCalm = maxSpeedSq <= restSpeed * restSpeed
         val isForceCalm = maxAccelSq <= restAccel * restAccel
-
-        if (env.coolingEnabled && alpha < env.alphaMin && isKineticCalm && isForceCalm) {
-            alpha = 0f
-            zeroAllVelocities(bodyList.size)
-            settleTimeSeconds = env.settleDurationSeconds
-            return false
-        }
 
         if (isKineticCalm && isForceCalm) {
             settleTimeSeconds += clampedDt
@@ -1284,7 +1334,6 @@ public class SimulationWorld(
     }
 
     private class Tier3StepMetrics(
-        val finalAlpha: Float,
         val maxSpeedSq: Float,
         val maxAccelSq: Float,
         val finalUnfoldRem: Float,
@@ -1300,8 +1349,6 @@ public class SimulationWorld(
         vpW: Float,
         vpH: Float,
         env: EnvironmentSpec,
-        anyPressed: Boolean,
-        initialAlpha: Float,
         needUnfoldSolve: Boolean,
         initialUnfoldRem: Float,
         established: BooleanArray,
@@ -1332,8 +1379,8 @@ public class SimulationWorld(
         val stepX = FloatArray(n)
         val stepY = FloatArray(n)
 
-        var curUnfoldRem = if (env.unfoldEnabled) initialUnfoldRem else 0f
-        if (env.unfoldEnabled && needUnfoldSolve) {
+        var curUnfoldRem = initialUnfoldRem
+        if (needUnfoldSolve) {
             var unfoldEdgeCount = 0
             for (r in 0 until activeSprings) {
                 if (rElastArr[r] > 0f) unfoldEdgeCount += 1
@@ -1376,13 +1423,12 @@ public class SimulationWorld(
         val thetaSq = DeponderDefaults.Simulation.BARNES_HUT_THETA * DeponderDefaults.Simulation.BARNES_HUT_THETA
         val chunkSize = (n + chunks - 1) / chunks
 
-        var curAlpha = initialAlpha
         var lastMaxSpeedSq = 0f
         var lastMaxAccelSq = 0f
 
         for (sub in 0 until subSteps) {
-            val alphaUnfold = if (env.unfoldEnabled) computeUnfoldAlpha(curUnfoldRem) else 0f
-            if (env.unfoldEnabled && curUnfoldRem > 0f) {
+            val alphaUnfold = computeUnfoldAlpha(curUnfoldRem)
+            if (curUnfoldRem > 0f) {
                 curUnfoldRem = max(0f, curUnfoldRem - subDt)
             }
             val repScale = if (alphaUnfold > 0f) 1f - UNFOLD_REPULSION_ATTENUATION * alphaUnfold else 1f
@@ -1453,7 +1499,6 @@ public class SimulationWorld(
                 }
             }
 
-            val effectiveAlpha = if (env.coolingEnabled) curAlpha else 1f
             var maxSpeedSq = 0f
             var maxAccelSq = 0f
 
@@ -1483,8 +1528,8 @@ public class SimulationWorld(
                 }
                 val totalFx = wallF.x + edgeFx[i] + pairFx[i] * repScale + guideFx
                 val totalFy = wallF.y + edgeFy[i] + pairFy[i] * repScale + guideFy
-                val ax = totalFx * invMass[i] * effectiveAlpha
-                val ay = totalFy * invMass[i] * effectiveAlpha
+                val ax = totalFx * invMass[i]
+                val ay = totalFy * invMass[i]
 
                 val nextVx = (vx[i] + ax * subDt) * dampFactor
                 val nextVy = (vy[i] + ay * subDt) * dampFactor
@@ -1499,13 +1544,6 @@ public class SimulationWorld(
                 if (accelSq > maxAccelSq) maxAccelSq = accelSq
             }
 
-            if (env.coolingEnabled) {
-                val target = if (anyPressed) DeponderDefaults.Simulation.INTERACTION_ALPHA else 0f
-                val dtRatio = subDt / DeponderDefaults.Simulation.REFERENCE_DT_SECONDS
-                val decay = 1f - (1f - env.alphaDecay.coerceIn(0f, 1f)).pow(dtRatio)
-                curAlpha += (target - curAlpha) * decay
-            }
-
             if (sub == subSteps - 1) {
                 lastMaxSpeedSq = maxSpeedSq
                 lastMaxAccelSq = maxAccelSq
@@ -1513,7 +1551,6 @@ public class SimulationWorld(
         }
 
         return Tier3StepMetrics(
-            finalAlpha = curAlpha,
             maxSpeedSq = lastMaxSpeedSq,
             maxAccelSq = lastMaxAccelSq,
             finalUnfoldRem = curUnfoldRem,
@@ -1535,7 +1572,6 @@ public class SimulationWorld(
     private fun prepareSnapshotAndSprings(
         n: Int,
         clampedScale: Float,
-        env: EnvironmentSpec,
     ) {
         // Pure Point-Mass Physics: neither radiation fields nor Hooke rest lengths couple to UI layout dimensions.
         for (i in 0 until n) {
@@ -1548,7 +1584,7 @@ public class SimulationWorld(
             } else if (rawR == 0f) {
                 0f
             } else {
-                (rawR + b.degree * env.degreeRadiusIncrementPx) * clampedScale
+                rawR * clampedScale
             }
             snapEc[i] = b.spec.elasticity
             outPairFx[i] = 0f
@@ -1586,9 +1622,8 @@ public class SimulationWorld(
         subDt: Float,
         clampedScale: Float,
         env: EnvironmentSpec,
-        anyPressed: Boolean,
     ): Vec2 {
-        prepareSnapshotAndSprings(n, clampedScale, env)
+        prepareSnapshotAndSprings(n, clampedScale)
 
         val infStrength = env.infiniteChargeStrength * clampedScale
         val softeningSq = DeponderDefaults.Simulation.COULOMB_SOFTENING_SQ
@@ -1651,7 +1686,7 @@ public class SimulationWorld(
             }
         }
 
-        return integrateSubstep(n, subDt, clampedScale, env, anyPressed)
+        return integrateSubstep(n, subDt, clampedScale, env)
     }
 
     private fun integrateSubstep(
@@ -1659,16 +1694,14 @@ public class SimulationWorld(
         subDt: Float,
         clampedScale: Float,
         env: EnvironmentSpec,
-        anyPressed: Boolean,
     ): Vec2 {
-        val alphaUnfold = if (env.unfoldEnabled) computeUnfoldAlpha(unfoldRemainingSeconds) else 0f
-        if (env.unfoldEnabled && unfoldRemainingSeconds > 0f) {
+        val alphaUnfold = computeUnfoldAlpha(unfoldRemainingSeconds)
+        if (unfoldRemainingSeconds > 0f) {
             unfoldRemainingSeconds = max(0f, unfoldRemainingSeconds - subDt)
         }
         val repScale = if (alphaUnfold > 0f) 1f - UNFOLD_REPULSION_ATTENUATION * alphaUnfold else 1f
         val effectiveDamping = max(0f, env.airDamping) + UNFOLD_EXTRA_DAMPING * alphaUnfold
         val dampFactor = exp(-effectiveDamping * subDt)
-        val effectiveAlpha = if (env.coolingEnabled) alpha else 1f
 
         var maxSpeedSq = 0f
         var maxAccelSq = 0f
@@ -1704,8 +1737,8 @@ public class SimulationWorld(
             val totalFy = wallF.y + accumEdgeFy[i] + outPairFy[i] * repScale + guideFy
             val invMass = 1f / max(1e-4f, b.spec.mass)
 
-            val ax = totalFx * invMass * effectiveAlpha
-            val ay = totalFy * invMass * effectiveAlpha
+            val ax = totalFx * invMass
+            val ay = totalFy * invMass
 
             // Semi-implicit Euler with exact exponential viscous drag — zero velocity deadband wiping!
             val nextVx = (b.vx + ax * subDt) * dampFactor
@@ -1720,13 +1753,6 @@ public class SimulationWorld(
             val accelSq = ax * ax + ay * ay
             if (speedSq > maxSpeedSq) maxSpeedSq = speedSq
             if (accelSq > maxAccelSq) maxAccelSq = accelSq
-        }
-
-        if (env.coolingEnabled) {
-            val target = if (anyPressed) DeponderDefaults.Simulation.INTERACTION_ALPHA else 0f
-            val dtRatio = subDt / DeponderDefaults.Simulation.REFERENCE_DT_SECONDS
-            val decay = 1f - (1f - env.alphaDecay.coerceIn(0f, 1f)).pow(dtRatio)
-            alpha += (target - alpha) * decay
         }
 
         return Vec2(maxSpeedSq, maxAccelSq)

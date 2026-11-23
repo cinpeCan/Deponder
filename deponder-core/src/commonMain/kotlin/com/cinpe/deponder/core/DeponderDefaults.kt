@@ -49,15 +49,23 @@ public object DeponderDefaults {
         public const val WALL_ELASTICITY_BOTTOM: Float = 1.44f
 
         /**
-         * Disabled by default so Hooke springs preserve true Newtonian elasticity and bounce cleanly
-         * before Global Kinetic-Force Sleep suspends at 0% CPU.
+         * Deprecated (no-op since 0.6.1): simulated annealing (`alpha` cooling) has been retired so
+         * Hooke springs preserve pure Newtonian elasticity governed solely by [AIR_DAMPING] (`0f`
+         * for undamped perpetual motion). Setting `coolingEnabled` has no effect.
          */
+        @Deprecated(
+            message = "No-op since 0.6.1: simulated annealing has been retired in favor of pure Newtonian mechanics; configure RootPhysics(airDamping = ...) instead (0f for perpetual motion).",
+        )
         public const val COOLING_ENABLED: Boolean = false
 
         /**
-         * Disabled by default to preserve strictly local point-mass spring behavior; enable via
-         * [RootPhysics.withUnfold] so tangled cycles, trees, and meshes smoothly unfold before settling.
+         * Deprecated: topological unfolding is a transient one-shot action rather than a persistent
+         * physics law. Invoke [SimulationWorld.unfold], `DeponderState.unfold()`, or
+         * `DeponderController.unfold()` instead.
          */
+        @Deprecated(
+            message = "Topological unfolding is a transient one-shot action; invoke DeponderState.unfold(), DeponderController.unfold(), or SimulationWorld.unfold() instead.",
+        )
         public const val UNFOLD_ENABLED: Boolean = false
     }
 
@@ -82,8 +90,13 @@ public object DeponderDefaults {
         public const val ELASTICITY: Float = 1.33f
 
         /**
-         * Incremental repulsion radius expansion per incident rubber link, in `dp`.
+         * Deprecated (no-op since 0.6.1): implicit per-edge repulsion radius inflation has been
+         * retired so node repulsion range strictly honors [PlanetPhysics.repulsionRadiusDp].
+         * Configure `PlanetPhysics(repulsionRadiusDp = ...)` explicitly when hub nodes need a wider field.
          */
+        @Deprecated(
+            message = "No-op since 0.6.1: implicit degree-based radius inflation has been retired so repulsion strictly honors PlanetPhysics.repulsionRadiusDp.",
+        )
         public const val DEGREE_RADIUS_INCREMENT_DP: Float = 0.15f
 
         /**
@@ -107,14 +120,37 @@ public object DeponderDefaults {
     }
 
     /**
-     * Numerical integrator, simulated annealing (`alpha` cooling), sleep thresholds, and spatial acceleration constants.
+     * Numerical integrator, Global Kinetic-Force Sleep thresholds, and spatial acceleration constants.
      */
     public object Simulation {
+        /** Deprecated (no-op since 0.6.1): simulated annealing has been retired in favor of pure Newtonian [Root.AIR_DAMPING]. */
+        @Deprecated(
+            message = "No-op since 0.6.1: simulated annealing (alpha cooling) has been retired; velocity decay is governed solely by RootPhysics.airDamping.",
+        )
         public const val INITIAL_ALPHA: Float = 1.0f
+
+        /** Deprecated (no-op since 0.6.1): simulated annealing has been retired in favor of pure Newtonian [Root.AIR_DAMPING]. */
+        @Deprecated(
+            message = "No-op since 0.6.1: simulated annealing (alpha cooling) has been retired; velocity decay is governed solely by RootPhysics.airDamping.",
+        )
         public const val INTERACTION_ALPHA: Float = 1.0f
+
+        /** Deprecated (no-op since 0.6.1): simulated annealing has been retired in favor of pure Newtonian [Root.AIR_DAMPING]. */
+        @Deprecated(
+            message = "No-op since 0.6.1: simulated annealing (alpha cooling) has been retired; velocity decay is governed solely by RootPhysics.airDamping.",
+        )
         public const val ALPHA_MIN: Float = 0.001f
+
+        /** Deprecated (no-op since 0.6.1): simulated annealing has been retired in favor of pure Newtonian [Root.AIR_DAMPING]. */
+        @Deprecated(
+            message = "No-op since 0.6.1: simulated annealing (alpha cooling) has been retired; velocity decay is governed solely by RootPhysics.airDamping.",
+        )
         public const val ALPHA_DECAY: Float = 0.015f
 
+        /** Deprecated (no-op since 0.6.1): reference step constant for retired `alphaDecay` normalization. */
+        @Deprecated(
+            message = "No-op since 0.6.1: simulated annealing (alpha cooling) has been retired; integration uses true physical dtSeconds with MAX_SUBSTEP_DT_SECONDS.",
+        )
         public const val REFERENCE_DT_SECONDS: Float = 0.016f
         public const val MAX_DT_SECONDS: Float = 0.032f
         public const val MAX_SUBSTEP_DT_SECONDS: Float = 1f / 120f
@@ -145,8 +181,32 @@ public object DeponderDefaults {
         public val planetElasticity: Float,
         public val rubberNaturalLengthDp: Float,
         public val rubberElasticity: Float,
+        @Deprecated(
+            message = "No-op since 0.6.1: simulated annealing has been retired; use the 6-parameter Preset constructor and configure airDamping instead.",
+        )
         public val alphaDecay: Float,
-    )
+    ) {
+        /**
+         * Creates a pure Newtonian [Preset] without retired simulated-annealing parameters.
+         */
+        @Suppress("DEPRECATION")
+        public constructor(
+            airDamping: Float,
+            wallRepulsionDp: Float,
+            planetRepulsionDp: Float,
+            planetElasticity: Float,
+            rubberNaturalLengthDp: Float,
+            rubberElasticity: Float,
+        ) : this(
+            airDamping = airDamping,
+            wallRepulsionDp = wallRepulsionDp,
+            planetRepulsionDp = planetRepulsionDp,
+            planetElasticity = planetElasticity,
+            rubberNaturalLengthDp = rubberNaturalLengthDp,
+            rubberElasticity = rubberElasticity,
+            alphaDecay = 0f,
+        )
+    }
 
     public object Presets {
         /** Balanced springiness and smooth settling suitable for general relationship graphs. */
@@ -157,7 +217,6 @@ public object DeponderDefaults {
             planetElasticity = Planet.ELASTICITY,
             rubberNaturalLengthDp = Rubber.NATURAL_LENGTH_DP,
             rubberElasticity = Rubber.ELASTICITY,
-            alphaDecay = Simulation.ALPHA_DECAY,
         )
 
         /** High-damping preset that converges quickly with minimal oscillation. */
@@ -168,7 +227,6 @@ public object DeponderDefaults {
             planetElasticity = 2.0f,
             rubberNaturalLengthDp = Rubber.NATURAL_LENGTH_DP,
             rubberElasticity = 2.4f,
-            alphaDecay = 0.03f,
         )
 
         /** Full-viewport electrostatic galaxy layout using [INFINITE_RANGE] on both walls and planets. */
@@ -179,7 +237,6 @@ public object DeponderDefaults {
             planetElasticity = 1.0f,
             rubberNaturalLengthDp = 100f,
             rubberElasticity = 1.5f,
-            alphaDecay = 0.018f,
         )
     }
 }

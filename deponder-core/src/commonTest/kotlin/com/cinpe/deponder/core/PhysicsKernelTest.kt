@@ -323,7 +323,6 @@ class PhysicsKernelTest {
                 EnvironmentSpec(
                     airDamping = 1.2f,
                     wallRepulsionPx = 0f,
-                    coolingEnabled = false,
                 ),
             )
             world.updateViewport(1000f, 1000f)
@@ -420,23 +419,36 @@ class PhysicsKernelTest {
     @Test
     fun largeGraph_tier3ParallelQuadtree_convergesToSleep_andIsolatesConcurrentMutations() = runTest {
         val world = SimulationWorld(
-            EnvironmentSpec(
-                airDamping = 30f,
-                wallRepulsionPx = DeponderDefaults.INFINITE_RANGE,
-                coolingEnabled = true,
-                alphaDecay = 0.08f,
-            ),
+            RootPhysics(
+                airDamping = 2.0f,
+                wallRepulsionDp = 80f,
+            ).toEnvironmentSpec(density = 1.0f),
         )
-        world.updateViewport(1000f, 1000f)
-        val nodes = (0 until 260).map { i ->
-            PlanetSpec(id = "n$i", repulsionRadiusPx = DeponderDefaults.INFINITE_RANGE, elasticity = 0.5f)
+        world.updateViewport(1500f, 1100f)
+        val rows = 13
+        val cols = 20
+        val nodes = (0 until rows * cols).map { i ->
+            if (i % 65 == 0) {
+                PlanetSpec(id = "n$i", repulsionRadiusPx = DeponderDefaults.INFINITE_RANGE, elasticity = 0.1f)
+            } else {
+                PlanetSpec(id = "n$i", repulsionRadiusPx = 65f, elasticity = 1.2f)
+            }
         }
-        val edges = (0 until 100).map { i ->
-            RubberSpec(startId = "n$i", endId = "n${i + 1}", naturalLengthPx = 60f)
+        val edges = ArrayList<RubberSpec>()
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                val u = r * cols + c
+                if (c + 1 < cols) {
+                    edges.add(RubberSpec(startId = "n$u", endId = "n${u + 1}", elasticity = 2.0f, naturalLengthPx = 65f))
+                }
+                if (r + 1 < rows) {
+                    edges.add(RubberSpec(startId = "n$u", endId = "n${u + cols}", elasticity = 2.0f, naturalLengthPx = 65f))
+                }
+            }
         }
         world.syncTopology(nodes, edges) { spec ->
             val idx = spec.id.removePrefix("n").toInt()
-            Vec2(200f + (idx % 20) * 30f, 200f + (idx / 20) * 30f)
+            Vec2(100f + (idx % cols) * 65f, 100f + (idx / cols) * 65f)
         }
 
         // Verify concurrent UI-thread topology/position mutations while Tier-3 step() runs on Dispatchers.Default
@@ -445,21 +457,22 @@ class PhysicsKernelTest {
             val stepDeferred = async(start = CoroutineStart.UNDISPATCHED) {
                 world.step(dtSeconds = 0.032f, scale = 1.0f)
             }
-            world.setBodyPosition("n0", 123f + round, 456f)
+            world.setBodyPosition("n0", 123f + round, 115f)
             world.upsertPlanet(PlanetSpec(id = "dyn_$round"), 500f, 500f)
             world.removePlanet("dyn_$round")
             assertTrue(stepDeferred.await())
             assertEquals(123f + round, world.bodyOf("n0")!!.x, 1e-3f)
-            assertEquals(456f, world.bodyOf("n0")!!.y, 1e-3f)
+            assertEquals(115f, world.bodyOf("n0")!!.y, 1e-3f)
         }
 
         var active = true
         var steps = 0
-        while (active && steps < 400) {
+        while (active && steps < 900) {
             active = world.step(dtSeconds = 0.016f, scale = 1.0f)
             steps += 1
         }
-        assertFalse(active, "260-node Tier-3 parallel simulation must settle to 0% CPU sleep")
+        val maxV = world.bodies.maxOf { hypot(it.vx, it.vy) }
+        assertFalse(active, "260-node Tier-3 parallel simulation must settle to 0% CPU sleep (steps=$steps, maxV=$maxV)")
     }
 
     @Test
@@ -495,17 +508,22 @@ class PhysicsKernelTest {
     }
 
     @Test
-    fun simulationWorld_rejectsNonFiniteMutators_andPreservesConcurrentTier3ReheatAlpha() = runTest {
+    @Suppress("DEPRECATION")
+    fun simulationWorld_rejectsNonFiniteMutators_andEnforcesDeprecatedNoOps() = runTest {
         val world = SimulationWorld(
-            EnvironmentSpec(
+            RootPhysics(
                 airDamping = 20f,
-                wallRepulsionPx = DeponderDefaults.INFINITE_RANGE,
-                coolingEnabled = true,
-                alphaDecay = 0.5f,
-            ),
+                wallRepulsionDp = DeponderDefaults.INFINITE_RANGE,
+            ).withCooling(true, 0.5f).toEnvironmentSpec(density = 1.0f),
         )
+        assertFalse(world.environment.coolingEnabled)
+        assertEquals(0f, world.environment.alphaDecay, 0f)
+        assertEquals(1.0f, world.alpha, 0f)
+
         world.updateViewport(800f, 600f)
-        world.upsertPlanet(PlanetSpec(id = "a"), 100f, 100f)
+        world.upsertPlanet(PlanetSpec(id = "a", mass = 2.0f, repulsionRadiusPx = 60f), 100f, 100f)
+        world.upsertPlanet(PlanetSpec(id = "b", mass = 3.0f, repulsionRadiusPx = 80f), 260f, 100f)
+        val rubber = world.upsertRubber(RubberSpec(startId = "a", endId = "b", naturalLengthPx = 100f))
 
         assertFailsWith<IllegalArgumentException> {
             world.upsertPlanet(PlanetSpec(id = "bad"), Float.NaN, 100f)
@@ -519,9 +537,20 @@ class PhysicsKernelTest {
         assertFailsWith<IllegalArgumentException> {
             world.offsetBodyPosition("a", 0f, Float.NaN)
         }
-        assertFailsWith<IllegalArgumentException> {
-            world.reheat(Float.NaN)
-        }
+
+        // Deprecated PlanetBody.spec and RubberPose.spec public setters are strict no-ops.
+        val bodyA = world.bodyOf("a")!!
+        val originalSpec = bodyA.spec
+        bodyA.spec = PlanetSpec(id = "tampered", mass = 99f)
+        assertEquals(originalSpec, bodyA.spec)
+        val originalRubberSpec = rubber.spec
+        rubber.spec = RubberSpec(startId = "x", endId = "y", elasticity = 99f)
+        assertEquals(originalRubberSpec, rubber.spec)
+
+        // Deprecated reheat/wake no-ops do not crash or mutate alpha away from 1.0f.
+        world.reheat(0.25f)
+        world.wake(0.5f)
+        assertEquals(1.0f, world.alpha, 0f)
 
         // Non-finite step/viewport/size inputs must never poison body coordinates with NaN.
         world.updateViewport(Float.NaN, 600f)
@@ -530,39 +559,16 @@ class PhysicsKernelTest {
         assertTrue(world.step(Float.NaN, Float.NaN))
         assertTrue(world.bodyOf("a")!!.x.isFinite())
         assertTrue(world.bodyOf("a")!!.y.isFinite())
-
-        // Tier-3 concurrency: reheat() called while Dispatchers.Default cools alpha must not be overwritten!
-        val nodes = (0 until 260).map { i ->
-            PlanetSpec(id = "t$i", repulsionRadiusPx = 0f, elasticity = 0.2f)
-        }
-        world.syncTopology(nodes, emptyList()) { spec ->
-            val idx = spec.id.removePrefix("t").toInt()
-            Vec2(100f + (idx % 20) * 25f, 100f + (idx / 20) * 25f)
-        }
-        // Cool alpha down first
-        repeat(6) {
-            world.step(0.032f, 1.0f)
-        }
-        assertTrue(world.alpha < 0.8f, "Alpha should have cooled prior to concurrent reheat test, was ${world.alpha}")
-
-        val stepDeferred = async(start = CoroutineStart.UNDISPATCHED) {
-            world.step(dtSeconds = 0.032f, scale = 1.0f)
-        }
-        // Trigger reheat() WITHOUT mutating topology or body coordinates while Tier-3 is suspended!
-        world.reheat(1.0f)
-        assertTrue(stepDeferred.await())
-        assertEquals(1.0f, world.alpha, 1e-6f)
     }
 
     @Test
-    fun tier3CausalJournalReplay_serializesCoalescedOffsetsPinningAndReheatInExactOrder() = runTest {
+    @Suppress("DEPRECATION")
+    fun tier3CausalJournalReplay_serializesCoalescedOffsetsPinningAndClearInExactOrder() = runTest {
         val world = SimulationWorld(
-            EnvironmentSpec(
+            RootPhysics(
                 airDamping = 20f,
-                wallRepulsionPx = 0f,
-                coolingEnabled = true,
-                alphaDecay = 0.5f,
-            ),
+                wallRepulsionDp = 0f,
+            ).toEnvironmentSpec(density = 1.0f),
         )
         world.updateViewport(1000f, 1000f)
         val nodes = (0 until 260).map { i ->
@@ -578,22 +584,20 @@ class PhysicsKernelTest {
         repeat(4) {
             world.step(0.032f, 1.0f)
         }
-        assertTrue(world.alpha < 0.8f, "Alpha should have cooled prior to concurrent replay, was ${world.alpha}")
+        assertEquals(1.0f, world.alpha, 1e-6f)
 
-        // Round A: Reheat(0.85f) + pin without interaction-alpha boost -> exact 0.85f monotonic floor survives cooling!
-        val pinAndReheatDeferred = async(start = CoroutineStart.UNDISPATCHED) {
+        // Round A: Concurrent pinning while Tier-3 is suspended on Dispatchers.Default.
+        val pinDeferred = async(start = CoroutineStart.UNDISPATCHED) {
             world.step(dtSeconds = 0.032f, scale = 1.0f)
         }
         world.setBodyPinned("t2", true)
-        world.reheat(0.85f)
-        assertTrue(pinAndReheatDeferred.await())
+        assertTrue(pinDeferred.await())
         assertTrue(world.bodyOf("t2")!!.spec.pinned)
-        assertEquals(0.85f, world.alpha, 1e-6f)
 
         val t0InitialX = world.bodyOf("t0")!!.x
         val t0InitialY = world.bodyOf("t0")!!.y
 
-        // Round B: Coalesced offsets + pin + elasticity update -> exact cumulative position & INTERACTION_ALPHA = 1.0f!
+        // Round B: Coalesced offsets + pin + elasticity update replay cleanly in exact order!
         val stepDeferred = async(start = CoroutineStart.UNDISPATCHED) {
             world.step(dtSeconds = 0.032f, scale = 1.0f)
         }
@@ -601,7 +605,7 @@ class PhysicsKernelTest {
         world.offsetBodyPosition("t0", 5f, 25f, 1.0f)
         world.setBodyPinned("t1", true)
         world.updateAllRubbersElasticity(4.5f)
-        world.reheat(0.95f)
+        world.reheat(0.5f)
 
         assertTrue(stepDeferred.await())
         val t0 = world.bodyOf("t0")!!
@@ -614,7 +618,7 @@ class PhysicsKernelTest {
         assertEquals(0f, t1.vx, 0f)
         assertEquals(0f, t1.vy, 0f)
         assertEquals(4.5f, world.rubberOf(EdgeKey("t0", "t1"))!!.spec.elasticity, 1e-4f)
-        assertEquals(DeponderDefaults.Simulation.INTERACTION_ALPHA, world.alpha, 1e-6f)
+        assertEquals(1.0f, world.alpha, 1e-6f)
 
         // Round C: Concurrent clear of all planets while Tier-3 is suspended -> step() returns false!
         val clearDeferred = async(start = CoroutineStart.UNDISPATCHED) {
@@ -697,6 +701,7 @@ class PhysicsKernelTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun rootPhysics_andEnvironmentSpec_preserveDefaultsBinaryCopyAndUnfoldToggle() {
         assertFalse(DeponderDefaults.Root.UNFOLD_ENABLED)
         val base = RootPhysics()
@@ -708,7 +713,7 @@ class PhysicsKernelTest {
         assertEquals(base, unfolded.withUnfold(false))
         assertEquals(base.hashCode(), unfolded.withUnfold(false).hashCode())
 
-        // All legacy fluent / copy helpers preserve unfoldEnabled cleanly.
+        // All legacy fluent / copy helpers preserve unfoldEnabled, while withCooling(...) is a safe no-op.
         val chained = unfolded
             .withAirDamping(2.2f)
             .withScaleBounds(initScale = 1.0f, minScale = 0.5f, maxScale = 2.0f)
@@ -718,7 +723,10 @@ class PhysicsKernelTest {
         assertTrue(chained.unfoldEnabled)
         assertEquals(2.2f, chained.airDamping, 1e-4f)
         assertEquals(90f, chained.wallRepulsionDp, 1e-4f)
-        assertTrue(chained.coolingEnabled)
+        assertFalse(chained.coolingEnabled)
+        assertEquals(0f, chained.alphaDecay, 0f)
+        assertFalse(RootPhysics(airDamping = 2.0f, coolingEnabled = true, alphaDecay = 0.5f).coolingEnabled)
+        assertEquals("a", NodePair("a", "b").startId)
 
         val env = unfolded.toEnvironmentSpec(density = 2.0f)
         assertTrue(env.unfoldEnabled)
@@ -731,6 +739,132 @@ class PhysicsKernelTest {
         val posRoot = RootPhysics(initScale = 1.0f, airDamping = 0.0f)
         assertEquals(posRoot, negRoot)
         assertEquals(posRoot.hashCode(), negRoot.hashCode())
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun pureNewtonianAirDamping_zeroSustainsPerpetualMotion_andHigherDampingConvergesFaster() = runTest {
+        // 1. airDamping = 0f sustains undamped harmonic oscillation even when deprecated withCooling(true) is chained!
+        val perpetualWorld = SimulationWorld(
+            RootPhysics(airDamping = 0f, wallRepulsionDp = 0f)
+                .withCooling(true, 0.8f)
+                .toEnvironmentSpec(density = 1.0f),
+        )
+        perpetualWorld.updateViewport(800f, 800f)
+        perpetualWorld.upsertPlanet(PlanetSpec(id = "anchor", pinned = true, repulsionRadiusPx = 0f), 200f, 400f)
+        perpetualWorld.upsertPlanet(PlanetSpec(id = "osc", repulsionRadiusPx = 0f), 420f, 400f)
+        perpetualWorld.upsertRubber(RubberSpec("anchor", "osc", elasticity = 10f, naturalLengthPx = 120f))
+
+        var minX = Float.POSITIVE_INFINITY
+        var maxX = Float.NEGATIVE_INFINITY
+        repeat(600) { stepIdx ->
+            val active = perpetualWorld.step(dtSeconds = 0.016f, scale = 1.0f)
+            assertTrue(active, "airDamping = 0f spring must sustain perpetual motion without sleeping (step=$stepIdx)")
+            val x = perpetualWorld.bodyOf("osc")!!.x
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+        }
+        // Equilibrium is 320f; undamped oscillator swings past 320f in both directions!
+        assertTrue(minX < 280f && maxX > 360f, "Perpetual spring must oscillate cleanly (minX=$minX, maxX=$maxX)")
+
+        // 2. Higher airDamping settles to 0% CPU sleep strictly faster than lower airDamping.
+        suspend fun stepsToSettle(airDamping: Float): Int {
+            val w = SimulationWorld(
+                RootPhysics(airDamping = airDamping, wallRepulsionDp = 0f).toEnvironmentSpec(density = 1.0f),
+            )
+            w.updateViewport(800f, 800f)
+            w.upsertPlanet(PlanetSpec(id = "a", pinned = true, repulsionRadiusPx = 0f), 200f, 400f)
+            w.upsertPlanet(PlanetSpec(id = "b", repulsionRadiusPx = 0f), 420f, 400f)
+            w.upsertRubber(RubberSpec("a", "b", elasticity = 8f, naturalLengthPx = 120f))
+            var steps = 0
+            while (w.step(0.016f, 1.0f) && steps < 2400) {
+                steps += 1
+            }
+            return steps
+        }
+
+        val slowSteps = stepsToSettle(1.0f)
+        val fastSteps = stepsToSettle(3.5f)
+        assertTrue(fastSteps < slowSteps, "Higher airDamping ($fastSteps) must settle faster than lower ($slowSteps)")
+    }
+
+    @Test
+    fun explicitPlanetRepulsionRadius_isHonoredStrictlyWithoutDegreeInflation() = runTest {
+        val world = SimulationWorld(RootPhysics(airDamping = 1.5f, wallRepulsionDp = 0f).toEnvironmentSpec(1.0f))
+        world.updateViewport(1000f, 1000f)
+
+        // hubA declares finite repulsionRadiusPx = 60f (`nodeB` has 0f so only hubA's field radiates).
+        // Place at dist = 63f (> 60f) and attach 50 incident rubbers (`degree = 50` on hubA).
+        world.upsertPlanet(PlanetSpec(id = "hubA", repulsionRadiusPx = 60f, elasticity = 4.0f), 300f, 500f)
+        world.upsertPlanet(PlanetSpec(id = "nodeB", pinned = true, repulsionRadiusPx = 0f, elasticity = 0f), 363f, 500f)
+        for (i in 0 until 50) {
+            val satId = "sat$i"
+            world.upsertPlanet(PlanetSpec(id = satId, pinned = true, repulsionRadiusPx = 0f), 300f, 200f)
+            world.upsertRubber(RubberSpec("hubA", satId, elasticity = 0f, naturalLengthPx = 300f))
+        }
+        // In 0.6.0, 0.15 * 50 = +7.5f degree inflation (67.5f > 63f) pushed hubA away even outside 60f.
+        // Since 0.6.1, hubA's repulsion range strictly equals 60f (< 63f), so zero movement occurs!
+        repeat(20) { world.step(0.016f, 1.0f) }
+        assertEquals(300f, world.bodyOf("hubA")!!.x, 1e-4f)
+
+        // Move nodeB inside strict 60f range (dist = 40f) -> repulsion engages immediately.
+        world.setBodyPosition("nodeB", 340f, 500f)
+        repeat(180) { world.step(0.016f, 1.0f) }
+        assertTrue(world.bodyOf("hubA")!!.x < 290f, "Explicit 60px finite repulsion must engage at dist=40px (x=${world.bodyOf("hubA")!!.x})")
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun deprecatedWithUnfoldFlag_preservesTransitionalAutoUnfoldOnTopologyChange() = runTest {
+        val world = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        world.updateViewport(600f, 600f)
+        val planets = listOf(
+            PlanetSpec("c0"),
+            PlanetSpec("c1"),
+            PlanetSpec("c2"),
+            PlanetSpec("c3"),
+        )
+        val edges = listOf(0 to 1, 1 to 2, 2 to 3, 3 to 0).map { (u, v) ->
+            RubberSpec("c$u", "c$v", naturalLengthPx = 120f)
+        }
+        val initial = listOf(
+            Vec2(200f, 200f),
+            Vec2(400f, 400f),
+            Vec2(200f, 400f),
+            Vec2(400f, 200f),
+        )
+        world.syncTopology(planets, edges) { spec ->
+            initial[spec.id.removePrefix("c").toInt()]
+        }
+        var active = true
+        var guard = 0
+        while (active && guard < 1800) {
+            active = world.step(0.016f, 1.0f)
+            guard += 1
+        }
+        assertFalse(active)
+        assertEquals(0, countEdgeCrossings(world))
+
+        // Manual crossed arrangement stays untouched across deprecated reheat() no-op,
+        // while subsequent topology change (upsertPlanet) still auto-unfolds for 0.6.0 compatibility.
+        world.setBodyPosition("c0", 200f, 200f)
+        world.setBodyPosition("c1", 400f, 400f)
+        world.setBodyPosition("c2", 200f, 400f)
+        world.setBodyPosition("c3", 400f, 200f)
+        assertEquals(1, countEdgeCrossings(world))
+
+        world.reheat()
+        assertEquals(1, countEdgeCrossings(world))
+
+        world.upsertPlanet(PlanetSpec("c4"), 300f, 300f)
+        var topoActive = true
+        var topoGuard = 0
+        while (topoActive && topoGuard < 1800) {
+            topoActive = world.step(0.016f, 1.0f)
+            topoGuard += 1
+        }
+        assertFalse(topoActive)
+        assertEquals(0, countEdgeCrossings(world))
     }
 
     @Test
@@ -747,7 +881,7 @@ class PhysicsKernelTest {
         val golden = 2.399963229728653
 
         for (trial in 0 until 8) {
-            val env = RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f)
+            val env = RootPhysics().toEnvironmentSpec(density = 1.0f)
             val world = SimulationWorld(env)
             world.updateViewport(360f, 620f)
 
@@ -767,6 +901,7 @@ class PhysicsKernelTest {
                     RubberSpec(startId = "n$u", endId = "n$v", naturalLengthPx = 135f),
                 )
             }
+            world.unfold()
 
             var active = true
             var steps = 0
@@ -796,13 +931,14 @@ class PhysicsKernelTest {
             vpW: Float,
             vpH: Float,
         ): SimulationWorld {
-            val world = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+            val world = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
             world.updateViewport(vpW, vpH)
             val planets = (0 until nodeCount).map { PlanetSpec(id = "p$it") }
             val rubbers = edgePairs.map { (u, v) ->
                 RubberSpec(startId = "p$u", endId = "p$v", naturalLengthPx = 110f)
             }
             world.syncTopology(planets, rubbers) { Vec2(vpW * 0.5f, vpH * 0.5f) }
+            world.unfold()
 
             var active = true
             var guard = 0
@@ -838,7 +974,7 @@ class PhysicsKernelTest {
         runAndVerifyPlanar(25, gridEdges, 900f, 900f)
 
         // 4. Disconnected islands + isolated nodes: 4-cycle + 3-node path + 2 isolated nodes
-        val islandWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        val islandWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         islandWorld.updateViewport(1000f, 1000f)
         val islandPlanets = (0 until 9).map { PlanetSpec(id = "i$it") }
         val islandEdges = listOf(
@@ -846,6 +982,7 @@ class PhysicsKernelTest {
             4 to 5, 5 to 6,
         ).map { (u, v) -> RubberSpec(startId = "i$u", endId = "i$v", naturalLengthPx = 110f) }
         islandWorld.syncTopology(islandPlanets, islandEdges) { Vec2(500f, 500f) }
+        islandWorld.unfold()
         var activeIsland = true
         var islandGuard = 0
         while (activeIsland && islandGuard < 1800) {
@@ -866,7 +1003,7 @@ class PhysicsKernelTest {
 
         // 5. Tier-3 parallel graph (N = 280 >= PARALLEL_DISPATCH_THRESHOLD): 14x20 grid
         val tier3World = SimulationWorld(
-            RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f),
+            RootPhysics().toEnvironmentSpec(density = 1.0f),
         )
         tier3World.updateViewport(2800f, 2200f)
         val t3Planets = (0 until 280).map { PlanetSpec(id = "g$it") }
@@ -879,6 +1016,7 @@ class PhysicsKernelTest {
             }
         }
         tier3World.syncTopology(t3Planets, t3Edges) { Vec2(1400f, 1100f) }
+        tier3World.unfold()
         repeat(150) {
             tier3World.step(0.016f, 1.0f)
         }
@@ -889,9 +1027,10 @@ class PhysicsKernelTest {
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun topologicalUnfold_incrementalGrowthAndPinnedAnchors_remainSmoothAndRespectLocks() = runTest {
         // 1. Incremental edge-by-edge growth ("生长重演"): smooth motion + 0 final crossings.
-        val growWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        val growWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         growWorld.updateViewport(420f, 680f)
         val growthEdges = listOf(0 to 1, 3 to 4, 1 to 2, 4 to 5, 2 to 3, 5 to 0, 6 to 4)
         var maxSingleFrameDelta = 0f
@@ -903,6 +1042,7 @@ class PhysicsKernelTest {
                 growWorld.upsertPlanet(PlanetSpec("g$v"), 210f, 340f)
             }
             growWorld.upsertRubber(RubberSpec("g$u", "g$v", naturalLengthPx = 120f))
+            growWorld.unfold()
             repeat(18) {
                 growWorld.step(0.016f, 1.0f)
                 for (b in growWorld.bodies) {
@@ -921,7 +1061,7 @@ class PhysicsKernelTest {
         assertTrue(maxSingleFrameDelta < 180f, "Growth unfolding must glide smoothly without teleporting (max=$maxSingleFrameDelta)")
 
         // 2. Pinned & pressed nodes remain strictly locked during unfolding.
-        val pinWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        val pinWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         pinWorld.updateViewport(600f, 600f)
         pinWorld.upsertPlanet(PlanetSpec("p0", pinned = true), 160f, 240f)
         pinWorld.upsertPlanet(PlanetSpec("p1"), 300f, 300f)
@@ -932,6 +1072,7 @@ class PhysicsKernelTest {
             pinWorld.upsertRubber(RubberSpec("p$u", "p$v", naturalLengthPx = 120f))
         }
         pinWorld.setBodyPressed("p4", true)
+        pinWorld.unfold()
         val pressedStartX = pinWorld.bodyOf("p4")!!.x
         val pressedStartY = pinWorld.bodyOf("p4")!!.y
         repeat(80) {
@@ -953,8 +1094,8 @@ class PhysicsKernelTest {
         assertFalse(pinActive)
         assertEquals(0, countEdgeCrossings(pinWorld))
 
-        // 3. Reheat untangles a manually crossed bowtie 4-cycle when unfoldEnabled = true.
-        val reheatWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        // 3. One-shot unfold() untangles a manually crossed bowtie 4-cycle, while reheat() & topology mutations do not auto-unfold.
+        val reheatWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         reheatWorld.updateViewport(600f, 600f)
         reheatWorld.upsertPlanet(PlanetSpec("c0"), 200f, 200f)
         reheatWorld.upsertPlanet(PlanetSpec("c1"), 400f, 400f)
@@ -963,7 +1104,7 @@ class PhysicsKernelTest {
         for ((u, v) in listOf(0 to 1, 1 to 2, 2 to 3, 3 to 0)) {
             reheatWorld.upsertRubber(RubberSpec("c$u", "c$v", naturalLengthPx = 120f))
         }
-        // Step past initial unfold, then manually cross into bowtie and call reheat()!
+        reheatWorld.unfold()
         repeat(100) { reheatWorld.step(0.016f, 1.0f) }
         reheatWorld.setBodyPosition("c0", 200f, 200f)
         reheatWorld.setBodyPosition("c1", 400f, 400f)
@@ -972,28 +1113,54 @@ class PhysicsKernelTest {
         assertEquals(1, countEdgeCrossings(reheatWorld))
 
         reheatWorld.reheat()
-        var reheatActive = true
-        var reheatGuard = 0
-        while (reheatActive && reheatGuard < 1800) {
-            reheatActive = reheatWorld.step(0.016f, 1.0f)
-            reheatGuard += 1
+        var reheatOnlyActive = true
+        var reheatOnlyGuard = 0
+        while (reheatOnlyActive && reheatOnlyGuard < 1800) {
+            reheatOnlyActive = reheatWorld.step(0.016f, 1.0f)
+            reheatOnlyGuard += 1
         }
-        assertFalse(reheatActive)
+        assertFalse(reheatOnlyActive)
+        assertEquals(1, countEdgeCrossings(reheatWorld), "reheat() alone must NOT unfold without explicit unfold()")
+
+        reheatWorld.unfold()
+        var unfoldActive = true
+        var unfoldGuard = 0
+        while (unfoldActive && unfoldGuard < 1800) {
+            unfoldActive = reheatWorld.step(0.016f, 1.0f)
+            unfoldGuard += 1
+        }
+        assertFalse(unfoldActive)
         assertEquals(0, countEdgeCrossings(reheatWorld))
+
+        // Subsequent manual cross + upsertPlanet/reheat must stay one-shot (no sticky auto-unfold).
+        reheatWorld.setBodyPosition("c0", 200f, 200f)
+        reheatWorld.setBodyPosition("c1", 400f, 400f)
+        reheatWorld.setBodyPosition("c2", 200f, 400f)
+        reheatWorld.setBodyPosition("c3", 400f, 200f)
+        reheatWorld.upsertPlanet(PlanetSpec("iso"), 50f, 50f)
+        reheatWorld.reheat()
+        var postMutationActive = true
+        var postMutationGuard = 0
+        while (postMutationActive && postMutationGuard < 1800) {
+            postMutationActive = reheatWorld.step(0.016f, 1.0f)
+            postMutationGuard += 1
+        }
+        assertFalse(postMutationActive)
+        assertEquals(1, countEdgeCrossings(reheatWorld), "unfold() must remain strictly one-shot across subsequent edits")
     }
 
     @Test
+    @Suppress("DEPRECATION")
     fun topologicalUnfold_staticAuditEdgeCases_delayedViewportWakeScaleLockedIsolatesBiCenteredTreesAndCancellation() = runTest {
         // 1. Builder preservation across copy/with* methods.
         val configured = RootPhysics()
-            .withUnfold(true)
             .withAirDamping(2.0f)
             .withScaleBounds(initScale = 1.0f, minScale = 0.5f, maxScale = 2.0f)
-        assertTrue(configured.unfoldEnabled)
+        assertEquals(2.0f, configured.airDamping, 1e-4f)
 
-        // 2. Stepping once at 0x0 viewport before updateViewport(360, 760) must still allow fresh
-        //    portrait PCA alignment & centering once real layout dimensions arrive.
-        val portraitWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        // 2. Calling unfold() before layout / stepping once at 0x0 viewport before updateViewport(360, 760)
+        //    must still allow fresh portrait PCA alignment & centering once real layout dimensions arrive.
+        val portraitWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         val ladderPlanets = (0 until 10).map { PlanetSpec(id = "l$it") }
         val ladderEdges = ArrayList<RubberSpec>()
         for (i in 0 until 4) {
@@ -1004,6 +1171,7 @@ class PhysicsKernelTest {
             ladderEdges.add(RubberSpec("l$i", "l${i + 5}", naturalLengthPx = 90f))
         }
         portraitWorld.syncTopology(ladderPlanets, ladderEdges) { Vec2(0f, 0f) }
+        portraitWorld.unfold()
         portraitWorld.step(0.016f, 1.0f) // Frame at 0x0 viewport before layout!
         portraitWorld.updateViewport(360f, 760f)
         var portraitActive = true
@@ -1030,8 +1198,8 @@ class PhysicsKernelTest {
         assertEquals(180f, 0.5f * (lMinX + lMaxX), 45f)
         assertEquals(380f, 0.5f * (lMinY + lMaxY), 45f)
 
-        // 3. wake() preserves manual bowtie arrangement, whereas reheat() untangles it.
-        val wakeWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        // 3. Both wake() and reheat() preserve manual bowtie arrangement, whereas unfold() untangles it.
+        val wakeWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         wakeWorld.updateViewport(600f, 600f)
         wakeWorld.upsertPlanet(PlanetSpec("w0"), 200f, 200f)
         wakeWorld.upsertPlanet(PlanetSpec("w1"), 400f, 400f)
@@ -1040,6 +1208,7 @@ class PhysicsKernelTest {
         for ((u, v) in listOf(0 to 1, 1 to 2, 2 to 3, 3 to 0)) {
             wakeWorld.upsertRubber(RubberSpec("w$u", "w$v", naturalLengthPx = 120f))
         }
+        wakeWorld.unfold()
         repeat(100) { wakeWorld.step(0.016f, 1.0f) }
         wakeWorld.setBodyPosition("w0", 200f, 200f)
         wakeWorld.setBodyPosition("w1", 400f, 400f)
@@ -1055,6 +1224,7 @@ class PhysicsKernelTest {
         }
         assertFalse(wakeActive)
         assertEquals(1, countEdgeCrossings(wakeWorld), "wake() must NOT overwrite manual arrangement")
+
         wakeWorld.reheat()
         var reheatActive2 = true
         var reheatGuard2 = 0
@@ -1063,10 +1233,20 @@ class PhysicsKernelTest {
             reheatGuard2 += 1
         }
         assertFalse(reheatActive2)
-        assertEquals(0, countEdgeCrossings(wakeWorld), "reheat() must untangle crossed cycle")
+        assertEquals(1, countEdgeCrossings(wakeWorld), "reheat() must NOT overwrite manual arrangement")
+
+        wakeWorld.unfold()
+        var unfoldActive2 = true
+        var unfoldGuard2 = 0
+        while (unfoldActive2 && unfoldGuard2 < 1800) {
+            unfoldActive2 = wakeWorld.step(0.016f, 1.0f)
+            unfoldGuard2 += 1
+        }
+        assertFalse(unfoldActive2)
+        assertEquals(0, countEdgeCrossings(wakeWorld), "unfold() must untangle crossed cycle")
 
         // 4. Locked isolated node acts as immovable obstacle during component/isolate packing.
-        val lockedIsoWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        val lockedIsoWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         lockedIsoWorld.updateViewport(1000f, 1000f)
         val isoPlanets = listOf(
             PlanetSpec("p0"),
@@ -1080,6 +1260,7 @@ class PhysicsKernelTest {
             RubberSpec("p$u", "p$v", naturalLengthPx = 100f)
         }
         lockedIsoWorld.syncTopology(isoPlanets, isoEdges) { Vec2(500f, 500f) }
+        lockedIsoWorld.unfold()
         val pinIsoStart = lockedIsoWorld.bodyOf("pinIso")!!
         val pinIsoStartX = pinIsoStart.x
         val pinIsoStartY = pinIsoStart.y
@@ -1101,7 +1282,7 @@ class PhysicsKernelTest {
         }
 
         // 5. Bi-centered double-star tree & symmetric bowtie cut-vertex with pendant subtree.
-        val dblStarWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        val dblStarWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         dblStarWorld.updateViewport(1100f, 1100f)
         val dblEdges = listOf(
             0 to 1,
@@ -1109,6 +1290,7 @@ class PhysicsKernelTest {
             1 to 7, 1 to 8, 1 to 9, 7 to 10, 7 to 11,
         ).map { (u, v) -> RubberSpec("d$u", "d$v", naturalLengthPx = 105f) }
         dblStarWorld.syncTopology((0 until 12).map { PlanetSpec("d$it") }, dblEdges) { Vec2(550f, 550f) }
+        dblStarWorld.unfold()
         var dblActive = true
         var dblGuard = 0
         while (dblActive && dblGuard < 1800) {
@@ -1118,7 +1300,7 @@ class PhysicsKernelTest {
         assertFalse(dblActive)
         assertEquals(0, countEdgeCrossings(dblStarWorld))
 
-        val bowtieWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        val bowtieWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         bowtieWorld.updateViewport(900f, 900f)
         val bowtieEdges = listOf(
             0 to 1, 1 to 2, 2 to 0,
@@ -1133,6 +1315,7 @@ class PhysicsKernelTest {
         bowtieWorld.syncTopology((0 until 8).map { PlanetSpec("b$it") }, bowtieEdges) { spec ->
             shuffledPos[spec.id.removePrefix("b").toInt()]
         }
+        bowtieWorld.unfold()
         var btActive = true
         var btGuard = 0
         while (btActive && btGuard < 1800) {
@@ -1142,8 +1325,8 @@ class PhysicsKernelTest {
         assertFalse(btActive)
         assertEquals(0, countEdgeCrossings(bowtieWorld))
 
-        // 6. Tier-3 cancellation recovery: cancelling mid-step must preserve unfoldDirty for next resume.
-        val t3CancelWorld = SimulationWorld(RootPhysics().withUnfold(true).toEnvironmentSpec(density = 1.0f))
+        // 6. Tier-3 cancellation recovery: cancelling mid-step must preserve unfoldRequested for next resume.
+        val t3CancelWorld = SimulationWorld(RootPhysics().toEnvironmentSpec(density = 1.0f))
         t3CancelWorld.updateViewport(2800f, 2200f)
         val t3Planets = (0 until 270).map { PlanetSpec("c$it") }
         val t3Edges = ArrayList<RubberSpec>()
@@ -1160,6 +1343,7 @@ class PhysicsKernelTest {
             val a = p * 2.39996
             Vec2(1400f + cos(a).toFloat() * 140f, 1100f + sin(a).toFloat() * 140f)
         }
+        t3CancelWorld.unfold()
         val cancelledStep = async(start = CoroutineStart.UNDISPATCHED) {
             t3CancelWorld.step(0.016f, 1.0f)
         }

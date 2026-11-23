@@ -586,7 +586,6 @@ class DeponderComposeUiTest {
 
             // Displace mover toward anchor so multi-frame spring integration runs continuously until sleep.
             state.moveTo("mover", displacedX, state.world.bodyOf("mover")!!.y)
-            state.reheat()
             waitForIdle()
 
             val settledAfterX = state.world.bodyOf("mover")!!.x
