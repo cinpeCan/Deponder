@@ -14,6 +14,39 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        exclusiveContent {
+            forRepository {
+                ivy("https://nodejs.org/dist") {
+                    name = "Node.js Distributions"
+                    patternLayout { artifact("v[revision]/[artifact](-v[revision]-[classifier]).[ext]") }
+                    metadataSources { artifact() }
+                    content { includeModule("org.nodejs", "node") }
+                }
+            }
+            filter { includeModule("org.nodejs", "node") }
+        }
+        exclusiveContent {
+            forRepository {
+                ivy("https://github.com/yarnpkg/yarn/releases/download") {
+                    name = "Yarn Distributions"
+                    patternLayout { artifact("v[revision]/[artifact](-v[revision]).[ext]") }
+                    metadataSources { artifact() }
+                    content { includeModule("com.yarnpkg", "yarn") }
+                }
+            }
+            filter { includeModule("com.yarnpkg", "yarn") }
+        }
+        exclusiveContent {
+            forRepository {
+                ivy("https://github.com/WebAssembly/binaryen/releases/download") {
+                    name = "Binaryen Distributions"
+                    patternLayout { artifact("version_[revision]/binaryen-version_[revision]-[classifier].[ext]") }
+                    metadataSources { artifact() }
+                    content { includeModule("com.github.webassembly", "binaryen") }
+                }
+            }
+            filter { includeModule("com.github.webassembly", "binaryen") }
+        }
     }
 }
 

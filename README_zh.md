@@ -6,7 +6,7 @@
   <a href="README.md"><b>English</b></a>
 </p>
 
-Deponder 是面向 **Compose Multiplatform**（Android / iOS / Desktop / Web Wasm）与 **Android 原生 View** 的力导向物理交互库。通过 `Modifier` 与 `View` 扩展，直接为现有 UI 组件附加质点排斥、弹簧牵引与物理拖拽交互，在图形层 / `RenderNode` 上更新位移与形变，无需引入额外包裹容器或每帧重排视图树。
+Deponder 是面向 **Compose Multiplatform**（Android / iOS / Desktop / Web Wasm）、**SwiftUI**（iOS 18+ / macOS 15+，基于官方 Kotlin Swift Export 与 Swift Package Manager）与 **Android 原生 View** 的力导向物理交互库。通过 `Modifier`、SwiftUI `View` 修饰符与 `View` 扩展，直接为现有 UI 组件附加质点排斥、弹簧牵引与物理拖拽交互，在渲染变换层更新位移与形变，无需引入额外包裹容器或每帧重排视图树。
 
 <p align="center">
   <img src="docs/assets/deponder-demo.gif" width="360" alt="Deponder 演示效果" />
@@ -18,27 +18,29 @@ Deponder 是面向 **Compose Multiplatform**（Android / iOS / Desktop / Web Was
   <img src="docs/assets/deponder-architecture.svg" width="880" alt="Deponder 架构示意图" />
 </p>
 
-Compose 与 Android View 两端基于同一套无 UI 依赖的 `deponder-core` 物理内核，对外提供一致的 5 个核心接入接口：
+Compose、SwiftUI 与 Android View 三端基于同一套无 UI 依赖的 `deponder-core` 物理内核，对外提供一致的 5 个核心接入接口：
 
-| 算子 | Compose | Android View | 作用 |
-| :--- | :--- | :--- | :--- |
-| **Root** | `Modifier.deponderRoot` | `ViewGroup.deponderRoot` | 建立仿真坐标系并驱动帧循环 |
-| **Planet** | `Modifier.deponderPlanet` | `View.deponderPlanet` | 注册具备质量、斥力半径与固定状态的节点 |
-| **Rubber** | `Modifier.deponderRubber` | `View.deponderRubber` | 连接两端节点 ID，建立弹簧力与端点安全区裁剪 |
-| **Stretch** | `Modifier.deponderStretch` | `View.deponderStretch` | 使自定义连线或内部线条子元素随间距拉伸 |
-| **Drag** | `Modifier.deponderDrag` | `View.deponderDrag` | 启用物理拖拽，并通过 `touchSlop` 保留点击事件 |
+| 算子 | Compose | SwiftUI (iOS 18+ / macOS 15+) | Android View | 作用 |
+| :--- | :--- | :--- | :--- | :--- |
+| **Root** | `Modifier.deponderRoot` | `View.deponderRoot` | `ViewGroup.deponderRoot` | 建立仿真坐标系并驱动帧循环 |
+| **Planet** | `Modifier.deponderPlanet` | `View.deponderPlanet` | `View.deponderPlanet` | 注册具备质量、斥力半径与固定状态的节点 |
+| **Rubber** | `Modifier.deponderRubber` | `View.deponderRubber` | `View.deponderRubber` | 连接两端节点 ID，建立弹簧力与端点安全区裁剪 |
+| **Stretch** | `Modifier.deponderStretch` | `View.deponderStretch` | `View.deponderStretch` | 使自定义连线或内部线条子元素随间距拉伸 |
+| **Drag** | `Modifier.deponderDrag` | `View.deponderDrag` | `View.deponderDrag` | 启用物理拖拽，并通过 `touchSlop` 保留点击事件 |
 
-- **视图层级约定**：在 Compose 中，`deponderPlanet` 与 `deponderRubber` 可放置于 `deponderRoot` 内部任意静态嵌套深度，无向连线建议使用对称且无冲突的 `EdgeKey(a, b)` 作为 `key(...)`。在 Android View 中，`deponderPlanet` 与 `deponderRubber` 必须是 `deponderRoot` 容器的**直接子 View**；绑定信息保存在私有资源 tag ID 中，不覆盖业务方 `View.getTag()`、子视图顺序或宿主 `clipChildren` 设置。
-- **手势共存**：`deponderDrag` 在手指位移超过 `touchSlop` 后才接管事件，保持原有的 `.clickable {}`、`OnClickListener`、`OnLongClickListener` 与点击水波纹反馈正常工作；拖拽修饰符既可直接加在节点本体，也可加在节点内部的指定手柄区域。
-- **帧调度与静止休眠**：内核使用自适应 `1/120s` 子步积分，在不同刷新率（60Hz–240Hz）屏幕上保持一致的运动速度；当自由节点的速率与加速度同时低于休眠阈值并持续稳定后，帧循环会自动挂起 VSYNC 回调（`isAwake == false`），待下次状态变更或触摸交互时即时恢复。
+- **视图层级约定**：在 Compose 与 SwiftUI 中，`deponderPlanet` 与 `deponderRubber` 可放置于 `deponderRoot` 内部任意静态嵌套深度（SwiftUI 下 `.deponderDrag()` 同时兼容挂在 `.deponderPlanet()` 外侧或内部手柄子视图上）；Compose 无向连线建议使用对称且无冲突的 `EdgeKey(a, b)` 作为 `key(...)`。在 Android View 中，`deponderPlanet` 与 `deponderRubber` 必须是 `deponderRoot` 容器的**直接子 View**；绑定信息保存在私有资源 tag ID 中，不覆盖业务方 `View.getTag()`、子视图顺序或宿主 `clipChildren` 设置。
+- **手势共存**：`deponderDrag` 在手指位移超过 `touchSlop` 后才接管事件，保持原有的 `.clickable {}`、SwiftUI `Button` / `.onTapGesture`、`OnClickListener`、`OnLongClickListener` 与点击水波纹反馈正常工作；拖拽修饰符既可直接加在节点本体，也可加在节点内部的指定手柄区域。
+- **帧调度与静止休眠**：内核使用自适应 `1/120s` 子步积分，在不同刷新率（60Hz–240Hz）屏幕上保持一致的运动速度；当自由节点的速率与加速度同时低于休眠阈值并持续稳定后，帧循环会自动挂起 DisplayLink / VSYNC 回调（`isAwake == false`），CPU 占用归零，待下次状态变更或触摸交互时即时恢复。
 
 ## 依赖引入
+
+### Gradle / Maven Central
 
 | Maven 构件 | 适用场景 | 支持平台 |
 | :--- | :--- | :--- |
 | `deponder-compose` | Compose Multiplatform 与 Jetpack Compose | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
 | `deponder` | Android 原生 `View` / `ViewGroup` | Android（`minSdk 23`, JVM 17） |
-| `deponder-core` | 无 UI 物理仿真或自绘 `Canvas` | Android、iOS、Desktop (JVM 17)、Web (`wasmJs`) |
+| `deponder-core` | 无 UI 物理仿真或自绘 `Canvas` | Android、iOS、macOS (`macosArm64`)、Desktop (JVM 17)、Web (`wasmJs`) |
 | `deponder-bom` | 跨模块版本对齐 BOM | 全平台 |
 
 所有构件均发布在 `io.github.cinpecan` 下。`deponder-compose` 仅依赖 `compose-runtime` 与 `compose-ui`（不引入 `compose-foundation` 或 Material）；`deponder` 仅依赖 `lifecycle-common`。
@@ -47,7 +49,7 @@ Compose 与 Android View 两端基于同一套无 UI 依赖的 `deponder-core` �
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder-compose:0.6.1")
+    implementation("io.github.cinpecan:deponder-compose:0.7.0")
 }
 ```
 
@@ -55,7 +57,7 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder:0.6.1")
+    implementation("io.github.cinpecan:deponder:0.7.0")
 }
 ```
 
@@ -63,10 +65,25 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.cinpecan:deponder-bom:0.6.1"))
+    implementation(platform("io.github.cinpecan:deponder-bom:0.7.0"))
     implementation("io.github.cinpecan:deponder")
     implementation("io.github.cinpecan:deponder-compose")
 }
+```
+
+### Swift Package Manager（原生 iOS 18+ / macOS 15+）
+
+直接在 Xcode（**File → Add Package Dependencies…**）或 `Package.swift` 中引入 `https://github.com/cinpeCan/Deponder.git`（`0.7.0`+），无需任何 Kotlin / Gradle 工具链或 Objective-C 桥接：
+
+| Product | 目标平台与定位 | 系统/架构要求 |
+| :--- | :--- | :--- |
+| `Deponder` | 原生 SwiftUI 五大算子与 `DeponderDefaultRubber`（同时 `@_exported import DeponderCore`） | iOS 18+、macOS 15+（`arm64`） |
+| `DeponderCore` | 官方 Kotlin Swift Export 导出的无 UI 物理内核（`SimulationWorld`、配置与预设） | iOS 18+、macOS 15+（`arm64`） |
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/cinpeCan/Deponder.git", from: "0.7.0")
+]
 ```
 
 ## 快速上手：Compose Multiplatform
@@ -158,6 +175,47 @@ controller.unfold()
 
 Java 调用方可通过 `DeponderViews` 静态方法（`deponderRoot`、`deponderPlanet`、`deponderRubber`、`deponderStretch`、`deponderDrag`、`clearDeponderPlanet`、`clearDeponderRubber`）以及 `DeponderRubberView` 的流式 `with*` 方法链式配置。
 
+## 快速上手：SwiftUI（iOS 18+ / macOS 15+）
+
+将 `.deponderRoot(state)` 挂载在 `ZStack` 等容器上：
+
+```swift
+import Deponder
+import SwiftUI
+
+struct KnowledgeGraphView: View {
+    @State private var state = DeponderState(physics: .balanced)
+
+    var body: some View {
+        ZStack {
+            ForEach(links) { link in
+                DeponderDefaultRubber(
+                    startId: link.fromId,
+                    endId: link.toId,
+                    label: link.relation,
+                    arrowMode: .end,
+                    physics: .default,
+                    insets: .default
+                )
+            }
+
+            ForEach(nodes) { node in
+                NodeCard(node: node)
+                    .deponderPlanet(
+                        id: node.id,
+                        physics: .make(repulsionRadiusDp: 80, pinned: node.isAnchor)
+                    )
+                    .deponderDrag()
+                    .onTapGesture { select(node) }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .deponderRoot(state)
+        .onAppear { state.unfold() }
+    }
+}
+```
+
 ## 物理参数与预设
 
 ### 内置预设
@@ -233,6 +291,7 @@ Deponder 将物理内核的力学平衡与 UI 渲染层的视觉裁剪正交拆�
 
 - **箭头模式（`DeponderArrowMode`）**：`NONE`、`END`、`START`、`BOTH`。
 - **Compose（`DeponderRubberStyle`）**：通过 `DeponderRubberStyle.of(lineColor, lineThickness, arrowSize, labelColor, labelTextSize, labelBackgroundColor)` 定制 `DeponderDefaultRubber` 的线条、箭头与标签样式。
+- **SwiftUI（`DeponderRubberStyle`）**：通过 `DeponderRubberStyle(lineColor:lineThickness:arrowSize:labelColor:labelTextSize:labelBackgroundColor:)` 定制样式。
 - **Android View（`DeponderRubberView`）**：代码层可通过 `withLabel`、`withArrowMode`、`withInsets`、`withPhysics`、`withLineStyle` 与 `withLabelStyle` 配置；XML 支持 `app:deponderStartId`、`app:deponderEndId`、`app:deponderElasticity`、`app:deponderNaturalLength`（`wrap_content` 或具体尺寸）、`app:deponderInsets`（`both` / `none` / `start` / `end` 或具体尺寸）、`app:deponderInsetGap`、`app:deponderLabel`、`app:deponderArrowMode`（`none` / `end` / `start` / `both`）、`app:deponderLineColor`、`app:deponderLineThickness`、`app:deponderArrowSize`、`app:deponderLabelColor`、`app:deponderLabelTextSize` 与 `app:deponderLabelBackgroundColor`。
 
 ### 自定义连线组件
@@ -240,13 +299,14 @@ Deponder 将物理内核的力学平衡与 UI 渲染层的视觉裁剪正交拆�
 将 `deponderRubber` 与 `deponderStretch` 组合即可驱动任意自定义连线布局。将 `deponderStretch` 加在内部的线条子元素上时，内核仅沿间距拉伸线条本体，同级文字或徽章子元素保持原始比例居中显示：
 
 - **Compose**：在连线容器挂载 `Modifier.deponderRubber(startId, endId, physics, insets)`，在线条子组件（或容器自身）追加 `Modifier.deponderStretch()`。
+- **SwiftUI**：在连线容器挂载 `.deponderRubber(startId:endId:physics:insets:)`，在内部线条子视图（或单一线条视图自身）追加 `.deponderStretch()`。
 - **Android View**：在连线父视图调用 `linkContainer.deponderRubber(startId, endId, physics, insets)`，在需要拉伸的线条子 View 上调用 `lineView.deponderStretch()` 或于 XML 设置 `android:tag="@string/deponder_stretch"`。
 
 ## 运行时控制与无 UI 内核调用
 
-### `DeponderState`（Compose）与 `DeponderController`（Android View）
+### `DeponderState`（Compose / SwiftUI）与 `DeponderController`（Android View）
 
-两端控制句柄提供一致的运行时控制接口：
+三端控制句柄提供一致的运行时控制接口：
 
 - **展开与全局物理调节**：`unfold()`、`updatePhysics(newPhysics)`、`submitScale(scale)`、`submitRubberElasticity(elasticity)`、`setPinned(id, pinned)`
 - **命令式节点控制**：`moveTo(id, xPx, yPx)`、`dragBy(id, dxPx, dyPx)`、`setPressed(id, pressed)`、`bringToFront(id)`

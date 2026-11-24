@@ -6,7 +6,7 @@
   <a href="README_zh.md"><b>中文说明</b></a>
 </p>
 
-Deponder is a force-directed physics interaction library for **Compose Multiplatform** (Android, iOS, Desktop, Web/Wasm) and **Android Views**. Attach physical bodies, spring links, and click-safe dragging directly to standard UI components via `Modifier`s or `View` extensions—updating graphics/`RenderNode` layers without wrapper layouts or per-frame relayout.
+Deponder is a force-directed physics interaction library for **Compose Multiplatform** (Android, iOS, Desktop, Web/Wasm), **SwiftUI** (iOS 18+, macOS 15+ via Swift Package Manager + official Kotlin Swift Export), and **Android Views**. Attach physical bodies, spring links, and click-safe dragging directly to standard UI components via `Modifier`s, SwiftUI `View` modifiers, or `View` extensions—updating render transforms without wrapper layouts or per-frame relayout.
 
 <p align="center">
   <img src="docs/assets/deponder-demo.gif" width="360" alt="Deponder Demo" />
@@ -18,36 +18,38 @@ Deponder is a force-directed physics interaction library for **Compose Multiplat
   <img src="docs/assets/deponder-architecture.svg" width="880" alt="Deponder Architecture" />
 </p>
 
-Both UI toolkits share the same five-operator model backed by a single UI-agnostic `deponder-core` kernel:
+All UI toolkits share the same five-operator model backed by a single UI-agnostic `deponder-core` kernel:
 
-| Operator | Compose | Android View | Role |
-| :--- | :--- | :--- | :--- |
-| **Root** | `Modifier.deponderRoot` | `ViewGroup.deponderRoot` | Simulation coordinate space and frame loop |
-| **Planet** | `Modifier.deponderPlanet` | `View.deponderPlanet` | Point-mass node with repulsion range and pinning |
-| **Rubber** | `Modifier.deponderRubber` | `View.deponderRubber` | Hooke spring link with endpoint safe-area trimming |
-| **Stretch** | `Modifier.deponderStretch` | `View.deponderStretch` | Stretches a custom link or inner child along the span |
-| **Drag** | `Modifier.deponderDrag` | `View.deponderDrag` | Pointer dragging with `touchSlop` click preservation |
+| Operator | Compose | SwiftUI (iOS 18+ / macOS 15+) | Android View | Role |
+| :--- | :--- | :--- | :--- | :--- |
+| **Root** | `Modifier.deponderRoot` | `View.deponderRoot` | `ViewGroup.deponderRoot` | Simulation coordinate space and frame loop |
+| **Planet** | `Modifier.deponderPlanet` | `View.deponderPlanet` | `View.deponderPlanet` | Point-mass node with repulsion range and pinning |
+| **Rubber** | `Modifier.deponderRubber` | `View.deponderRubber` | `View.deponderRubber` | Hooke spring link with endpoint safe-area trimming |
+| **Stretch** | `Modifier.deponderStretch` | `View.deponderStretch` | `View.deponderStretch` | Stretches a custom link or inner child along the span |
+| **Drag** | `Modifier.deponderDrag` | `View.deponderDrag` | `View.deponderDrag` | Pointer dragging with `touchSlop` click preservation |
 
-- **Hierarchy rules**: In Compose, `deponderPlanet` and `deponderRubber` can live at any static nesting depth inside `deponderRoot`; use `EdgeKey(a, b)` as a symmetric, collision-free `key(...)` for undirected links. In Android Views, `deponderPlanet` and `deponderRubber` views must be **direct children** of the `deponderRoot` `ViewGroup` (bindings store private keyed tag IDs and never alter `View.getTag()`, child order, or `clipChildren`).
-- **Gesture coexistence**: `deponderDrag` defers interception until pointer movement exceeds `touchSlop`, keeping `.clickable {}`, `OnClickListener`, `OnLongClickListener`, and touch ripples intact. It can be attached to the planet component itself or to an inner drag-handle child.
-- **Frame scheduling & sleep**: Simulation steps use `1/120s` adaptive sub-stepping for consistent motion across 60Hz–240Hz displays and suspend VSYNC frame callbacks (`isAwake == false`) once free-body velocities and accelerations settle below rest thresholds. Any state mutation or touch interaction resumes the loop on demand.
+- **Hierarchy rules**: In Compose and SwiftUI, `deponderPlanet` and `deponderRubber` can live at any static nesting depth inside `deponderRoot` (and in SwiftUI, `.deponderDrag()` works both outside `.deponderPlanet()` and on inner child handles). In Compose, use `EdgeKey(a, b)` as a symmetric, collision-free `key(...)` for undirected links. In Android Views, `deponderPlanet` and `deponderRubber` views must be **direct children** of the `deponderRoot` `ViewGroup` (bindings store private keyed tag IDs and never alter `View.getTag()`, child order, or `clipChildren`).
+- **Gesture coexistence**: `deponderDrag` defers interception until pointer movement exceeds `touchSlop`, keeping `.clickable {}`, SwiftUI `Button` / `.onTapGesture`, `OnClickListener`, `OnLongClickListener`, and touch ripples intact. It can be attached to the planet component itself or to an inner drag-handle child.
+- **Frame scheduling & sleep**: Simulation steps use `1/120s` adaptive sub-stepping for consistent motion across 60Hz–240Hz displays and suspend display-link / VSYNC frame callbacks (`isAwake == false`) once free-body velocities and accelerations settle below rest thresholds. Any state mutation or touch interaction resumes the loop on demand.
 
 ## Installation
+
+### Gradle / Maven Central
 
 | Artifact | Target | Platforms |
 | :--- | :--- | :--- |
 | `deponder-compose` | Compose Multiplatform & Jetpack Compose | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
 | `deponder` | Android `View` / `ViewGroup` | Android (`minSdk 23`, JVM 17) |
-| `deponder-core` | Headless simulation / custom `Canvas` | Android, iOS, Desktop (JVM 17), Web (`wasmJs`) |
+| `deponder-core` | Headless simulation / custom `Canvas` | Android, iOS, macOS (`macosArm64`), Desktop (JVM 17), Web (`wasmJs`) |
 | `deponder-bom` | Maven BOM for version alignment | All |
 
-All artifacts are published under `io.github.cinpecan`. `deponder-compose` depends only on `compose-runtime` and `compose-ui` (no `compose-foundation` or Material); `deponder` depends only on `lifecycle-common`.
+All Maven artifacts are published under `io.github.cinpecan`. `deponder-compose` depends only on `compose-runtime` and `compose-ui` (no `compose-foundation` or Material); `deponder` depends only on `lifecycle-common`.
 
 **Compose Multiplatform (`commonMain`) or Jetpack Compose:**
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder-compose:0.6.1")
+    implementation("io.github.cinpecan:deponder-compose:0.7.0")
 }
 ```
 
@@ -55,7 +57,7 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation("io.github.cinpecan:deponder:0.6.1")
+    implementation("io.github.cinpecan:deponder:0.7.0")
 }
 ```
 
@@ -63,10 +65,25 @@ dependencies {
 
 ```kotlin
 dependencies {
-    implementation(platform("io.github.cinpecan:deponder-bom:0.6.1"))
+    implementation(platform("io.github.cinpecan:deponder-bom:0.7.0"))
     implementation("io.github.cinpecan:deponder")
     implementation("io.github.cinpecan:deponder-compose")
 }
+```
+
+### Swift Package Manager (Native iOS 18+ / macOS 15+)
+
+Add `https://github.com/cinpeCan/Deponder.git` (`0.7.0`+) in Xcode (**File → Add Package Dependencies…**) or `Package.swift` — zero Kotlin/Gradle toolchain or Objective-C bridging required:
+
+| Product | Target | Platforms |
+| :--- | :--- | :--- |
+| `Deponder` | Native SwiftUI five-operator bindings + `DeponderDefaultRubber` (also `@_exported import DeponderCore`) | iOS 18+, macOS 15+ (`arm64`) |
+| `DeponderCore` | Headless Swift Export physics kernel (`SimulationWorld`, configs, presets) | iOS 18+, macOS 15+ (`arm64`) |
+
+```swift
+dependencies: [
+    .package(url: "https://github.com/cinpeCan/Deponder.git", from: "0.7.0")
+]
 ```
 
 ## Quick Start: Compose Multiplatform
@@ -158,6 +175,47 @@ controller.unfold()
 
 Java callers can use static methods on `DeponderViews` (`deponderRoot`, `deponderPlanet`, `deponderRubber`, `deponderStretch`, `deponderDrag`, `clearDeponderPlanet`, `clearDeponderRubber`) alongside fluent `with*` builders on `DeponderRubberView`.
 
+## Quick Start: SwiftUI (iOS 18+ / macOS 15+)
+
+Mount `.deponderRoot(state)` on an unconstrained container such as `ZStack`:
+
+```swift
+import Deponder
+import SwiftUI
+
+struct KnowledgeGraphView: View {
+    @State private var state = DeponderState(physics: .balanced)
+
+    var body: some View {
+        ZStack {
+            ForEach(links) { link in
+                DeponderDefaultRubber(
+                    startId: link.fromId,
+                    endId: link.toId,
+                    label: link.relation,
+                    arrowMode: .end,
+                    physics: .default,
+                    insets: .default
+                )
+            }
+
+            ForEach(nodes) { node in
+                NodeCard(node: node)
+                    .deponderPlanet(
+                        id: node.id,
+                        physics: .make(repulsionRadiusDp: 80, pinned: node.isAnchor)
+                    )
+                    .deponderDrag()
+                    .onTapGesture { select(node) }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .deponderRoot(state)
+        .onAppear { state.unfold() }
+    }
+}
+```
+
 ## Physics Configuration & Presets
 
 ### Built-in Presets
@@ -235,20 +293,22 @@ Use per-side builders (`withStartNone()`, `withEndNone()`, `withStartContour(gap
 
 - **Arrowheads (`DeponderArrowMode`)**: `NONE`, `END`, `START`, `BOTH`.
 - **Compose (`DeponderRubberStyle`)**: customize `DeponderDefaultRubber` colors, line thickness, arrow size, and label styling via `DeponderRubberStyle.of(lineColor, lineThickness, arrowSize, labelColor, labelTextSize, labelBackgroundColor)`.
+- **SwiftUI (`DeponderRubberStyle`)**: customize `DeponderDefaultRubber` via `DeponderRubberStyle(lineColor:lineThickness:arrowSize:labelColor:labelTextSize:labelBackgroundColor:)`.
 - **Android View (`DeponderRubberView`)**: configure programmatically with `withLabel`, `withArrowMode`, `withInsets`, `withPhysics`, `withLineStyle`, `withLabelStyle`, or in XML with `app:deponderStartId`, `app:deponderEndId`, `app:deponderElasticity`, `app:deponderNaturalLength` (`wrap_content` or dimension), `app:deponderInsets` (`both`, `none`, `start`, `end`, or dimension), `app:deponderInsetGap`, `app:deponderLabel`, `app:deponderArrowMode` (`none`, `end`, `start`, `both`), `app:deponderLineColor`, `app:deponderLineThickness`, `app:deponderArrowSize`, `app:deponderLabelColor`, `app:deponderLabelTextSize`, and `app:deponderLabelBackgroundColor`.
 
 ### Custom Link Layouts
 
-Combine `deponderRubber` with `deponderStretch` to render any custom Composable or `View` as a spring link. Placing `deponderStretch` on an inner line view/composable stretches only that child while keeping sibling badges or labels at their unstretched size:
+Combine `deponderRubber` with `deponderStretch` to render any custom Composable, SwiftUI `View`, or Android `View` as a spring link. Placing `deponderStretch` on an inner line view/composable stretches only that child while keeping sibling badges or labels at their unstretched size:
 
 - **Compose**: chain `Modifier.deponderRubber(startId, endId, physics, insets)` on the link container and `Modifier.deponderStretch()` on the line element (or directly on the root link modifier).
+- **SwiftUI**: attach `.deponderRubber(startId:endId:physics:insets:)` to the link container and `.deponderStretch()` to the line child (or directly upstream on a single line view).
 - **Android View**: call `linkContainer.deponderRubber(startId, endId, physics, insets)` and mark the stretching child with `lineView.deponderStretch()` or XML `android:tag="@string/deponder_stretch"`.
 
 ## Runtime Control & Headless `SimulationWorld`
 
-### `DeponderState` (Compose) & `DeponderController` (Android View)
+### `DeponderState` (Compose / SwiftUI) & `DeponderController` (Android View)
 
-Both handles expose an identical runtime control surface:
+All three hosts expose a unified runtime control surface:
 
 - **Layout & global physics**: `unfold()`, `updatePhysics(newPhysics)`, `submitScale(scale)`, `submitRubberElasticity(elasticity)`, `setPinned(id, pinned)`
 - **Imperative node control**: `moveTo(id, xPx, yPx)`, `dragBy(id, dxPx, dyPx)`, `setPressed(id, pressed)`, `bringToFront(id)`

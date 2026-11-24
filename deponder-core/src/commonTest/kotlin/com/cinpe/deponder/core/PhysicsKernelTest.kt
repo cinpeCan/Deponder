@@ -1354,4 +1354,52 @@ class PhysicsKernelTest {
         }
         assertEquals(0, countEdgeCrossings(t3CancelWorld), "Resumed Tier-3 world must still unfold cleanly")
     }
+
+    @Test
+    fun stepSync_andVec2FreeSyncTopology_matchSuspendStepBehavior() = runTest {
+        val env = RootPhysics.fromPreset(DeponderDefaults.Presets.Crisp).toEnvironmentSpec(density = 1.0f)
+        val syncWorld = SimulationWorld(env)
+        val suspendWorld = SimulationWorld(env)
+        syncWorld.updateViewport(900f, 700f)
+        suspendWorld.updateViewport(900f, 700f)
+
+        val planets = listOf(
+            PlanetPhysics(pinned = true).toPlanetSpec("root", 1.0f),
+            PlanetPhysics().toPlanetSpec("a", 1.0f),
+            PlanetPhysics().toPlanetSpec("b", 1.0f),
+            PlanetPhysics().toPlanetSpec("c", 1.0f),
+        )
+        val edges = listOf(
+            RubberPhysics.fixed(100f).toRubberSpec("root", "a", 1.0f),
+            RubberPhysics.fixed(100f).toRubberSpec("root", "b", 1.0f),
+            RubberPhysics.fixed(100f).toRubberSpec("a", "c", 1.0f),
+        )
+
+        syncWorld.syncTopology(planets, edges, 450f, 350f)
+        suspendWorld.syncTopology(planets, edges) { Vec2(450f, 350f) }
+
+        for (i in planets.indices) {
+            val sb = syncWorld.bodyOf(planets[i].id)!!
+            val ab = suspendWorld.bodyOf(planets[i].id)!!
+            assertEquals(ab.x, sb.x, 1e-5f)
+            assertEquals(ab.y, sb.y, 1e-5f)
+        }
+
+        var syncActive = true
+        var suspendActive = true
+        var guard = 0
+        while ((syncActive || suspendActive) && guard < 2400) {
+            if (syncActive) syncActive = syncWorld.stepSync(0.016f, 1.0f)
+            if (suspendActive) suspendActive = suspendWorld.step(0.016f, 1.0f)
+            assertEquals(suspendActive, syncActive, "Active/settle state diverged at frame $guard")
+            for (spec in planets) {
+                val sb = syncWorld.bodyOf(spec.id)!!
+                val ab = suspendWorld.bodyOf(spec.id)!!
+                assertEquals(ab.x, sb.x, 1e-4f)
+                assertEquals(ab.y, sb.y, 1e-4f)
+            }
+            guard += 1
+        }
+        assertFalse(syncActive, "Simulation should settle cleanly via stepSync")
+    }
 }

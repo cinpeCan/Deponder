@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.20")
+        classpath("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.21")
         classpath("org.ow2.asm:asm:9.7.1")
     }
 }
@@ -21,8 +21,50 @@ plugins {
     alias(libs.plugins.vanniktech.maven.publish) apply false
 }
 
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+import org.jetbrains.kotlin.gradle.targets.js.EnvSpec
+import org.jetbrains.kotlin.gradle.targets.js.npm.LockStoreTask
+import org.jetbrains.kotlin.gradle.targets.wasm.binaryen.BinaryenEnvSpec
+import org.jetbrains.kotlin.gradle.targets.wasm.binaryen.BinaryenPlugin
+import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsEnvSpec
+import org.jetbrains.kotlin.gradle.targets.wasm.nodejs.WasmNodeJsPlugin
+import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnPlugin
+import org.jetbrains.kotlin.gradle.targets.wasm.yarn.WasmYarnRootEnvSpec
+
 val deponderGroupId = "io.github.cinpecan"
-val deponderVersion = "0.6.1"
+val deponderVersion = "0.7.0"
+
+fun <P : Plugin<*>, S : EnvSpec<*>> Project.disableToolDownloadUrl(
+    pluginClass: Class<P>,
+    specClass: Class<S>,
+) {
+    plugins.withType(pluginClass) {
+        extensions.configure(specClass) {
+            downloadBaseUrl.unset()
+            downloadBaseUrl.unsetConvention()
+        }
+    }
+}
+
+allprojects {
+    disableToolDownloadUrl(WasmNodeJsPlugin::class.java, WasmNodeJsEnvSpec::class.java)
+    disableToolDownloadUrl(WasmYarnPlugin::class.java, WasmYarnRootEnvSpec::class.java)
+    @OptIn(ExperimentalWasmDsl::class)
+    disableToolDownloadUrl(BinaryenPlugin::class.java, BinaryenEnvSpec::class.java)
+}
+
+// KGP registers npm LockStoreTask alongside Yarn; running both in Gradle 9.6 fails without package-lock.json.
+plugins.withType(WasmYarnPlugin::class.java) {
+    tasks.withType(LockStoreTask::class.java)
+        .matching { it.name == "kotlinWasmUpgradePackageLock" || it.name == "kotlinWasmStorePackageLock" }
+        .configureEach {
+            enabled = false
+            setDependsOn(emptyList<Any>())
+            inputFile.unset()
+            inputFile.unsetConvention()
+            additionalInputFiles.setFrom()
+        }
+}
 
 subprojects {
     group = deponderGroupId

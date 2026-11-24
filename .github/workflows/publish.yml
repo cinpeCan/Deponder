@@ -4,21 +4,34 @@ on:
   release:
     types: [ published ]
   workflow_dispatch:
+    inputs:
+      create_github_release:
+        description: "Tag v<deponderVersion> and publish GitHub Release with XCFramework"
+        required: false
+        type: boolean
+        default: true
+      publish_maven:
+        description: "Publish Multiplatform & Android artifacts to Maven Central"
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   publish:
-    name: Publish All Multiplatform Artifacts to Central Portal
+    name: Publish All Multiplatform & Apple SPM Artifacts
     runs-on: macos-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v6
@@ -29,21 +42,70 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Verify Release Tag Matches Project Version
-        if: github.event_name == 'release'
+      - name: Validate Version & Tag State
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
           BUILD_VERSION="$(grep -E 'val deponderVersion\s*=' build.gradle.kts | sed -E 's/.*"([^"]+)".*/\1/')"
-          echo "Release tag version: $TAG_VERSION, build.gradle.kts version: $BUILD_VERSION"
-          if [ "$TAG_VERSION" != "$BUILD_VERSION" ]; then
-            echo "Mismatch between release tag ($TAG_VERSION) and deponderVersion ($BUILD_VERSION)" >&2
-            exit 1
+          echo "BUILD_VERSION=$BUILD_VERSION" >> "$GITHUB_ENV"
+          if [ "${{ github.event_name }}" = "release" ]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            echo "Release tag version: $TAG_VERSION, build.gradle.kts version: $BUILD_VERSION"
+            if [ "$TAG_VERSION" != "$BUILD_VERSION" ]; then
+              echo "Mismatch between release tag ($TAG_VERSION) and deponderVersion ($BUILD_VERSION)" >&2
+              exit 1
+            fi
+          elif [ "${{ inputs.create_github_release }}" = "true" ]; then
+            if git ls-remote --exit-code --tags origin "refs/tags/v${BUILD_VERSION}" >/dev/null 2>&1; then
+              echo "Tag v${BUILD_VERSION} already exists on origin. Bump deponderVersion in build.gradle.kts first." >&2
+              exit 1
+            fi
           fi
 
       - name: Run Tests & ABI Verification
         run: ./gradlew :deponder-core:jvmTest :deponder-core:checkKotlinAbi :deponder-compose:desktopTest :deponder-compose:checkKotlinAbi :deponder:testDebugUnitTest :deponder:apiCheck
 
+      - name: Build Swift Export XCFramework & Sync Package.swift
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          ./gradlew :deponder-core:assembleDeponderAppleSwiftPackage -PupdatePackageSwiftChecksum=true
+          DEPONDER_LOCAL_BINARY=1 swift test
+
+      - name: Verify Attached Release XCFramework & Package.swift
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXPECTED_URL="https://github.com/cinpeCan/Deponder/releases/download/v${BUILD_VERSION}/DeponderCoreBridge.xcframework.zip"
+          grep -qF "$EXPECTED_URL" Package.swift || {
+            echo "Package.swift URL mismatch; expected $EXPECTED_URL" >&2
+            exit 1
+          }
+          mkdir -p /tmp/release-xcframework deponder-core/build/XCFrameworks/release
+          if ! gh release download "$GITHUB_REF_NAME" -p "DeponderCoreBridge.xcframework.zip" -D /tmp/release-xcframework; then
+            echo "Missing DeponderCoreBridge.xcframework.zip on GitHub Release $GITHUB_REF_NAME." >&2
+            echo "Attach the local deponder-core/build/XCFrameworks/release/DeponderCoreBridge.xcframework.zip matching Package.swift, or run this workflow via workflow_dispatch for an automated release." >&2
+            exit 1
+          fi
+          ACTUAL_SHA="$(swift package compute-checksum /tmp/release-xcframework/DeponderCoreBridge.xcframework.zip | tr -d '[:space:]')"
+          grep -qF "$ACTUAL_SHA" Package.swift || {
+            echo "Checksum mismatch! Release zip SHA-256 ($ACTUAL_SHA) does not match Package.swift in tag $GITHUB_REF_NAME." >&2
+            exit 1
+          }
+          ditto -x -k /tmp/release-xcframework/DeponderCoreBridge.xcframework.zip deponder-core/build/XCFrameworks/release
+          DEPONDER_LOCAL_BINARY=1 swift test
+
+      - name: Sync Updated Apple Manifest to Branch
+        if: github.event_name == 'workflow_dispatch' && inputs.create_github_release == true
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Package.swift apple/Generated
+          if ! git diff --cached --quiet; then
+            git commit -m "chore(release): sync Apple SwiftPM manifest for v${BUILD_VERSION}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+
       - name: Publish and Release to Maven Central Portal
+        if: github.event_name == 'release' || inputs.publish_maven == true
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -51,3 +113,15 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.GPG_SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_SIGNING_PASSWORD }}
         run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
+
+      - name: Tag & Publish GitHub Release with XCFramework
+        if: github.event_name == 'workflow_dispatch' && inputs.create_github_release == true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git tag -a "v${BUILD_VERSION}" -m "Release v${BUILD_VERSION}"
+          git push origin "refs/tags/v${BUILD_VERSION}"
+          gh release create "v${BUILD_VERSION}" \
+            deponder-core/build/XCFrameworks/release/DeponderCoreBridge.xcframework.zip \
+            --title "v${BUILD_VERSION}" \
+            --generate-notes

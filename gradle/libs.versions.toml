@@ -1,10 +1,10 @@
 [versions]
 agp = "9.2.1"
-kotlin = "2.3.20"
-composeMultiplatform = "1.11.1"
+kotlin = "2.4.21"
+composeMultiplatform = "1.12.2"
 dokka = "2.2.0"
 vanniktechPublish = "0.37.0"
-compileSdk = "36"
+compileSdk = "37"
 minSdk = "23"
 targetSdk = "36"
 androidxAnnotation = "1.9.1"

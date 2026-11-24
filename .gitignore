@@ -9,3 +9,6 @@ captures/
 .externalNativeBuild/
 .cxx/
 gradle/gradle-daemon-jvm.properties
+.swiftpm/
+.build/
+kotlin-js-store/

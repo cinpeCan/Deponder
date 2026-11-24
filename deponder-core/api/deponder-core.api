@@ -179,7 +179,6 @@ public final class com/cinpe/deponder/core/EdgeKey$Companion {
 }
 
 public final class com/cinpe/deponder/core/EnvironmentSpec {
-	public fun <init> ()V
 	public fun <init> (FFFFFFFFFFFZFFFFF)V
 	public synthetic fun <init> (FFFFFFFFFFFZFFFFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()F
@@ -309,7 +308,6 @@ public final class com/cinpe/deponder/core/PlanetSpec {
 
 public final class com/cinpe/deponder/core/RootPhysics {
 	public static final field Companion Lcom/cinpe/deponder/core/RootPhysics$Companion;
-	public fun <init> ()V
 	public fun <init> (FFFFFFFFF)V
 	public fun <init> (FFFFFFFFFF)V
 	public synthetic fun <init> (FFFFFFFFFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -366,7 +364,6 @@ public final class com/cinpe/deponder/core/RootPhysics$Companion {
 
 public final class com/cinpe/deponder/core/RubberPhysics {
 	public static final field Companion Lcom/cinpe/deponder/core/RubberPhysics$Companion;
-	public fun <init> ()V
 	public fun <init> (F)V
 	public fun <init> (FF)V
 	public synthetic fun <init> (FFILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -492,6 +489,8 @@ public final class com/cinpe/deponder/core/SimulationWorld {
 	public final fun setBodySize (Ljava/lang/String;FFF)V
 	public static synthetic fun setBodySize$default (Lcom/cinpe/deponder/core/SimulationWorld;Ljava/lang/String;FFFILjava/lang/Object;)V
 	public final fun step (FFLkotlin/coroutines/Continuation;)Ljava/lang/Object;
+	public final fun stepSync (FF)Z
+	public final fun syncTopology (Ljava/util/List;Ljava/util/List;FF)V
 	public final fun syncTopology (Ljava/util/List;Ljava/util/List;Lkotlin/jvm/functions/Function1;)V
 	public final fun unfold ()V
 	public final fun updateAllRubbersElasticity (F)V

@@ -1,5 +1,5 @@
 // Klib ABI Dump
-// Targets: [iosArm64, iosSimulatorArm64, wasmJs]
+// Targets: [iosArm64, iosSimulatorArm64, macosArm64, wasmJs]
 // Rendering settings:
 // - Signature version: 2
 // - Show manifest properties: true
@@ -441,6 +441,8 @@ final class com.cinpe.deponder.core/SimulationWorld { // com.cinpe.deponder.core
     final fun setBodyPosition(kotlin/String, kotlin/Float, kotlin/Float, kotlin/Float = ...) // com.cinpe.deponder.core/SimulationWorld.setBodyPosition|setBodyPosition(kotlin.String;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
     final fun setBodyPressed(kotlin/String, kotlin/Boolean) // com.cinpe.deponder.core/SimulationWorld.setBodyPressed|setBodyPressed(kotlin.String;kotlin.Boolean){}[0]
     final fun setBodySize(kotlin/String, kotlin/Float, kotlin/Float, kotlin/Float = ...) // com.cinpe.deponder.core/SimulationWorld.setBodySize|setBodySize(kotlin.String;kotlin.Float;kotlin.Float;kotlin.Float){}[0]
+    final fun stepSync(kotlin/Float, kotlin/Float): kotlin/Boolean // com.cinpe.deponder.core/SimulationWorld.stepSync|stepSync(kotlin.Float;kotlin.Float){}[0]
+    final fun syncTopology(kotlin.collections/List<com.cinpe.deponder.core/PlanetSpec>, kotlin.collections/List<com.cinpe.deponder.core/RubberSpec>, kotlin/Float, kotlin/Float) // com.cinpe.deponder.core/SimulationWorld.syncTopology|syncTopology(kotlin.collections.List<com.cinpe.deponder.core.PlanetSpec>;kotlin.collections.List<com.cinpe.deponder.core.RubberSpec>;kotlin.Float;kotlin.Float){}[0]
     final fun syncTopology(kotlin.collections/List<com.cinpe.deponder.core/PlanetSpec>, kotlin.collections/List<com.cinpe.deponder.core/RubberSpec>, kotlin/Function1<com.cinpe.deponder.core/PlanetSpec, com.cinpe.deponder.core/Vec2>) // com.cinpe.deponder.core/SimulationWorld.syncTopology|syncTopology(kotlin.collections.List<com.cinpe.deponder.core.PlanetSpec>;kotlin.collections.List<com.cinpe.deponder.core.RubberSpec>;kotlin.Function1<com.cinpe.deponder.core.PlanetSpec,com.cinpe.deponder.core.Vec2>){}[0]
     final fun unfold() // com.cinpe.deponder.core/SimulationWorld.unfold|unfold(){}[0]
     final fun updateAllRubbersElasticity(kotlin/Float) // com.cinpe.deponder.core/SimulationWorld.updateAllRubbersElasticity|updateAllRubbersElasticity(kotlin.Float){}[0]

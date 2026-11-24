@@ -1,0 +1,4 @@
+module "SharedBridge_DeponderCore" {
+    umbrella "."
+    export *
+}

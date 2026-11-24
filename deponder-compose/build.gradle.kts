@@ -19,9 +19,7 @@ kotlin {
     explicitApi()
 
     @OptIn(ExperimentalAbiValidation::class)
-    abiValidation {
-        enabled.set(true)
-    }
+    abiValidation()
 
     android {
         namespace = "com.cinpe.deponder.compose"

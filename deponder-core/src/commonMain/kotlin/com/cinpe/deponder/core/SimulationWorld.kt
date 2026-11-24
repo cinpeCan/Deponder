@@ -612,6 +612,22 @@ public class SimulationWorld(
         resetSettleTimer()
     }
 
+    /**
+     * Atomically reconciles full planet and rubber lists while placing any newly added planets at
+     * `(defaultInitialX, defaultInitialY)`.
+     *
+     * Convenience overload for cross-language callers (such as Swift Export) where inline
+     * `value class Vec2` lambdas are unavailable.
+     */
+    public fun syncTopology(
+        planets: List<PlanetSpec>,
+        edges: List<RubberSpec>,
+        defaultInitialX: Float,
+        defaultInitialY: Float,
+    ) {
+        syncTopology(planets, edges) { Vec2(defaultInitialX, defaultInitialY) }
+    }
+
     private fun rebuildTopologyIndex(scale: Float) {
         val clampedScale = clampScale(scale)
         bodyList.clear()
@@ -959,6 +975,182 @@ public class SimulationWorld(
         return u * u * (3f - 2f * u)
     }
 
+    private fun clampStepDt(dtSeconds: Float): Float =
+        if (dtSeconds.isFinite()) {
+            dtSeconds.coerceIn(1e-4f, DeponderDefaults.Simulation.MAX_DT_SECONDS)
+        } else {
+            1e-4f
+        }
+
+    private fun computeSubSteps(clampedDt: Float): Int =
+        ceil(clampedDt / DeponderDefaults.Simulation.MAX_SUBSTEP_DT_SECONDS)
+            .toInt()
+            .coerceIn(1, DeponderDefaults.Simulation.MAX_SUBSTEPS)
+
+    private fun captureFrameStart(n: Int): Boolean {
+        var anyPressed = false
+        for (i in 0 until n) {
+            val b = bodyList[i]
+            frameStartX[i] = b.x
+            frameStartY[i] = b.y
+            if (b.isPressed) anyPressed = true
+        }
+        return anyPressed
+    }
+
+    private fun runSyncSubsteps(
+        n: Int,
+        clampedScale: Float,
+        env: EnvironmentSpec,
+        subSteps: Int,
+        subDt: Float,
+    ): Vec2 {
+        val wasExplicitUnfold = unfoldRequested
+        @Suppress("DEPRECATION")
+        val wasLegacyAutoUnfold = env.unfoldEnabled && unfoldDirty
+        if (wasExplicitUnfold || wasLegacyAutoUnfold) {
+            unfoldRequested = false
+            if (wasLegacyAutoUnfold) {
+                unfoldDirty = false
+            }
+            if (viewportWidthPx > 0f || viewportHeightPx > 0f) {
+                unfoldAwaitingViewport = false
+            }
+            val edgeCount = collectUnfoldInputs(n, clampedScale)
+            val solved = unfolder.solve(
+                n = n,
+                curX = snapPx,
+                curY = snapPy,
+                locked = unfoldLocked,
+                established = unfoldEstablished,
+                edgeCount = edgeCount,
+                edgeStart = unfoldEdgeStart,
+                edgeEnd = unfoldEdgeEnd,
+                edgeLength = unfoldEdgeLen,
+                viewportWidth = viewportWidthPx,
+                viewportHeight = viewportHeightPx,
+                wallRepulsionPx = env.wallRepulsionPx,
+                clampedScale = clampedScale,
+                outTargetX = unfoldTargetX,
+                outTargetY = unfoldTargetY,
+            )
+            if (solved) {
+                unfoldRemainingSeconds = UNFOLD_DURATION_SECONDS
+                for (i in 0 until n) {
+                    bodyList[i].hasEstablishedPose = true
+                }
+            } else {
+                unfoldRemainingSeconds = 0f
+            }
+        }
+
+        var lastSpeedSq = 0f
+        var lastAccelSq = 0f
+        for (sub in 0 until subSteps) {
+            val metrics = runSingleSubstepNonSuspend(
+                n = n,
+                subDt = subDt,
+                clampedScale = clampedScale,
+                env = env,
+            )
+            if (sub == subSteps - 1) {
+                lastSpeedSq = metrics.x
+                lastAccelSq = metrics.y
+            }
+        }
+        for (i in 0 until n) {
+            val b = bodyList[i]
+            b.dx = b.x - frameStartX[i]
+            b.dy = b.y - frameStartY[i]
+            b.hasEstablishedPose = true
+        }
+        return Vec2(lastSpeedSq, lastAccelSq)
+    }
+
+    private fun finalizeStepAndCheckSleep(
+        clampedDt: Float,
+        clampedScale: Float,
+        env: EnvironmentSpec,
+        anyPressed: Boolean,
+        maxSpeedSq: Float,
+        maxAccelSq: Float,
+    ): Boolean {
+        if (bodyList.isEmpty()) {
+            return false
+        }
+
+        // Update visual rubber poses once at the end of the VSYNC step.
+        refreshRubberPoses(clampedScale)
+
+        if (anyPressed || bodyList.any { it.isPressed }) {
+            settleTimeSeconds = 0f
+            return true
+        }
+
+        if (unfoldRemainingSeconds > 0f) {
+            settleTimeSeconds = 0f
+            return true
+        }
+
+        val restSpeed = env.restSpeedPxPerSec * clampedScale
+        val restAccel = env.restAccelPxPerSecSq * clampedScale
+        val isKineticCalm = maxSpeedSq <= restSpeed * restSpeed
+        val isForceCalm = maxAccelSq <= restAccel * restAccel
+
+        if (isKineticCalm && isForceCalm) {
+            settleTimeSeconds += clampedDt
+            if (settleTimeSeconds >= env.settleDurationSeconds) {
+                zeroAllVelocities(bodyList.size)
+                return false
+            }
+        } else {
+            settleTimeSeconds = 0f
+        }
+
+        return true
+    }
+
+    /**
+     * Synchronously advances the physics world by [dtSeconds] at zoom [scale] on the caller thread
+     * with zero coroutine or heap allocations.
+     *
+     * Ideal for caller-thread 120Hz display-link loops (such as Apple SwiftUI/CADisplayLink or
+     * synchronous canvas renders).
+     *
+     * @return `true` if the simulation remains active and should schedule another frame;
+     *         `false` once all free nodes satisfy global kinetic + acceleration calm over
+     *         [EnvironmentSpec.settleDurationSeconds] so the caller can suspend at 0% CPU.
+     */
+    public fun stepSync(dtSeconds: Float, scale: Float): Boolean {
+        if (asyncStepInFlight) return true
+        val n = bodyList.size
+        if (n == 0) return false
+        ensureBuffers(n)
+
+        val clampedDt = clampStepDt(dtSeconds)
+        val clampedScale = clampScale(scale)
+        val env = environment
+        val subSteps = computeSubSteps(clampedDt)
+        val subDt = clampedDt / subSteps.toFloat()
+        val anyPressed = captureFrameStart(n)
+
+        val metrics = runSyncSubsteps(
+            n = n,
+            clampedScale = clampedScale,
+            env = env,
+            subSteps = subSteps,
+            subDt = subDt,
+        )
+        return finalizeStepAndCheckSleep(
+            clampedDt = clampedDt,
+            clampedScale = clampedScale,
+            env = env,
+            anyPressed = anyPressed,
+            maxSpeedSq = metrics.x,
+            maxAccelSq = metrics.y,
+        )
+    }
+
     /**
      * Advances the physics world by [dtSeconds] at zoom [scale].
      *
@@ -976,26 +1168,13 @@ public class SimulationWorld(
         if (n == 0) return false
         ensureBuffers(n)
 
-        val clampedDt = if (dtSeconds.isFinite()) {
-            dtSeconds.coerceIn(1e-4f, DeponderDefaults.Simulation.MAX_DT_SECONDS)
-        } else {
-            1e-4f
-        }
+        val clampedDt = clampStepDt(dtSeconds)
         val clampedScale = clampScale(scale)
         val env = environment
 
-        val subSteps = ceil(clampedDt / DeponderDefaults.Simulation.MAX_SUBSTEP_DT_SECONDS)
-            .toInt()
-            .coerceIn(1, DeponderDefaults.Simulation.MAX_SUBSTEPS)
+        val subSteps = computeSubSteps(clampedDt)
         val subDt = clampedDt / subSteps.toFloat()
-
-        var anyPressed = false
-        for (i in 0 until n) {
-            val b = bodyList[i]
-            frameStartX[i] = b.x
-            frameStartY[i] = b.y
-            if (b.isPressed) anyPressed = true
-        }
+        val anyPressed = captureFrameStart(n)
 
         val maxSpeedSq: Float
         val maxAccelSq: Float
@@ -1235,102 +1414,25 @@ public class SimulationWorld(
             maxAccelSq = tier3Metrics.maxAccelSq
         } else {
             // Tier 1 (N < 64) & Tier 2 (64 <= N < 256): Zero coroutine context-switch overhead.
-            val wasExplicitUnfold = unfoldRequested
-            @Suppress("DEPRECATION")
-            val wasLegacyAutoUnfold = env.unfoldEnabled && unfoldDirty
-            if (wasExplicitUnfold || wasLegacyAutoUnfold) {
-                unfoldRequested = false
-                if (wasLegacyAutoUnfold) {
-                    unfoldDirty = false
-                }
-                if (viewportWidthPx > 0f || viewportHeightPx > 0f) {
-                    unfoldAwaitingViewport = false
-                }
-                val edgeCount = collectUnfoldInputs(n, clampedScale)
-                val solved = unfolder.solve(
-                    n = n,
-                    curX = snapPx,
-                    curY = snapPy,
-                    locked = unfoldLocked,
-                    established = unfoldEstablished,
-                    edgeCount = edgeCount,
-                    edgeStart = unfoldEdgeStart,
-                    edgeEnd = unfoldEdgeEnd,
-                    edgeLength = unfoldEdgeLen,
-                    viewportWidth = viewportWidthPx,
-                    viewportHeight = viewportHeightPx,
-                    wallRepulsionPx = env.wallRepulsionPx,
-                    clampedScale = clampedScale,
-                    outTargetX = unfoldTargetX,
-                    outTargetY = unfoldTargetY,
-                )
-                if (solved) {
-                    unfoldRemainingSeconds = UNFOLD_DURATION_SECONDS
-                    for (i in 0 until n) {
-                        bodyList[i].hasEstablishedPose = true
-                    }
-                } else {
-                    unfoldRemainingSeconds = 0f
-                }
-            }
-
-            var lastSpeedSq = 0f
-            var lastAccelSq = 0f
-            for (sub in 0 until subSteps) {
-                val metrics = runSingleSubstepNonSuspend(
-                    n = n,
-                    subDt = subDt,
-                    clampedScale = clampedScale,
-                    env = env,
-                )
-                if (sub == subSteps - 1) {
-                    lastSpeedSq = metrics.x
-                    lastAccelSq = metrics.y
-                }
-            }
-            for (i in 0 until n) {
-                val b = bodyList[i]
-                b.dx = b.x - frameStartX[i]
-                b.dy = b.y - frameStartY[i]
-                b.hasEstablishedPose = true
-            }
-            maxSpeedSq = lastSpeedSq
-            maxAccelSq = lastAccelSq
+            val metrics = runSyncSubsteps(
+                n = n,
+                clampedScale = clampedScale,
+                env = env,
+                subSteps = subSteps,
+                subDt = subDt,
+            )
+            maxSpeedSq = metrics.x
+            maxAccelSq = metrics.y
         }
 
-        if (bodyList.isEmpty()) {
-            return false
-        }
-
-        // Update visual rubber poses once at the end of the VSYNC step.
-        refreshRubberPoses(clampedScale)
-
-        if (anyPressed || bodyList.any { it.isPressed }) {
-            settleTimeSeconds = 0f
-            return true
-        }
-
-        if (unfoldRemainingSeconds > 0f) {
-            settleTimeSeconds = 0f
-            return true
-        }
-
-        val restSpeed = env.restSpeedPxPerSec * clampedScale
-        val restAccel = env.restAccelPxPerSecSq * clampedScale
-        val isKineticCalm = maxSpeedSq <= restSpeed * restSpeed
-        val isForceCalm = maxAccelSq <= restAccel * restAccel
-
-        if (isKineticCalm && isForceCalm) {
-            settleTimeSeconds += clampedDt
-            if (settleTimeSeconds >= env.settleDurationSeconds) {
-                zeroAllVelocities(bodyList.size)
-                return false
-            }
-        } else {
-            settleTimeSeconds = 0f
-        }
-
-        return true
+        return finalizeStepAndCheckSleep(
+            clampedDt = clampedDt,
+            clampedScale = clampedScale,
+            env = env,
+            anyPressed = anyPressed,
+            maxSpeedSq = maxSpeedSq,
+            maxAccelSq = maxAccelSq,
+        )
     }
 
     private class Tier3StepMetrics(
