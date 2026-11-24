@@ -3,7 +3,13 @@
 import Foundation
 import PackageDescription
 
-private let useLocalBinary = ProcessInfo.processInfo.environment["DEPONDER_LOCAL_BINARY"] == "1"
+private let packageRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+private let localXCFrameworkRelativePath = "deponder-core/build/XCFrameworks/release/DeponderCoreBridge.xcframework"
+private let hasLocalXCFramework = FileManager.default.fileExists(
+    atPath: packageRoot.appendingPathComponent(localXCFrameworkRelativePath).path
+)
+private let envLocalFlag = ProcessInfo.processInfo.environment["DEPONDER_LOCAL_BINARY"]
+private let useLocalBinary = envLocalFlag == "1" || (envLocalFlag != "0" && hasLocalXCFramework)
 
 private let bridgeBinaryTarget: Target = useLocalBinary
     ? .binaryTarget(

@@ -18,15 +18,15 @@ Deponder 是面向 **Compose Multiplatform**（Android / iOS / Desktop / Web Was
   <img src="docs/assets/deponder-architecture.svg" width="880" alt="Deponder 架构示意图" />
 </p>
 
-Compose、SwiftUI 与 Android View 三端基于同一套无 UI 依赖的 `deponder-core` 物理内核，对外提供一致的 5 个核心接入接口：
+Compose、SwiftUI 与 Android View 三端基于同一套无 UI 依赖的 `deponder-core` 物理内核，共享一致的 5 算子模型（分别以 `Modifier.deponder*`、SwiftUI `View.deponder*` 与 Android `View` / `ViewGroup.deponder*` 形式挂载）：
 
-| 算子 | Compose | SwiftUI (iOS 18+ / macOS 15+) | Android View | 作用 |
-| :--- | :--- | :--- | :--- | :--- |
-| **Root** | `Modifier.deponderRoot` | `View.deponderRoot` | `ViewGroup.deponderRoot` | 建立仿真坐标系并驱动帧循环 |
-| **Planet** | `Modifier.deponderPlanet` | `View.deponderPlanet` | `View.deponderPlanet` | 注册具备质量、斥力半径与固定状态的节点 |
-| **Rubber** | `Modifier.deponderRubber` | `View.deponderRubber` | `View.deponderRubber` | 连接两端节点 ID，建立弹簧力与端点安全区裁剪 |
-| **Stretch** | `Modifier.deponderStretch` | `View.deponderStretch` | `View.deponderStretch` | 使自定义连线或内部线条子元素随间距拉伸 |
-| **Drag** | `Modifier.deponderDrag` | `View.deponderDrag` | `View.deponderDrag` | 启用物理拖拽，并通过 `touchSlop` 保留点击事件 |
+| 算子 | 挂载目标 | 作用 |
+| :--- | :--- | :--- |
+| `deponderRoot` | 根容器（`Box` / `ZStack` / `ViewGroup`） | 建立仿真坐标系并驱动帧循环 |
+| `deponderPlanet` | 节点组件 | 注册具备质量、斥力半径与固定状态的质点 |
+| `deponderRubber` | 连线组件 | 连接两端节点 ID，建立弹簧力与端点安全区裁剪 |
+| `deponderStretch` | 连线或内部线条子元素 | 使自定义连线或内部线条随间距拉伸 |
+| `deponderDrag` | 节点本体或拖拽手柄 | 启用物理拖拽，并通过 `touchSlop` 保留点击事件 |
 
 - **视图层级约定**：在 Compose 与 SwiftUI 中，`deponderPlanet` 与 `deponderRubber` 可放置于 `deponderRoot` 内部任意静态嵌套深度（SwiftUI 下 `.deponderDrag()` 同时兼容挂在 `.deponderPlanet()` 外侧或内部手柄子视图上）；Compose 无向连线建议使用对称且无冲突的 `EdgeKey(a, b)` 作为 `key(...)`。在 Android View 中，`deponderPlanet` 与 `deponderRubber` 必须是 `deponderRoot` 容器的**直接子 View**；绑定信息保存在私有资源 tag ID 中，不覆盖业务方 `View.getTag()`、子视图顺序或宿主 `clipChildren` 设置。
 - **手势共存**：`deponderDrag` 在手指位移超过 `touchSlop` 后才接管事件，保持原有的 `.clickable {}`、SwiftUI `Button` / `.onTapGesture`、`OnClickListener`、`OnLongClickListener` 与点击水波纹反馈正常工作；拖拽修饰符既可直接加在节点本体，也可加在节点内部的指定手柄区域。
@@ -77,7 +77,7 @@ dependencies {
 
 | Product | 目标平台与定位 | 系统/架构要求 |
 | :--- | :--- | :--- |
-| `Deponder` | 原生 SwiftUI 五大算子与 `DeponderDefaultRubber`（同时 `@_exported import DeponderCore`） | iOS 18+、macOS 15+（`arm64`） |
+| `Deponder` | 原生 SwiftUI 五大算子与 `DeponderDefaultRubber`（自动导出 `DeponderCore`） | iOS 18+、macOS 15+（`arm64`） |
 | `DeponderCore` | 官方 Kotlin Swift Export 导出的无 UI 物理内核（`SimulationWorld`、配置与预设） | iOS 18+、macOS 15+（`arm64`） |
 
 ```swift

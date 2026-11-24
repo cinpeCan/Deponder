@@ -18,15 +18,15 @@ Deponder is a force-directed physics interaction library for **Compose Multiplat
   <img src="docs/assets/deponder-architecture.svg" width="880" alt="Deponder Architecture" />
 </p>
 
-All UI toolkits share the same five-operator model backed by a single UI-agnostic `deponder-core` kernel:
+All UI toolkits share the same five-operator model backed by a single UI-agnostic `deponder-core` kernel — invoked as `Modifier.deponder*` in Compose, `View.deponder*` in SwiftUI, and `View` / `ViewGroup.deponder*` in Android Views:
 
-| Operator | Compose | SwiftUI (iOS 18+ / macOS 15+) | Android View | Role |
-| :--- | :--- | :--- | :--- | :--- |
-| **Root** | `Modifier.deponderRoot` | `View.deponderRoot` | `ViewGroup.deponderRoot` | Simulation coordinate space and frame loop |
-| **Planet** | `Modifier.deponderPlanet` | `View.deponderPlanet` | `View.deponderPlanet` | Point-mass node with repulsion range and pinning |
-| **Rubber** | `Modifier.deponderRubber` | `View.deponderRubber` | `View.deponderRubber` | Hooke spring link with endpoint safe-area trimming |
-| **Stretch** | `Modifier.deponderStretch` | `View.deponderStretch` | `View.deponderStretch` | Stretches a custom link or inner child along the span |
-| **Drag** | `Modifier.deponderDrag` | `View.deponderDrag` | `View.deponderDrag` | Pointer dragging with `touchSlop` click preservation |
+| Operator | Attach To | Role |
+| :--- | :--- | :--- |
+| `deponderRoot` | Container (`Box`, `ZStack`, `ViewGroup`) | Simulation coordinate space and frame loop |
+| `deponderPlanet` | Node component | Point-mass body with repulsion range and pinning |
+| `deponderRubber` | Link component | Hooke spring link with endpoint safe-area trimming |
+| `deponderStretch` | Link or inner line child | Stretches a custom link or inner child along the span |
+| `deponderDrag` | Node or drag handle | Pointer dragging with `touchSlop` click preservation |
 
 - **Hierarchy rules**: In Compose and SwiftUI, `deponderPlanet` and `deponderRubber` can live at any static nesting depth inside `deponderRoot` (and in SwiftUI, `.deponderDrag()` works both outside `.deponderPlanet()` and on inner child handles). In Compose, use `EdgeKey(a, b)` as a symmetric, collision-free `key(...)` for undirected links. In Android Views, `deponderPlanet` and `deponderRubber` views must be **direct children** of the `deponderRoot` `ViewGroup` (bindings store private keyed tag IDs and never alter `View.getTag()`, child order, or `clipChildren`).
 - **Gesture coexistence**: `deponderDrag` defers interception until pointer movement exceeds `touchSlop`, keeping `.clickable {}`, SwiftUI `Button` / `.onTapGesture`, `OnClickListener`, `OnLongClickListener`, and touch ripples intact. It can be attached to the planet component itself or to an inner drag-handle child.
@@ -77,7 +77,7 @@ Add `https://github.com/cinpeCan/Deponder.git` (`0.7.0`+) in Xcode (**File → A
 
 | Product | Target | Platforms |
 | :--- | :--- | :--- |
-| `Deponder` | Native SwiftUI five-operator bindings + `DeponderDefaultRubber` (also `@_exported import DeponderCore`) | iOS 18+, macOS 15+ (`arm64`) |
+| `Deponder` | Native SwiftUI operators + `DeponderDefaultRubber` (re-exports `DeponderCore`) | iOS 18+, macOS 15+ (`arm64`) |
 | `DeponderCore` | Headless Swift Export physics kernel (`SimulationWorld`, configs, presets) | iOS 18+, macOS 15+ (`arm64`) |
 
 ```swift
