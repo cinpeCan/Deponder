@@ -21,6 +21,8 @@ plugins {
     alias(libs.plugins.vanniktech.maven.publish) apply false
 }
 
+import org.gradle.api.tasks.testing.AbstractTestTask
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.targets.js.EnvSpec
 import org.jetbrains.kotlin.gradle.targets.js.npm.LockStoreTask
@@ -69,6 +71,16 @@ plugins.withType(WasmYarnPlugin::class.java) {
 subprojects {
     group = deponderGroupId
     version = deponderVersion
+
+    tasks.withType<AbstractTestTask>().configureEach {
+        testLogging {
+            events("failed")
+            exceptionFormat = TestExceptionFormat.FULL
+            showExceptions = true
+            showCauses = true
+            showStackTraces = true
+        }
+    }
 
     plugins.withId("com.vanniktech.maven.publish") {
         extensions.configure<com.vanniktech.maven.publish.MavenPublishBaseExtension> {

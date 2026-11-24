@@ -13,7 +13,7 @@ private let bridgeBinaryTarget: Target = useLocalBinary
     : .binaryTarget(
         name: "DeponderCoreBridge",
         url: "https://github.com/cinpeCan/Deponder/releases/download/v0.7.0/DeponderCoreBridge.xcframework.zip",
-        checksum: "9345d903744187a9bd5fb94722ea863d0a46feda30b5ac336f46d9cdc5528b57"
+        checksum: "f36a841d71a4fbc695c336c7b2ec3c97017a534b528bfc3e21106c9e973971ab"
     )
 
 let package = Package(

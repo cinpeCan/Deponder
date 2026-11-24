@@ -1,5 +1,6 @@
 package com.cinpe.deponder.core
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -63,6 +64,7 @@ public class SimulationWorld(
     private var lastRefreshedScale: Float = Float.NaN
     private var perturbationCounter: Int = 0
     private var asyncStepInFlight: Boolean = false
+    internal var tier3Dispatcher: CoroutineDispatcher = Dispatchers.Default
     private val inFlightJournal = ArrayList<CausalIntent>(4)
 
     private val unfolder = TopologicalUnfolder()
@@ -1248,7 +1250,7 @@ public class SimulationWorld(
             inFlightJournal.clear()
             asyncStepInFlight = true
             val tier3Metrics = try {
-                withContext(Dispatchers.Default) {
+                withContext(tier3Dispatcher) {
                     runTier3ParallelSubsteps(
                         n = n,
                         subSteps = subSteps,

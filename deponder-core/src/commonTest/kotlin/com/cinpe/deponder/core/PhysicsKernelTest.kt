@@ -2,6 +2,7 @@ package com.cinpe.deponder.core
 
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.async
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.math.abs
 import kotlin.math.cos
@@ -585,6 +586,7 @@ class PhysicsKernelTest {
             world.step(0.032f, 1.0f)
         }
         assertEquals(1.0f, world.alpha, 1e-6f)
+        world.tier3Dispatcher = StandardTestDispatcher(testScheduler)
 
         // Round A: Concurrent pinning while Tier-3 is suspended on Dispatchers.Default.
         val pinDeferred = async(start = CoroutineStart.UNDISPATCHED) {
@@ -1343,6 +1345,7 @@ class PhysicsKernelTest {
             val a = p * 2.39996
             Vec2(1400f + cos(a).toFloat() * 140f, 1100f + sin(a).toFloat() * 140f)
         }
+        t3CancelWorld.tier3Dispatcher = StandardTestDispatcher(testScheduler)
         t3CancelWorld.unfold()
         val cancelledStep = async(start = CoroutineStart.UNDISPATCHED) {
             t3CancelWorld.step(0.016f, 1.0f)
